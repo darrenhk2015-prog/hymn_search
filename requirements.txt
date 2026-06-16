@@ -1,0 +1,4 @@
+PyQt6
+PyMuPDF
+python-docx
+pyinstaller
