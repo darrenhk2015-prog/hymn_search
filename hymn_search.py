@@ -16,7 +16,7 @@
     - 建議：Windows 10/11（Word 聚焦、顯示切換、文件監聽為 Windows 專用）
 
 【資料來源】
-    預設掃描 HYMN_FOLDER 指向的資料夾（見下方 CONFIG）。
+    預設掃描 exe 旁 `神家詩歌集`；所有 UI 設定存於 settings.json，啟動時還原。
     每個子資料夾或單一檔案視為一本「詩歌冊」，可含 PDF、DOC/DOCX、ODT。
 
 【主要模組結構】
@@ -48,26 +48,51 @@ from PyQt6.QtWidgets import (
     QVBoxLayout, QHBoxLayout, QGridLayout, QPushButton,
     QLineEdit, QLabel, QListWidget, QListWidgetItem,
     QComboBox, QSlider, QFrame, QScrollArea, QCheckBox, QSpinBox,
-    QGroupBox,
+    QGroupBox, QFileDialog,
 )
 from PyQt6.QtCore import (
     Qt, QTimer, QPoint, pyqtSignal, QEvent, QThread, QRectF, QRect,
     QPropertyAnimation, QEasingCurve,
 )
-from PyQt6.QtGui import QColor, QPalette, QFont, QPainter, QPainterPath, QIcon
+from PyQt6.QtGui import (
+    QColor, QPalette, QFont, QPainter, QPainterPath, QIcon, QShortcut, QKeySequence,
+)
+
+from hymn_remote.server import RemoteServer
+from hymn_remote.state import (
+    DEFAULT_PORT, OPEN_POLICY_AUTO, OPEN_POLICY_CONFIRM, OPEN_POLICY_UI,
+)
+from hymn_remote.resolver import resolve_books, resolve_targets
+
+try:
+    from version import APP_VERSION
+except ImportError:
+    APP_VERSION = 0
 
 # ══════════════════════════════════════════════════════════════
 #  CONFIG — 全域設定與資源路徑
 # ══════════════════════════════════════════════════════════════
-# HYMN_FOLDER：詩歌資料根目錄；啟動時會遞迴掃描此路徑下的書冊與檔案。
-# app_resource_path / load_app_icon：開發模式與 PyInstaller 打包後均能正確載入 assets。
-HYMN_FOLDER = os.path.expanduser("~/Desktop/神家詩歌集new")
+# default_hymn_folder：未設定時的預設詩歌根目錄（exe / 專案目錄下的 神家詩歌集）。
+# settings.json：儲存所有 UI 設定；缺省時用 default_settings()。
+# app_dir：exe 所在目錄（打包）或專案目錄（開發）；settings 與預設資料夾放這裡。
+# app_resource_path：打包後讀 _MEIPASS 內嵌資源（icons），與詩歌資料夾分開。
+def app_dir():
+    if getattr(sys, 'frozen', False):
+        return os.path.dirname(os.path.abspath(sys.executable))
+    return os.path.dirname(os.path.abspath(__file__))
+
+
+def default_hymn_folder():
+    return os.path.join(app_dir(), '神家詩歌集')
+
+
+def settings_file_path():
+    return os.path.join(app_dir(), 'settings.json')
 
 
 def app_resource_path(*parts):
-    """解析資源檔路徑（開發環境用腳本目錄，打包後用 _MEIPASS 臨時目錄）。"""
     if getattr(sys, 'frozen', False):
-        base = getattr(sys, '_MEIPASS', os.path.dirname(sys.executable))
+        base = sys._MEIPASS
     else:
         base = os.path.dirname(os.path.abspath(__file__))
     return os.path.join(base, *parts)
@@ -279,17 +304,11 @@ def scan_books(folder):
     return books
 
 
-def find_page_in_toc(toc_list, hymn_num):
-    n, n3 = str(hymn_num), str(hymn_num).zfill(3)
-    for _lvl, title, page in toc_list:
-        t = title.strip()
-        if t in (n, n3): return page
-        if t.startswith((n+'.', n+' ', n+'。', n+'、', n3+'.', n3+' ')): return page
-        if re.match(rf'^第\s*{n}\s*首', t): return page
-    for _lvl, title, page in toc_list:
-        nums = re.findall(r'\d+', title)
-        if nums and int(nums[0]) == hymn_num: return page
-    return None
+def find_page_in_toc(toc_list, hymn_num, raw=''):
+    """依詩歌編號在 PDF 目錄中查找對應頁碼（支援 H22-04 格式）。"""
+    from hymn_remote.resolver import _find_page_in_toc
+    found = _find_page_in_toc(toc_list, hymn_num, raw)
+    return found[0] if found else None
 
 
 # ══════════════════════════════════════════════════════════════
@@ -766,6 +785,121 @@ CENTER_OVERLAY_SECS = 5
 OVERLAY_MODE_CORNER = 'corner'
 OVERLAY_MODE_CENTER = 'center_then_corner'
 
+SETTINGS_VERSION = 1
+
+
+def default_settings():
+    return {
+        'version': SETTINGS_VERSION,
+        'hymn_folder': '',
+        'theme': 'dark',
+        'font_size': 13,
+        'search_mode': 'book',
+        'open_overlay': True,
+        'overlay_duration': DEFAULT_OVERLAY_SECS,
+        'overlay_mode': OVERLAY_MODE_CORNER,
+        'display_duplicate': False,
+        'keyword_instant': True,
+        'book_auto_focus_hymn': True,
+        'click_to_open': False,
+        'remote_api_enabled': False,
+        'remote_accept': False,
+        'remote_port': DEFAULT_PORT,
+        'remote_policy': OPEN_POLICY_AUTO,
+        'remote_token': '',
+    }
+
+
+def normalize_settings(raw):
+    merged = default_settings()
+    if isinstance(raw, dict):
+        for key in merged:
+            if key == 'version':
+                continue
+            if key in raw:
+                merged[key] = raw[key]
+    if merged['theme'] not in THEMES:
+        merged['theme'] = 'dark'
+    try:
+        merged['font_size'] = max(10, min(18, int(merged['font_size'])))
+    except (TypeError, ValueError):
+        merged['font_size'] = 13
+    if merged['search_mode'] not in ('book', 'global', 'keyword'):
+        merged['search_mode'] = 'book'
+    merged['open_overlay'] = bool(merged['open_overlay'])
+    try:
+        dur = int(merged['overlay_duration'])
+        if dur != OVERLAY_DURATION_ALWAYS and not (1 <= dur <= MAX_OVERLAY_SECS):
+            dur = DEFAULT_OVERLAY_SECS
+        merged['overlay_duration'] = dur
+    except (TypeError, ValueError):
+        merged['overlay_duration'] = DEFAULT_OVERLAY_SECS
+    if merged['overlay_mode'] not in (OVERLAY_MODE_CORNER, OVERLAY_MODE_CENTER):
+        merged['overlay_mode'] = OVERLAY_MODE_CORNER
+    merged['display_duplicate'] = bool(merged['display_duplicate'])
+    merged['keyword_instant'] = bool(merged['keyword_instant'])
+    merged['book_auto_focus_hymn'] = bool(merged['book_auto_focus_hymn'])
+    merged['click_to_open'] = bool(merged['click_to_open'])
+    merged['remote_api_enabled'] = bool(merged['remote_api_enabled'])
+    merged['remote_accept'] = bool(merged['remote_accept'])
+    try:
+        merged['remote_port'] = max(1024, min(65535, int(merged['remote_port'])))
+    except (TypeError, ValueError):
+        merged['remote_port'] = DEFAULT_PORT
+    if merged['remote_policy'] not in (OPEN_POLICY_AUTO, OPEN_POLICY_CONFIRM, OPEN_POLICY_UI):
+        merged['remote_policy'] = OPEN_POLICY_AUTO
+    merged['remote_token'] = str(merged['remote_token'] or '')
+    folder = str(merged.get('hymn_folder') or '').strip()
+    merged['hymn_folder'] = os.path.abspath(folder) if folder else ''
+    merged['version'] = SETTINGS_VERSION
+    return merged
+
+
+def load_settings():
+    raw = {}
+    path = settings_file_path()
+    if os.path.isfile(path):
+        try:
+            with open(path, encoding='utf-8') as f:
+                data = json.load(f)
+            raw = data if isinstance(data, dict) else {}
+        except Exception as e:
+            print(f"[WARN] load settings: {e}")
+    return normalize_settings(raw)
+
+
+def save_settings(settings):
+    try:
+        data = normalize_settings(settings)
+        with open(settings_file_path(), 'w', encoding='utf-8') as f:
+            json.dump(data, f, ensure_ascii=False, indent=2)
+    except Exception as e:
+        print(f"[WARN] save settings: {e}")
+
+
+def resolve_hymn_folder(settings):
+    custom = (settings.get('hymn_folder') or '').strip()
+    if custom:
+        return os.path.abspath(custom)
+    return os.path.abspath(default_hymn_folder())
+
+
+def _overlay_duration_index(duration):
+    if duration == OVERLAY_DURATION_ALWAYS:
+        return MAX_OVERLAY_SECS
+    return max(0, min(MAX_OVERLAY_SECS - 1, int(duration) - 1))
+
+
+def _overlay_mode_index(mode):
+    return 1 if mode == OVERLAY_MODE_CENTER else 0
+
+
+def _remote_policy_index(policy):
+    for idx, val in enumerate((OPEN_POLICY_AUTO, OPEN_POLICY_CONFIRM, OPEN_POLICY_UI)):
+        if policy == val:
+            return idx
+    return 0
+
 
 def _overlay_subtitle(text):
     """Display name without file extension for the overlay second line."""
@@ -796,7 +930,7 @@ def _win_ps_bool(script):
         )
         return (result.stdout or '').strip() == '1'
     except Exception as e:
-        print(f"[WARN] document watch: {e}")
+        print(f"py[WARN] document watch: {e}")
         return True
 
 
@@ -1420,20 +1554,28 @@ class MainWindow(QMainWindow):
     - 協調開檔流程（提示 → 開啟 → Word 快捷鍵 → 可選同步畫面）
     """
     display_duplicate_requested = pyqtSignal()  # 從背景執行緒安全觸發顯示模式切換
+    remote_open_payload = pyqtSignal(dict)
+    remote_populate_ui = pyqtSignal(str, str, list)
+    remote_pending_request = pyqtSignal(object)
 
     def __init__(self):
         super().__init__()
         self.books        = []
         self.current_book = None
-        self.search_mode  = 'book'
-        self.theme_name   = 'dark'
-        self.font_size    = 13
+        self._loading_settings = True
+        self._settings    = load_settings()
+        self.hymn_folder  = resolve_hymn_folder(self._settings)
+        self.search_mode  = self._settings['search_mode']
+        self.theme_name   = self._settings['theme']
+        self.font_size    = self._settings['font_size']
         self._search_worker = None
         self._index_worker = None
         self.content_index = None
         self._app         = QApplication.instance()
+        self._remote      = RemoteServer()
+        self._remote_pending_id = None
 
-        self.setWindowTitle("詩歌冊搜索系統")
+        self.setWindowTitle(f"詩歌冊搜索系統 v{APP_VERSION}")
         icon = load_app_icon()
         if not icon.isNull():
             self.setWindowIcon(icon)
@@ -1443,10 +1585,39 @@ class MainWindow(QMainWindow):
         self.dropdown = DropdownList(self.theme_name)
         self.dropdown.book_selected.connect(self._select_book)
         self.display_duplicate_requested.connect(self._switch_duplicate_with_overlay_fix)
+        self.remote_open_payload.connect(self._on_remote_open_payload)
+        self.remote_populate_ui.connect(self._on_remote_populate_ui)
+        self.remote_pending_request.connect(self._on_remote_pending_request)
+        self._remote.set_handlers(
+            lambda: self.books,
+            lambda p: self.remote_open_payload.emit(p),
+            lambda b, n, m: self.remote_populate_ui.emit(b, n, m),
+            lambda r: self.remote_pending_request.emit(r),
+        )
 
         self._build_ui()
+        self._setup_focus_shortcuts()
+        if self._app:
+            self._app.installEventFilter(self)
         self._apply_theme()
+        self._restore_saved_settings()
         self._scan_all()
+        self._update_remote_status_label()
+
+    def _setup_focus_shortcuts(self):
+        for seq in (
+            QKeySequence(Qt.Modifier.CTRL | Qt.Key.Key_Return),
+            QKeySequence(Qt.Modifier.CTRL | Qt.Key.Key_Enter),
+            QKeySequence(Qt.Key.Key_F1),
+        ):
+            sc = QShortcut(seq, self)
+            sc.setContext(Qt.ShortcutContext.WindowShortcut)
+            sc.activated.connect(self._focus_book_input)
+
+    def _focus_book_input(self):
+        if self.search_mode != 'book':
+            self._set_search_mode('book')
+        self.inp_book.setFocus(Qt.FocusReason.ShortcutFocusReason)
 
     def resizeEvent(self, event):
         super().resizeEvent(event)
@@ -1496,7 +1667,10 @@ class MainWindow(QMainWindow):
         )
         h.addWidget(self.hdr_title)
 
-        self.hdr_ver = QLabel("Phase 1")
+        self.hdr_app_ver = QLabel(f"v{APP_VERSION}")
+        h.addWidget(self.hdr_app_ver)
+
+        self.hdr_ver = QLabel("香港神的教會西北區")
         h.addWidget(self.hdr_ver)
 
         self.hdr_vsep = QFrame()
@@ -1504,9 +1678,25 @@ class MainWindow(QMainWindow):
         self.hdr_vsep.setFixedHeight(20)
         h.addWidget(self.hdr_vsep)
 
-        self.hdr_path = QLabel(f"  {HYMN_FOLDER}")
+        self.hdr_path = QLabel(f"  {self.hymn_folder}")
         h.addWidget(self.hdr_path)
         h.addStretch()
+
+        self.chk_remote_accept_hdr = QCheckBox("接受請求")
+        self.chk_remote_accept_hdr.setChecked(self._settings['remote_accept'])
+        self.chk_remote_accept_hdr.setEnabled(False)
+        self.chk_remote_accept_hdr.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.chk_remote_accept_hdr.toggled.connect(self._on_remote_accept_hdr_toggled)
+        h.addWidget(self.chk_remote_accept_hdr)
+
+        self.chk_click_to_open_hdr = QCheckBox("一點即開")
+        self.chk_click_to_open_hdr.setChecked(self._settings['click_to_open'])
+        self.chk_click_to_open_hdr.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.chk_click_to_open_hdr.toggled.connect(self._on_click_to_open_hdr_toggled)
+        h.addWidget(self.chk_click_to_open_hdr)
+
+        self.remote_status_lbl = QLabel("遙控：關閉")
+        h.addWidget(self.remote_status_lbl)
 
         self.status_lbl = QLabel("◌  掃描中...")
         h.addWidget(self.status_lbl)
@@ -1576,6 +1766,24 @@ class MainWindow(QMainWindow):
         self.content_sep = HSep()
         lay.addWidget(self.content_sep)
 
+        self.remote_pending_bar = QFrame()
+        self.remote_pending_bar.setVisible(False)
+        pbl = QHBoxLayout(self.remote_pending_bar)
+        pbl.setContentsMargins(20, 8, 20, 8)
+        self.remote_pending_lbl = QLabel("")
+        self.btn_remote_approve = QPushButton("開啟")
+        self.btn_remote_approve.setFixedWidth(72)
+        self.btn_remote_approve.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_remote_approve.clicked.connect(self._approve_remote_pending)
+        self.btn_remote_reject = QPushButton("忽略")
+        self.btn_remote_reject.setFixedWidth(72)
+        self.btn_remote_reject.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_remote_reject.clicked.connect(self._reject_remote_pending)
+        pbl.addWidget(self.remote_pending_lbl, 1)
+        pbl.addWidget(self.btn_remote_approve)
+        pbl.addWidget(self.btn_remote_reject)
+        lay.addWidget(self.remote_pending_bar)
+
         lay.addWidget(self._build_file_area(), 1)
         return panel
 
@@ -1598,7 +1806,6 @@ class MainWindow(QMainWindow):
             btn.setCheckable(True)
             btn.setFixedHeight(30)
             btn.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.btn_book.setChecked(True)
         self.btn_book.clicked.connect(lambda: self._set_search_mode('book'))
         self.btn_global.clicked.connect(lambda: self._set_search_mode('global'))
         self.btn_keyword.clicked.connect(lambda: self._set_search_mode('keyword'))
@@ -1615,24 +1822,27 @@ class MainWindow(QMainWindow):
         mode_row.addWidget(self.btn_settings)
         lay.addLayout(mode_row)
 
-        # ── 書本模式：過濾書冊 + 檔案關鍵字 + Filter/Open 按鈕 ──
+        # ── 書本模式：書冊 + 詩歌號/名 + Filter/Open 按鈕（上下兩行）──
         self.book_row = QWidget()
-        br = QHBoxLayout(self.book_row)
+        br = QVBoxLayout(self.book_row)
         br.setContentsMargins(0, 0, 0, 0)
         br.setSpacing(8)
 
         self.inp_book = QLineEdit()
         self.inp_book.setFixedHeight(40)
-        self.inp_book.setPlaceholderText("🔍  過濾書冊  e.g. 讚美詩")
+        self.inp_book.setPlaceholderText("請按 F1 開始輸入書冊名稱...")
         self.inp_book.textChanged.connect(self._on_book_text_changed)
         self.inp_book.returnPressed.connect(self._on_book_filter_action)
         self.inp_book.installEventFilter(self)
 
+        book_action_row = QWidget()
+        bar = QHBoxLayout(book_action_row)
+        bar.setContentsMargins(0, 0, 0, 0)
+        bar.setSpacing(8)
+
         self.inp_num = QLineEdit()
         self.inp_num.setFixedHeight(40)
-        self.inp_num.setFixedWidth(150)
-        self.inp_num.setPlaceholderText("檔案關鍵字")
-        self.inp_num.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.inp_num.setPlaceholderText("詩歌號/名")
         self.inp_num.textChanged.connect(self._apply_sidebar_filter)
         self.inp_num.returnPressed.connect(self._on_book_filter_action)
 
@@ -1642,9 +1852,11 @@ class MainWindow(QMainWindow):
         self.btn_filter.setCursor(Qt.CursorShape.PointingHandCursor)
         self.btn_filter.clicked.connect(self._on_book_filter_action)
 
-        br.addWidget(self.inp_book, 1)
-        br.addWidget(self.inp_num)
-        br.addWidget(self.btn_filter)
+        bar.addWidget(self.inp_num, 1)
+        bar.addWidget(self.btn_filter)
+
+        br.addWidget(self.inp_book)
+        br.addWidget(book_action_row)
         lay.addWidget(self.book_row)
 
         # ── 全局模式：跨書冊搜索書籤與檔名（預設隱藏）──────────
@@ -1683,8 +1895,9 @@ class MainWindow(QMainWindow):
         self.inp_keyword.textChanged.connect(self._on_keyword_text_changed)
 
         self.chk_instant = QCheckBox("即時搜索")
-        self.chk_instant.setChecked(True)
+        self.chk_instant.setChecked(self._settings['keyword_instant'])
         self.chk_instant.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.chk_instant.toggled.connect(self._on_keyword_instant_toggled)
 
         self.btn_keyword_search = QPushButton("搜索")
         self.btn_keyword_search.setFixedHeight(40)
@@ -1741,6 +1954,36 @@ class MainWindow(QMainWindow):
         label_min_w = 80
         grid_margins = (18, 18, 16, 14)
 
+        self.grp_data = QGroupBox("詩歌資料夾")
+        data_grid = QGridLayout(self.grp_data)
+        data_grid.setContentsMargins(*grid_margins)
+        data_grid.setHorizontalSpacing(14)
+        data_grid.setVerticalSpacing(12)
+        data_grid.setColumnStretch(1, 1)
+        data_grid.setColumnMinimumWidth(0, label_min_w)
+
+        self.lbl_hymn_folder = QLabel("路徑")
+        self.lbl_hymn_folder.setMinimumWidth(label_min_w)
+        self.lbl_hymn_folder.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
+        self.inp_hymn_folder = QLineEdit(self.hymn_folder)
+        self.inp_hymn_folder.setPlaceholderText(default_hymn_folder())
+        self.btn_browse_hymn_folder = QPushButton("瀏覽…")
+        self.btn_browse_hymn_folder.setFixedWidth(72)
+        self.btn_browse_hymn_folder.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_browse_hymn_folder.clicked.connect(self._browse_hymn_folder)
+        folder_row = QHBoxLayout()
+        folder_row.setSpacing(8)
+        folder_row.addWidget(self.inp_hymn_folder, 1)
+        folder_row.addWidget(self.btn_browse_hymn_folder)
+
+        self.btn_apply_hymn_folder = QPushButton("套用並重新掃描")
+        self.btn_apply_hymn_folder.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_apply_hymn_folder.clicked.connect(self._apply_hymn_folder)
+
+        data_grid.addWidget(self.lbl_hymn_folder, 0, 0)
+        data_grid.addLayout(folder_row, 0, 1)
+        data_grid.addWidget(self.btn_apply_hymn_folder, 1, 1, Qt.AlignmentFlag.AlignLeft)
+
         self.grp_appearance = QGroupBox("外觀")
         appearance_grid = QGridLayout(self.grp_appearance)
         appearance_grid.setContentsMargins(*grid_margins)
@@ -1778,6 +2021,18 @@ class MainWindow(QMainWindow):
         appearance_grid.addWidget(self.lbl_font, 1, 0)
         appearance_grid.addLayout(font_row, 1, 1)
 
+        self.chk_book_auto_focus_hymn = QCheckBox("唯一書冊結果跳至詩歌號/名")
+        self.chk_book_auto_focus_hymn.setChecked(self._settings['book_auto_focus_hymn'])
+        self.chk_book_auto_focus_hymn.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.chk_book_auto_focus_hymn.toggled.connect(self._on_book_auto_focus_hymn_toggled)
+        appearance_grid.addWidget(self.chk_book_auto_focus_hymn, 2, 0, 1, 2)
+
+        self.chk_click_to_open = QCheckBox("一點即開檔案（單擊列表即開啟）")
+        self.chk_click_to_open.setChecked(self._settings['click_to_open'])
+        self.chk_click_to_open.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.chk_click_to_open.toggled.connect(self._on_click_to_open_settings_toggled)
+        appearance_grid.addWidget(self.chk_click_to_open, 3, 0, 1, 2)
+
         self.grp_open = QGroupBox("開啟 Word / PDF 時")
         open_grid = QGridLayout(self.grp_open)
         open_grid.setContentsMargins(*grid_margins)
@@ -1787,7 +2042,7 @@ class MainWindow(QMainWindow):
         open_grid.setColumnMinimumWidth(0, label_min_w)
 
         self.chk_open_overlay = QCheckBox("顯示置頂書名提示")
-        self.chk_open_overlay.setChecked(True)
+        self.chk_open_overlay.setChecked(self._settings['open_overlay'])
         self.chk_open_overlay.setCursor(Qt.CursorShape.PointingHandCursor)
         self.chk_open_overlay.toggled.connect(self._on_open_overlay_toggled)
 
@@ -1798,9 +2053,12 @@ class MainWindow(QMainWindow):
         for sec in range(1, MAX_OVERLAY_SECS + 1):
             self.combo_overlay_duration.addItem(f"{sec} 秒", sec)
         self.combo_overlay_duration.addItem("一直顯示", OVERLAY_DURATION_ALWAYS)
-        self.combo_overlay_duration.setCurrentIndex(DEFAULT_OVERLAY_SECS - 1)
+        self.combo_overlay_duration.setCurrentIndex(
+            _overlay_duration_index(self._settings['overlay_duration'])
+        )
         self.combo_overlay_duration.setMinimumWidth(108)
         self.combo_overlay_duration.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.combo_overlay_duration.currentIndexChanged.connect(self._on_overlay_duration_changed)
 
         self.lbl_overlay_pos = QLabel("提示位置")
         self.lbl_overlay_pos.setMinimumWidth(label_min_w)
@@ -1808,13 +2066,16 @@ class MainWindow(QMainWindow):
         self.combo_overlay_pos = QComboBox()
         self.combo_overlay_pos.addItem("右下角", OVERLAY_MODE_CORNER)
         self.combo_overlay_pos.addItem("置中 → 右下角", OVERLAY_MODE_CENTER)
+        self.combo_overlay_pos.setCurrentIndex(_overlay_mode_index(self._settings['overlay_mode']))
         self.combo_overlay_pos.setMinimumWidth(140)
         self.combo_overlay_pos.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.combo_overlay_pos.currentIndexChanged.connect(self._on_overlay_mode_changed)
 
         self.chk_display_duplicate = QCheckBox("切換同步畫面")
         self.chk_display_duplicate.setToolTip("開啟 Word / PDF 後，將延伸桌面改為同步（複製）畫面")
-        self.chk_display_duplicate.setChecked(False)
+        self.chk_display_duplicate.setChecked(self._settings['display_duplicate'])
         self.chk_display_duplicate.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.chk_display_duplicate.toggled.connect(self._on_display_duplicate_toggled)
         if sys.platform != 'win32':
             self.chk_display_duplicate.setEnabled(False)
             self.chk_display_duplicate.setToolTip("僅支援 Windows")
@@ -1826,11 +2087,79 @@ class MainWindow(QMainWindow):
         open_grid.addWidget(self.combo_overlay_pos, 2, 1, Qt.AlignmentFlag.AlignLeft)
         open_grid.addWidget(self.chk_display_duplicate, 3, 0, 1, 2)
 
+        self.grp_remote = QGroupBox("Mobile 遙控")
+        remote_grid = QGridLayout(self.grp_remote)
+        remote_grid.setContentsMargins(*grid_margins)
+        remote_grid.setHorizontalSpacing(14)
+        remote_grid.setVerticalSpacing(12)
+        remote_grid.setColumnStretch(1, 1)
+        remote_grid.setColumnMinimumWidth(0, label_min_w)
+
+        self.chk_remote_api = QCheckBox("啟用 API")
+        self.chk_remote_api.setChecked(self._settings['remote_api_enabled'])
+        self.chk_remote_api.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.chk_remote_api.toggled.connect(self._on_remote_api_toggled)
+
+        self.chk_remote_accept = QCheckBox("接受請求")
+        self.chk_remote_accept.setChecked(self._settings['remote_accept'])
+        self.chk_remote_accept.setEnabled(False)
+        self.chk_remote_accept.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.chk_remote_accept.toggled.connect(self._on_remote_accept_settings_toggled)
+
+        self.lbl_remote_port = QLabel("Port")
+        self.lbl_remote_port.setMinimumWidth(label_min_w)
+        self.spin_remote_port = QSpinBox()
+        self.spin_remote_port.setRange(1024, 65535)
+        self.spin_remote_port.setValue(self._settings['remote_port'])
+        self.spin_remote_port.setFixedWidth(100)
+        self.spin_remote_port.valueChanged.connect(self._on_remote_port_changed)
+
+        self.lbl_remote_policy = QLabel("開檔策略")
+        self.lbl_remote_policy.setMinimumWidth(label_min_w)
+        self.combo_remote_policy = QComboBox()
+        self.combo_remote_policy.addItem("唯一結果自動開", OPEN_POLICY_AUTO)
+        self.combo_remote_policy.addItem("待操作員確認", OPEN_POLICY_CONFIRM)
+        self.combo_remote_policy.addItem("只填 UI 不自動開", OPEN_POLICY_UI)
+        self.combo_remote_policy.setCurrentIndex(
+            _remote_policy_index(self._settings['remote_policy'])
+        )
+        self.combo_remote_policy.currentIndexChanged.connect(self._on_remote_policy_changed)
+
+        self.lbl_remote_token = QLabel("API Token")
+        self.lbl_remote_token.setMinimumWidth(label_min_w)
+        self.inp_remote_token = QLineEdit(self._settings['remote_token'])
+        self.inp_remote_token.setPlaceholderText("留空 = 不驗證")
+        self.inp_remote_token.textChanged.connect(self._on_remote_token_changed)
+
+        self.lbl_remote_url = QLabel("URL")
+        self.lbl_remote_url.setMinimumWidth(label_min_w)
+        self.remote_url_lbl = QLabel("—")
+        self.remote_url_lbl.setWordWrap(True)
+
+        remote_grid.addWidget(self.chk_remote_api, 0, 0, 1, 2)
+        remote_grid.addWidget(self.chk_remote_accept, 1, 0, 1, 2)
+        remote_grid.addWidget(self.lbl_remote_port, 2, 0)
+        remote_grid.addWidget(self.spin_remote_port, 2, 1, Qt.AlignmentFlag.AlignLeft)
+        remote_grid.addWidget(self.lbl_remote_policy, 3, 0)
+        remote_grid.addWidget(self.combo_remote_policy, 3, 1, Qt.AlignmentFlag.AlignLeft)
+        remote_grid.addWidget(self.lbl_remote_token, 4, 0)
+        remote_grid.addWidget(self.inp_remote_token, 4, 1)
+        remote_grid.addWidget(self.lbl_remote_url, 5, 0)
+        remote_grid.addWidget(self.remote_url_lbl, 5, 1)
+
         settings_row = QHBoxLayout()
         settings_row.setSpacing(12)
         settings_row.addWidget(self.grp_appearance, 1)
         settings_row.addWidget(self.grp_open, 1)
+        settings_lay.addWidget(self.grp_data)
         settings_lay.addLayout(settings_row)
+        settings_lay.addWidget(self.grp_remote)
+
+        self.settings_credit = QLabel("Designed By Darren Ho")
+        self.settings_credit.setAlignment(
+            Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter
+        )
+        settings_lay.addWidget(self.settings_credit)
 
         self.settings_scroll = QScrollArea()
         self.settings_scroll.setWidgetResizable(True)
@@ -1861,6 +2190,7 @@ class MainWindow(QMainWindow):
 
         self.file_list = QListWidget()
         self.file_list.itemClicked.connect(self._file_clicked)
+        self.file_list.itemDoubleClicked.connect(self._file_double_clicked)
         lay.addWidget(self.file_list, 1)
 
         self.hint_lbl = QLabel("選一個左邊書冊，右邊會列出該書的所有檔案")
@@ -1914,6 +2244,66 @@ class MainWindow(QMainWindow):
             w.setEnabled(checked)
         if not checked:
             BookNameOverlay.hide_overlay()
+        self._persist_settings(open_overlay=checked)
+
+    def _on_overlay_duration_changed(self, _idx):
+        self._persist_settings(
+            overlay_duration=self.combo_overlay_duration.currentData()
+        )
+
+    def _on_overlay_mode_changed(self, _idx):
+        self._persist_settings(
+            overlay_mode=self.combo_overlay_pos.currentData()
+        )
+
+    def _on_display_duplicate_toggled(self, checked):
+        self._persist_settings(display_duplicate=checked)
+
+    def _on_keyword_instant_toggled(self, checked):
+        self._persist_settings(keyword_instant=checked)
+
+    def _on_book_auto_focus_hymn_toggled(self, checked):
+        self._persist_settings(book_auto_focus_hymn=checked)
+
+    def _sync_click_to_open_checkboxes(self, checked):
+        for chk in (self.chk_click_to_open_hdr, self.chk_click_to_open):
+            chk.blockSignals(True)
+            chk.setChecked(checked)
+            chk.blockSignals(False)
+
+    def _on_click_to_open_toggled(self, checked):
+        self._sync_click_to_open_checkboxes(checked)
+        self._persist_settings(click_to_open=checked)
+
+    def _on_click_to_open_hdr_toggled(self, checked):
+        self._sync_click_to_open_checkboxes(checked)
+        self._on_click_to_open_toggled(checked)
+
+    def _on_click_to_open_settings_toggled(self, checked):
+        self._sync_click_to_open_checkboxes(checked)
+        self._on_click_to_open_toggled(checked)
+
+    def _persist_settings(self, **updates):
+        if self._loading_settings:
+            return
+        self._settings.update(updates)
+        save_settings(self._settings)
+
+    def _restore_saved_settings(self):
+        self._loading_settings = True
+        s = self._settings
+        self._remote.state.set_policy(s['remote_policy'])
+        self._remote.state.set_token(s['remote_token'])
+        self._remote.state.set_port(s['remote_port'])
+        self._set_search_mode(s['search_mode'])
+        self._on_open_overlay_toggled(s['open_overlay'])
+        if s['remote_api_enabled']:
+            self.chk_remote_api.setChecked(True)
+            self._on_remote_api_toggled(True)
+            if s['remote_accept']:
+                self._sync_remote_accept_checkboxes(True)
+                self._remote.state.set_accepting(True)
+        self._loading_settings = False
 
     def _on_settings_toggled(self, checked):
         self.settings_scroll.setVisible(checked)
@@ -1923,8 +2313,32 @@ class MainWindow(QMainWindow):
         else:
             self.settings_scroll.setMaximumHeight(0)
 
+    def _browse_hymn_folder(self):
+        start = self.inp_hymn_folder.text().strip() or self.hymn_folder
+        if not os.path.isdir(start):
+            start = os.path.dirname(start) if os.path.dirname(start) else default_hymn_folder()
+        path = QFileDialog.getExistingDirectory(self, "選擇詩歌資料夾", start)
+        if path:
+            self.inp_hymn_folder.setText(path)
+
+    def _apply_hymn_folder(self):
+        path = self.inp_hymn_folder.text().strip() or default_hymn_folder()
+        path = os.path.abspath(path)
+        if path == os.path.abspath(self.hymn_folder):
+            self._show_toast('資料夾路徑未變更', 'warn')
+            return
+        self.hymn_folder = path
+        self._persist_settings(hymn_folder=path)
+        self.hdr_path.setText(f"  {self.hymn_folder}")
+        self._stop_index_worker()
+        self._stop_search_worker()
+        self.content_index = None
+        self.current_book = None
+        self._scan_all()
+        self._show_toast(f'已切換資料夾：{os.path.basename(path) or path}', 'ok')
+
     def _refresh_settings_layout(self):
-        for w in (self.grp_appearance, self.grp_open, self.settings_frame, self.search_frame):
+        for w in (self.grp_data, self.grp_appearance, self.grp_open, self.settings_frame, self.search_frame):
             w.updateGeometry()
             w.adjustSize()
         self._update_settings_scroll_height()
@@ -2006,6 +2420,10 @@ class MainWindow(QMainWindow):
             f"font-size: 17px; font-weight: bold; color: {t['text']}; "
             f"padding-right: 5px; background: transparent;"
         )
+        self.hdr_app_ver.setStyleSheet(
+            f"font-size: 11px; color: {t['muted']}; "
+            f"padding-top: 5px; padding-right: 8px; background: transparent;"
+        )
         self.hdr_ver.setStyleSheet(
             f"font-size: 11px; color: {t['muted']}; "
             f"padding-top: 5px; padding-right: 14px; background: transparent;"
@@ -2079,8 +2497,14 @@ class MainWindow(QMainWindow):
             f"QScrollArea {{ background: transparent; border: none; }}"
             f"QScrollArea > QWidget > QWidget {{ background: transparent; }}"
         )
+        self.grp_data.setStyleSheet(group_style)
         self.grp_appearance.setStyleSheet(group_style)
         self.grp_open.setStyleSheet(group_style)
+        self.grp_remote.setStyleSheet(group_style)
+        self.settings_credit.setStyleSheet(
+            f"font-size: {max(9, fs - 3)}px; color: {t['muted']}; "
+            f"padding: 4px 8px 2px; background: transparent;"
+        )
 
         # Action buttons
         action_style = f"""
@@ -2092,6 +2516,19 @@ class MainWindow(QMainWindow):
             QPushButton:hover   {{ background: {t['accent_h']}; }}
             QPushButton:pressed {{ background: {t['accent_d']}; }}
         """
+        ok_hover = '#4ade80' if self.theme_name == 'dark' else '#22c55e'
+        ok_press = '#10b981' if self.theme_name == 'dark' else '#15803d'
+        open_style = f"""
+            QPushButton {{
+                background: {t['ok']}; color: #ffffff;
+                border: none; border-radius: 10px;
+                padding: 8px 18px; font-size: {fs - 1}px; font-weight: bold;
+            }}
+            QPushButton:hover   {{ background: {ok_hover}; }}
+            QPushButton:pressed {{ background: {ok_press}; }}
+        """
+        self._action_btn_style = action_style
+        self._open_btn_style = open_style
         self.btn_filter.setStyleSheet(action_style)
         self.btn_global_search.setStyleSheet(action_style)
         self.btn_keyword_search.setStyleSheet(action_style)
@@ -2107,6 +2544,8 @@ class MainWindow(QMainWindow):
         """
         self.btn_build_index.setStyleSheet(index_btn_style)
         self.btn_refresh_index.setStyleSheet(index_btn_style)
+        self.btn_browse_hymn_folder.setStyleSheet(index_btn_style)
+        self.btn_apply_hymn_folder.setStyleSheet(action_style)
         self.index_status_lbl.setStyleSheet(
             f"font-size: {fs - 2}px; color: {t['muted']}; background: transparent;"
         )
@@ -2117,8 +2556,36 @@ class MainWindow(QMainWindow):
             f"font-size: {fs - 1}px; color: {t['text2']}; background: transparent; "
             f"spacing: 8px; padding-left: 2px;"
         )
+        self.chk_book_auto_focus_hymn.setStyleSheet(checkbox_style)
+        self.chk_click_to_open.setStyleSheet(checkbox_style)
+        self.chk_click_to_open_hdr.setStyleSheet(checkbox_style)
         self.chk_open_overlay.setStyleSheet(checkbox_style)
         self.chk_display_duplicate.setStyleSheet(checkbox_style)
+        for chk in (self.chk_remote_api, self.chk_remote_accept, self.chk_remote_accept_hdr):
+            chk.setStyleSheet(checkbox_style)
+        for lbl in (self.lbl_remote_port, self.lbl_remote_policy,
+                    self.lbl_remote_token, self.lbl_remote_url):
+            lbl.setStyleSheet(
+                f"font-size: {fs - 2}px; color: {t['muted']}; background: transparent;"
+            )
+        self.remote_url_lbl.setStyleSheet(
+            f"font-size: {fs - 2}px; color: {t['accent_h']}; background: transparent;"
+        )
+        self.remote_status_lbl.setStyleSheet(
+            f"font-size: 11px; color: {t['muted']}; background: {t['panel2']}; "
+            f"padding: 4px 10px; border-radius: 12px; margin-right: 8px;"
+        )
+        pending_style = f"""
+            QFrame {{ background: {t['warn_bg']}; border-bottom: 1px solid {t['border']}; }}
+            QLabel {{ color: {t['warn']}; font-size: {fs - 1}px; background: transparent; }}
+            QPushButton {{
+                background: {t['panel2']}; color: {t['text']};
+                border: 1.5px solid {t['in_bd']}; border-radius: 8px;
+                padding: 4px 10px; font-size: {fs - 2}px;
+            }}
+            QPushButton:hover {{ border-color: {t['accent_h']}; }}
+        """
+        self.remote_pending_bar.setStyleSheet(pending_style)
         self.lbl_overlay_secs.setStyleSheet(
             f"font-size: {fs - 2}px; color: {t['muted']}; background: transparent;"
         )
@@ -2132,7 +2599,8 @@ class MainWindow(QMainWindow):
         )
 
         # Settings labels
-        for lbl in (self.lbl_theme, self.lbl_font, self.lbl_overlay_secs, self.lbl_overlay_pos, self.fs_lbl):
+        for lbl in (self.lbl_hymn_folder, self.lbl_theme, self.lbl_font, self.lbl_overlay_secs, self.lbl_overlay_pos, self.fs_lbl,
+                    self.lbl_remote_port, self.lbl_remote_policy, self.lbl_remote_token, self.lbl_remote_url):
             lbl.setStyleSheet(f"font-size: {fs - 1}px; color: {t['text2']}; background: transparent;")
 
         # ── Content sep + file area ──────────────────────────────
@@ -2170,14 +2638,14 @@ class MainWindow(QMainWindow):
     # ─────────────────────────────────────────────────────────────
     def _scan_all(self):
         t = THEMES[self.theme_name]
-        self.books = scan_books(HYMN_FOLDER)
+        self.books = scan_books(self.hymn_folder)
         self.book_list.clear()
 
         if not self.books:
             item = QListWidgetItem("  ⚠  找不到資料夾")
             item.setForeground(QColor(t['err']))
             self.book_list.addItem(item)
-            self._set_status('err', f"找不到：{os.path.basename(HYMN_FOLDER)}")
+            self._set_status('err', f"找不到：{os.path.basename(self.hymn_folder)}")
             return
 
         for b in self.books:
@@ -2204,7 +2672,7 @@ class MainWindow(QMainWindow):
         self._load_content_index()
 
     def _load_content_index(self):
-        self.content_index = load_content_index(HYMN_FOLDER)
+        self.content_index = load_content_index(self.hymn_folder)
         self._update_index_status_label()
 
     def _update_index_status_label(self):
@@ -2239,7 +2707,7 @@ class MainWindow(QMainWindow):
         self.btn_refresh_index.setEnabled(False)
         self._set_status('warn', '正在建立內容索引…')
 
-        self._index_worker = IndexBuildWorker(self.books, HYMN_FOLDER)
+        self._index_worker = IndexBuildWorker(self.books, self.hymn_folder)
         self._index_worker.progress.connect(self._on_index_progress)
         self._index_worker.finished.connect(self._on_index_built)
         self._index_worker.start()
@@ -2256,7 +2724,7 @@ class MainWindow(QMainWindow):
             return
         self.content_index = index
         try:
-            save_content_index(index, HYMN_FOLDER)
+            save_content_index(index, self.hymn_folder)
         except Exception as e:
             self._show_toast(f'索引儲存失敗：{e}', 'err')
         nfiles, nchunks, _ = index_stats(index)
@@ -2297,6 +2765,17 @@ class MainWindow(QMainWindow):
         self.inp_book.blockSignals(False)
         self._show_book_files(book, self.inp_num.text().strip().lower())
         self._update_sel_info(book)
+        self._update_search_action_buttons()
+
+    def _clear_file_keyword(self):
+        if not self.inp_num.text():
+            return
+        self.inp_num.blockSignals(True)
+        self.inp_num.clear()
+        self.inp_num.blockSignals(False)
+        if self.current_book and self.search_mode == 'book':
+            self._show_book_files(self.current_book, '')
+            self._update_search_action_buttons()
 
     # ─────────────────────────────────────────────────────────────
     #  FILE LIST — 顯示書冊檔案、書籤、全局/關鍵字搜索結果
@@ -2315,21 +2794,44 @@ class MainWindow(QMainWindow):
             i.setFont(f)
             self.file_list.addItem(i)
 
+        if q:
+            targets = resolve_targets(book, q)
+            if not targets:
+                ni = QListWidgetItem("  ⚠  沒有符合條件的檔案或書籤")
+                ni.setForeground(QColor(t['muted']))
+                self.file_list.addItem(ni)
+            else:
+                for payload in targets:
+                    if payload.get('kind') == 'file':
+                        path = payload['path']
+                        ext = os.path.splitext(path)[1].lower()
+                        tag = ext[1:].upper() if ext.startswith('.') else ext.upper()
+                        item = QListWidgetItem(f"  [{tag}]  {os.path.basename(path)}")
+                        item.setData(Qt.ItemDataRole.UserRole, {
+                            'kind': 'file', 'path': path,
+                        })
+                        self.file_list.addItem(item)
+                    elif payload.get('kind') == 'bookmark':
+                        lvl = payload.get('toc_level')
+                        indent = "      " if lvl == 1 else "          "
+                        bi = QListWidgetItem(
+                            f"{indent}↳  {payload['title']}  ·  P.{payload['page']}"
+                        )
+                        bi.setData(Qt.ItemDataRole.UserRole, {
+                            'kind': 'bookmark',
+                            'title': payload['title'],
+                            'page': payload['page'],
+                            'pdf_path': payload['pdf_path'],
+                        })
+                        self.file_list.addItem(bi)
+            self.file_count_lbl.setText(f"{self.file_list.count()} 項")
+            self._update_search_action_buttons()
+            return
+
         count = 0
         for fi in book.get('files', []):
-            name_lower = fi['name'].lower()
-            ext        = fi['ext']
-            is_pdf     = ext == '.pdf'
-
-            file_match = bool(q and q in name_lower)
-            bm_match   = bool(
-                is_pdf and book.get('bookmark') and q and
-                any(q in title.lower() for _lvl, title, _page in book.get('toc', []))
-            )
-
-            if q and not file_match and not bm_match:
-                continue
-
+            ext = fi['ext']
+            is_pdf = ext == '.pdf'
             tag = ext[1:].upper() if ext.startswith('.') else ext.upper()
             item = QListWidgetItem(f"  [{tag}]  {fi['name']}")
             item.setData(Qt.ItemDataRole.UserRole, {'kind': 'file', 'path': fi['path']})
@@ -2337,13 +2839,12 @@ class MainWindow(QMainWindow):
             count += 1
 
             if is_pdf and book.get('bookmark') and book.get('toc'):
-                matches = [
-                    (lvl, title, page) for lvl, title, page in book['toc']
-                    if not q or q in title.lower() or file_match
-                ]
-                if matches:
+                toc = book['toc']
+                if any(lvl == 2 for lvl, _, _ in toc):
+                    toc = [(lvl, title, page) for lvl, title, page in toc if lvl == 2]
+                if toc:
                     add_section_hdr("    書籤")
-                    for lvl, title, page in matches:
+                    for lvl, title, page in toc:
                         indent = "      " if lvl == 1 else "          "
                         bi = QListWidgetItem(f"{indent}↳  {title}  ·  P.{page}")
                         bi.setData(Qt.ItemDataRole.UserRole, {
@@ -2560,9 +3061,20 @@ class MainWindow(QMainWindow):
         self._update_search_action_buttons()
 
     def _file_clicked(self, item):
+        if not self._settings.get('click_to_open'):
+            return
+        self._file_open_item(item)
+
+    def _file_double_clicked(self, item):
+        self._file_open_item(item)
+
+    def _file_open_item(self, item):
         payload = item.data(Qt.ItemDataRole.UserRole)
         if not payload:
             return
+        self._open_from_payload(payload)
+
+    def _open_from_payload(self, payload):
         kind = payload.get('kind')
         if kind == 'file':
             path = payload.get('path')
@@ -2651,17 +3163,25 @@ class MainWindow(QMainWindow):
 
     def _update_search_action_buttons(self):
         single = len(self._actionable_file_items()) == 1
+        open_style = getattr(self, '_open_btn_style', '')
+        action_style = getattr(self, '_action_btn_style', '')
         if self.search_mode == 'book':
-            self.btn_filter.setText('Open' if single else 'Filter')
+            is_open = single
+            self.btn_filter.setText('Open' if is_open else 'Filter')
+            self.btn_filter.setStyleSheet(open_style if is_open else action_style)
         elif self.search_mode == 'global':
-            self.btn_global_search.setText('Open' if single else '搜索')
+            is_open = single
+            self.btn_global_search.setText('Open' if is_open else '搜索')
+            self.btn_global_search.setStyleSheet(open_style if is_open else action_style)
         elif self.search_mode == 'keyword':
-            self.btn_keyword_search.setText('Open' if single else '搜索')
+            is_open = single
+            self.btn_keyword_search.setText('Open' if is_open else '搜索')
+            self.btn_keyword_search.setStyleSheet(open_style if is_open else action_style)
 
     def _open_first_result(self):
         items = self._actionable_file_items()
         if items:
-            self._file_clicked(items[0])
+            self._file_open_item(items[0])
 
     def _try_open_single_result(self):
         if len(self._actionable_file_items()) == 1:
@@ -2718,6 +3238,16 @@ class MainWindow(QMainWindow):
             self.file_list.addItem(ni)
             self._update_sel_info(None)
         self._update_search_action_buttons()
+        self._maybe_focus_hymn_after_book_match(visible, bq)
+
+    def _maybe_focus_hymn_after_book_match(self, visible, bq):
+        if not self._settings.get('book_auto_focus_hymn'):
+            return
+        if not bq or len(visible) != 1:
+            return
+        if not self.inp_book.hasFocus():
+            return
+        QTimer.singleShot(0, lambda: self.inp_num.setFocus(Qt.FocusReason.OtherFocusReason))
 
     # ─────────────────────────────────────────────────────────────
     #  SEARCH MODE — 切換書本/全局/關鍵字模式與主題、字體
@@ -2758,6 +3288,7 @@ class MainWindow(QMainWindow):
             self._show_keyword_placeholder()
 
         self._update_search_action_buttons()
+        self._persist_settings(search_mode=mode)
 
     def _on_global_search(self, *_):
         if self.search_mode != 'global':
@@ -2782,6 +3313,7 @@ class MainWindow(QMainWindow):
             item = self.book_list.item(i)
             if not item.data(Qt.ItemDataRole.UserRole):
                 item.setForeground(QColor(t['err']))
+        self._persist_settings(theme=name)
 
     def _on_font_changed(self, val):
         self.font_size = val
@@ -2793,6 +3325,7 @@ class MainWindow(QMainWindow):
             pass  # keep current keyword results
         elif self.current_book:
             self._show_book_files(self.current_book, self.inp_num.text().strip().lower())
+        self._persist_settings(font_size=val)
 
     # ─────────────────────────────────────────────────────────────
     #  TOAST — 顯示底部操作結果提示
@@ -2815,15 +3348,172 @@ class MainWindow(QMainWindow):
         self._toast_timer.start(3500)
 
     # ─────────────────────────────────────────────────────────────
-    #  EVENT FILTER — inp_book 聚焦時清空、失焦時隱藏下拉
+    #  REMOTE — Mobile API 遙控開檔
     # ─────────────────────────────────────────────────────────────
+    def _on_remote_api_toggled(self, checked):
+        self._remote.state.set_api_enabled(checked)
+        if checked:
+            port = self.spin_remote_port.value()
+            if not self._remote.start(port):
+                self.chk_remote_api.blockSignals(True)
+                self.chk_remote_api.setChecked(False)
+                self.chk_remote_api.blockSignals(False)
+                self._remote.state.set_api_enabled(False)
+                self.spin_remote_port.setEnabled(True)
+                self.remote_url_lbl.setText('—')
+                err = self._remote.last_error or 'port 可能已被佔用'
+                self._show_toast(
+                    f'API 啟動失敗：{err}（詳情見 exe 旁 remote_api.log）',
+                    'err',
+                )
+                self._sync_remote_accept_checkboxes(checked=False)
+                self._sync_remote_accept_enabled()
+                self._update_remote_status_label()
+                self._persist_settings(remote_api_enabled=False, remote_accept=False)
+                return
+            self.spin_remote_port.setEnabled(False)
+            self.remote_url_lbl.setText(self._remote.url())
+        else:
+            self._remote.stop()
+            self.spin_remote_port.setEnabled(True)
+            self.remote_url_lbl.setText('—')
+            self._sync_remote_accept_checkboxes(checked=False)
+        self._sync_remote_accept_enabled()
+        self._update_remote_status_label()
+        self._persist_settings(remote_api_enabled=checked)
+        if not checked:
+            self._persist_settings(remote_accept=False)
+
+    def _sync_remote_accept_enabled(self):
+        enabled = self.chk_remote_api.isChecked() and self._remote.running
+        self.chk_remote_accept.setEnabled(enabled)
+        self.chk_remote_accept_hdr.setEnabled(enabled)
+        if not enabled:
+            self._remote.state.set_accepting(False)
+            self._sync_remote_accept_checkboxes(checked=False)
+
+    def _sync_remote_accept_checkboxes(self, checked):
+        for chk in (self.chk_remote_accept_hdr, self.chk_remote_accept):
+            chk.blockSignals(True)
+            chk.setChecked(checked)
+            chk.blockSignals(False)
+
+    def _on_remote_accept_toggled(self, checked):
+        self._remote.state.set_accepting(checked)
+        self._update_remote_status_label()
+        self._persist_settings(remote_accept=checked)
+
+    def _on_remote_accept_hdr_toggled(self, checked):
+        self._sync_remote_accept_checkboxes(checked)
+        self._on_remote_accept_toggled(checked)
+
+    def _on_remote_accept_settings_toggled(self, checked):
+        self._sync_remote_accept_checkboxes(checked)
+        self._on_remote_accept_toggled(checked)
+
+    def _on_remote_policy_changed(self, _idx):
+        policy = self.combo_remote_policy.currentData()
+        self._remote.state.set_policy(policy)
+        self._persist_settings(remote_policy=policy)
+
+    def _on_remote_token_changed(self, text):
+        self._remote.state.set_token(text)
+        self._persist_settings(remote_token=text)
+
+    def _on_remote_port_changed(self, val):
+        self._remote.state.set_port(val)
+        self._persist_settings(remote_port=val)
+
+    def _update_remote_status_label(self):
+        t = THEMES[self.theme_name]
+        if not self.chk_remote_api.isChecked() or not self._remote.running:
+            text, color = '遙控：關閉', t['muted']
+        elif not self._remote.state.accepting_requests:
+            text, color = '遙控：待機', t['warn']
+        else:
+            text, color = '遙控：接受中', t['ok']
+        self.remote_status_lbl.setText(text)
+        self.remote_status_lbl.setStyleSheet(
+            f"font-size: 11px; color: {color}; background: {t['panel2']}; "
+            f"padding: 4px 10px; border-radius: 12px; margin-right: 8px;"
+        )
+
+    def _on_remote_open_payload(self, payload):
+        self._open_from_payload(payload)
+        self._show_toast('📱  Mobile 遙控已開啟', 'ok')
+
+    def _sync_remote_query(self, book_ref, num_ref):
+        matched = resolve_books(self.books, book_ref)
+        if not matched:
+            return
+        book = matched[0]
+        self._set_search_mode('book')
+        self.inp_num.blockSignals(True)
+        self.inp_num.setText(str(num_ref))
+        self.inp_num.blockSignals(False)
+        self._select_book(book)
+
+    def _on_remote_populate_ui(self, book_ref, num_ref, matches):
+        self._sync_remote_query(book_ref, num_ref)
+        self._show_toast('📱  Mobile 請求 — 請揀選開啟', 'warn')
+
+    def _on_remote_pending_request(self, req):
+        self._remote_pending_id = req.id
+        self.remote_pending_lbl.setText(
+            f"📱  待確認：{req.book_ref} / {req.num_ref}  —  {req.summary}"
+        )
+        self.remote_pending_bar.setVisible(True)
+        self._show_toast('📱  Mobile 請求待確認', 'warn')
+
+    def _approve_remote_pending(self):
+        if not self._remote_pending_id:
+            return
+        result = self._remote.state.approve_pending(self._remote_pending_id)
+        self._remote_pending_id = None
+        self.remote_pending_bar.setVisible(False)
+        if result.get('status') == 'opened':
+            self._show_toast('✅  已確認開啟', 'ok')
+        elif result.get('status') == 'ui_populated':
+            self._show_toast('📋  請在列表揀選', 'warn')
+
+    def _reject_remote_pending(self):
+        if not self._remote_pending_id:
+            return
+        self._remote.state.reject_pending(self._remote_pending_id)
+        self._remote_pending_id = None
+        self.remote_pending_bar.setVisible(False)
+        self._show_toast('已忽略 Mobile 請求', 'warn')
+
+    def closeEvent(self, event):
+        self._remote.stop()
+        super().closeEvent(event)
+
+    # ─────────────────────────────────────────────────────────────
+    #  EVENT FILTER — Enter 確認 Mobile 待辦；inp_book 聚焦行為
+    # ─────────────────────────────────────────────────────────────
+    def _pending_enter_modifiers_ok(self, event):
+        mods = event.modifiers()
+        return not (
+            mods & Qt.KeyboardModifier.ControlModifier
+            or mods & Qt.KeyboardModifier.AltModifier
+            or mods & Qt.KeyboardModifier.MetaModifier
+        )
+
     def eventFilter(self, obj, event):
+        if (event.type() == QEvent.Type.KeyPress
+                and self._remote_pending_id
+                and self.remote_pending_bar.isVisible()
+                and event.key() in (Qt.Key.Key_Return, Qt.Key.Key_Enter)
+                and self._pending_enter_modifiers_ok(event)):
+            self._approve_remote_pending()
+            return True
+
         if obj == self.inp_book:
-            if (event.type() == QEvent.Type.FocusIn
-                    and self.search_mode == 'book'
-                    and self.inp_book.text()):
-                self.inp_book.clear()
-                self.dropdown.hide()
+            if event.type() == QEvent.Type.FocusIn and self.search_mode == 'book':
+                if self.inp_book.text():
+                    self.inp_book.clear()
+                    self.dropdown.hide()
+                self._clear_file_keyword()
             elif event.type() == QEvent.Type.FocusOut:
                 QTimer.singleShot(200, self.dropdown.hide)
         return super().eventFilter(obj, event)

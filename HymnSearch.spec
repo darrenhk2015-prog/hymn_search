@@ -1,12 +1,18 @@
 # -*- mode: python ; coding: utf-8 -*-
+from PyInstaller.utils.hooks import collect_submodules
+
+hiddenimports = ['fitz', 'hymn_remote.api', 'hymn_remote.server', 'uvicorn.logging', 'uvicorn.loops', 'uvicorn.loops.auto', 'uvicorn.protocols.http.auto', 'uvicorn.lifespan.on']
+hiddenimports += collect_submodules('uvicorn')
+hiddenimports += collect_submodules('fastapi')
+hiddenimports += collect_submodules('starlette')
 
 
 a = Analysis(
     ['hymn_search.py'],
     pathex=[],
     binaries=[],
-    datas=[('assets', 'assets')],
-    hiddenimports=['fitz'],
+    datas=[('assets', 'assets'), ('hymn_remote\\static', 'hymn_remote\\static')],
+    hiddenimports=hiddenimports,
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
