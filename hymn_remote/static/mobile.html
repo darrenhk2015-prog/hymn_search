@@ -1,0 +1,605 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+  <title>詩歌冊遙控</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      font-family: 'Segoe UI', 'PingFang TC', 'Microsoft YaHei', sans-serif;
+      margin: 0; padding: 0 0 24px;
+      background: #0c0e1a; color: #e4e8f5;
+      min-height: 100vh;
+    }
+    .page { padding: 16px; }
+    h1 { font-size: 1.25rem; margin: 0 0 4px; }
+    .sub { color: #8892b8; font-size: 0.85rem; margin-bottom: 16px; }
+    label { display: block; font-size: 0.85rem; color: #8892b8; margin: 12px 0 6px; }
+    input, button {
+      width: 100%; font-size: 1rem; padding: 12px 14px;
+      border-radius: 10px; border: 1.5px solid #2e3254;
+      background: #191c30; color: #e4e8f5;
+    }
+    button.main {
+      margin-top: 16px; background: #7c6af7; border: none;
+      color: #fff; font-weight: 600; cursor: pointer;
+    }
+    button.main.ready { background: #34d399; }
+    button.main.ready:active { background: #10b981; }
+    button.main.secondary {
+      background: #4338ca; margin-top: 10px;
+    }
+    button.main:disabled { opacity: 0.45; cursor: not-allowed; }
+    .field { position: relative; }
+    .suggest {
+      margin-top: 6px; max-height: 220px; overflow-y: auto;
+      border: 1.5px solid #2e3254; border-radius: 10px;
+      background: #13162a;
+    }
+    .suggest.hidden { display: none; }
+    .suggest button {
+      width: 100%; text-align: left; border: none; border-radius: 0;
+      background: transparent; color: #e4e8f5; padding: 10px 14px;
+      border-bottom: 1px solid #252840; font-size: 0.95rem;
+    }
+    .suggest button:last-child { border-bottom: none; }
+    .suggest button:active { background: #1b1f36; }
+    .suggest .tag {
+      display: inline-block; font-size: 0.75rem; color: #8892b8;
+      margin-right: 6px;
+    }
+    #status, #openResult, #scheduleResult {
+      margin-top: 14px; padding: 12px 14px; border-radius: 10px;
+      font-size: 0.9rem; line-height: 1.5;
+    }
+    #status { background: #13162a; color: #8892b8; }
+    #status.ok { color: #34d399; }
+    #status.warn { background: #1c1200; color: #fbbf24; }
+    #openResult, #scheduleResult {
+      background: #13162a; white-space: pre-wrap; word-break: break-word;
+    }
+    .hidden { display: none !important; }
+    .hint { font-size: 0.8rem; color: #505870; margin-top: 4px; }
+    .tabs {
+      display: flex; gap: 0; border-bottom: 1.5px solid #2e3254;
+      background: #13162a; position: sticky; top: 0; z-index: 10;
+    }
+    .tab-btn {
+      flex: 1; border: none; border-radius: 0; background: transparent;
+      color: #8892b8; font-weight: 600; padding: 14px 8px;
+      border-bottom: 3px solid transparent;
+    }
+    .tab-btn.active {
+      color: #e4e8f5; border-bottom-color: #7c6af7; background: #0c0e1a;
+    }
+    .panel { display: none; }
+    .panel.active { display: block; }
+    .setlist {
+      margin-top: 12px; border: 1.5px solid #2e3254; border-radius: 10px;
+      overflow: hidden; background: #13162a;
+    }
+    .setlist-item {
+      width: 100%; text-align: left; border: none; border-radius: 0;
+      border-bottom: 1px solid #252840; background: transparent;
+      color: #e4e8f5; padding: 12px 14px; font-size: 0.95rem;
+    }
+    .setlist-item:last-child { border-bottom: none; }
+    .setlist-item.current { background: #1b1f36; border-left: 3px solid #7c6af7; }
+    .setlist-item .idx {
+      display: inline-block; min-width: 1.6em; color: #8892b8; margin-right: 6px;
+    }
+    .setlist-empty {
+      padding: 24px 14px; text-align: center; color: #505870; font-size: 0.9rem;
+    }
+    .nav-row { display: flex; gap: 10px; margin-top: 14px; }
+    .nav-row button { flex: 1; margin-top: 0; }
+  </style>
+</head>
+<body>
+  <div class="tabs">
+    <button type="button" class="tab-btn active" data-tab="open">開啟</button>
+    <button type="button" class="tab-btn hidden" id="tabSchedule" data-tab="schedule">排程</button>
+  </div>
+
+  <div class="page">
+    <h1>🎵 詩歌冊遙控</h1>
+    <p class="sub">由桌面端開啟詩歌；有排程時可切換「排程」分頁</p>
+    <div id="status">連線中…</div>
+
+    <div id="panelOpen" class="panel active">
+      <div id="tokenSection">
+        <label for="apiToken">API Token</label>
+        <input id="apiToken" type="password" inputmode="text" placeholder="與桌面端設定相同" autocomplete="off">
+        <div id="tokenHint" class="hint">請輸入 API Token</div>
+      </div>
+
+      <label for="book">書冊號（順序或書名）</label>
+      <div class="field">
+        <input id="book" type="text" inputmode="text" placeholder="e.g. 1 或 讚美詩" list="booklist" autocomplete="off">
+        <datalist id="booklist"></datalist>
+      </div>
+
+      <label for="num">檔案 / 書籤號</label>
+      <div class="field">
+        <input id="num" type="text" inputmode="text" placeholder="先選書冊，再選檔案或書籤" list="numlist" autocomplete="off">
+        <datalist id="numlist"></datalist>
+        <div id="numHint" class="hint">請先輸入書冊</div>
+        <div id="numSuggest" class="suggest hidden"></div>
+      </div>
+
+      <button id="openBtn" class="main" disabled>開啟</button>
+      <button id="addBtn" class="main secondary" disabled>＋ 加入排程</button>
+      <div id="openResult" class="hidden"></div>
+    </div>
+
+    <div id="panelSchedule" class="panel">
+      <p class="hint" id="scheduleHint">載入排程…</p>
+      <div id="setlistBox" class="setlist"></div>
+      <div class="nav-row">
+        <button id="prevBtn" class="main secondary" disabled>◀ 上一首</button>
+        <button id="nextBtn" class="main secondary" disabled>下一首 ▶</button>
+      </div>
+      <div id="scheduleResult" class="hidden"></div>
+    </div>
+  </div>
+
+  <script>
+    const statusEl = document.getElementById('status');
+    const tabSchedule = document.getElementById('tabSchedule');
+    const panelOpen = document.getElementById('panelOpen');
+    const panelSchedule = document.getElementById('panelSchedule');
+    const openBtn = document.getElementById('openBtn');
+    const addBtn = document.getElementById('addBtn');
+    const prevBtn = document.getElementById('prevBtn');
+    const nextBtn = document.getElementById('nextBtn');
+    const setlistBox = document.getElementById('setlistBox');
+    const scheduleHint = document.getElementById('scheduleHint');
+    const openResult = document.getElementById('openResult');
+    const scheduleResult = document.getElementById('scheduleResult');
+    const bookInput = document.getElementById('book');
+    const numInput = document.getElementById('num');
+    const booklist = document.getElementById('booklist');
+    const numlist = document.getElementById('numlist');
+    const numSuggest = document.getElementById('numSuggest');
+    const numHint = document.getElementById('numHint');
+    const tokenInput = document.getElementById('apiToken');
+    const tokenHint = document.getElementById('tokenHint');
+    const tokenSection = document.getElementById('tokenSection');
+    const TOKEN_KEY = 'hymn_remote_api_token';
+    let accepting = false;
+    let serverNeedsToken = false;
+    let allEntries = [];
+    let entriesBook = '';
+    let setlistData = { entries: [], index: -1, total: 0 };
+    let activeTab = 'open';
+
+    function getToken() {
+      return tokenInput.value.trim();
+    }
+
+    function apiHeaders(extra = {}) {
+      const h = { 'Content-Type': 'application/json', ...extra };
+      const token = getToken();
+      if (token) h['X-Api-Token'] = token;
+      return h;
+    }
+
+    async function api(path, opts = {}) {
+      const r = await fetch(path, {
+        ...opts,
+        headers: apiHeaders(opts.headers || {}),
+      });
+      const data = await r.json().catch(() => ({}));
+      return { ok: r.ok, status: r.status, data };
+    }
+
+    function loadSavedToken() {
+      try {
+        const saved = localStorage.getItem(TOKEN_KEY);
+        if (saved) tokenInput.value = saved;
+      } catch (_) {}
+      const q = new URLSearchParams(location.search).get('token');
+      if (q) tokenInput.value = q;
+    }
+
+    function saveToken() {
+      try {
+        const t = getToken();
+        if (t) localStorage.setItem(TOKEN_KEY, t);
+        else localStorage.removeItem(TOKEN_KEY);
+      } catch (_) {}
+    }
+
+    function setStatus(text, kind) {
+      statusEl.textContent = text;
+      statusEl.className = kind || '';
+    }
+
+    function showResult(el, text) {
+      el.textContent = text;
+      el.classList.remove('hidden');
+    }
+
+    function formatOpenPolicyResult(data, okPrefix) {
+      const summaries = (data.matches || []).map(m => m.summary).join('\n');
+      if (data.status === 'opened') {
+        return okPrefix + (summaries ? '\n' + summaries : '');
+      }
+      if (data.status === 'queued' || data.status === 'ui_populated') {
+        return '⏳ 等待操作員操作' + (summaries ? '\n' + summaries : '');
+      }
+      const detail = summaries || data.message || '';
+      return '⚠ 無法開啟' + (detail ? '\n' + detail : '');
+    }
+
+    function switchTab(name) {
+      activeTab = name;
+      document.querySelectorAll('.tab-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.tab === name);
+      });
+      panelOpen.classList.toggle('active', name === 'open');
+      panelSchedule.classList.toggle('active', name === 'schedule');
+    }
+
+    document.querySelectorAll('.tab-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        if (btn.classList.contains('hidden')) return;
+        switchTab(btn.dataset.tab);
+      });
+    });
+
+    function fillDatalist(listEl, items) {
+      listEl.innerHTML = '';
+      items.forEach(item => {
+        const o = document.createElement('option');
+        o.value = item.value;
+        o.label = item.label;
+        listEl.appendChild(o);
+      });
+    }
+
+    function renderNumSuggest(items) {
+      numSuggest.innerHTML = '';
+      if (!bookInput.value.trim()) {
+        numSuggest.classList.add('hidden');
+        numHint.textContent = '請先輸入書冊';
+        return;
+      }
+      if (!items.length) {
+        numSuggest.classList.add('hidden');
+        numHint.textContent = entriesBook ? '沒有符合的檔案或書籤' : '載入中或書冊無效';
+        return;
+      }
+      const q = numInput.value.trim().toLowerCase();
+      const shown = q
+        ? items.filter(i => i.value.toLowerCase().includes(q) || i.label.toLowerCase().includes(q))
+        : items.slice(0, 80);
+      if (!shown.length) {
+        numSuggest.classList.add('hidden');
+        numHint.textContent = '沒有符合的檔案或書籤';
+        return;
+      }
+      numHint.textContent = `${shown.length} 項可選（${items.length} 項總計）`;
+      shown.forEach(item => {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        const tag = item.kind === 'bookmark' ? '書籤' : '檔案';
+        btn.innerHTML = `<span class="tag">${tag}</span>${item.label}`;
+        btn.addEventListener('click', () => {
+          numInput.value = item.value;
+          numSuggest.classList.add('hidden');
+        });
+        numSuggest.appendChild(btn);
+      });
+      numSuggest.classList.remove('hidden');
+    }
+
+    async function loadEntries() {
+      const book = bookInput.value.trim();
+      if (!book) {
+        allEntries = [];
+        entriesBook = '';
+        fillDatalist(numlist, []);
+        numInput.value = '';
+        numInput.placeholder = '先選書冊，再選檔案或書籤';
+        renderNumSuggest([]);
+        return;
+      }
+      if (book === entriesBook && allEntries.length) {
+        renderNumSuggest(allEntries);
+        return;
+      }
+      numHint.textContent = '載入檔案 / 書籤…';
+      try {
+        const { ok, status, data } = await api('/api/entries?book=' + encodeURIComponent(book));
+        if (status === 401) {
+          allEntries = [];
+          numHint.textContent = 'API Token 不正確';
+          renderNumSuggest([]);
+          return;
+        }
+        if (!ok || !Array.isArray(data)) {
+          allEntries = [];
+          renderNumSuggest([]);
+          return;
+        }
+        entriesBook = book;
+        allEntries = data;
+        fillDatalist(numlist, data);
+        renderNumSuggest(data);
+      } catch (_) {
+        allEntries = [];
+        renderNumSuggest([]);
+      }
+    }
+
+    let bookDebounce, numDebounce;
+    bookInput.addEventListener('input', () => {
+      clearTimeout(bookDebounce);
+      const book = bookInput.value.trim();
+      if (book !== entriesBook) {
+        numInput.value = '';
+        allEntries = [];
+      }
+      bookDebounce = setTimeout(loadEntries, 300);
+    });
+    bookInput.addEventListener('change', () => {
+      numInput.value = '';
+      entriesBook = '';
+      allEntries = [];
+      loadEntries();
+    });
+
+    numInput.addEventListener('focus', () => {
+      if (bookInput.value.trim()) renderNumSuggest(allEntries);
+    });
+    numInput.addEventListener('input', () => {
+      clearTimeout(numDebounce);
+      numDebounce = setTimeout(() => renderNumSuggest(allEntries), 150);
+    });
+
+    document.addEventListener('click', (e) => {
+      if (!numSuggest.contains(e.target) && e.target !== numInput) {
+        numSuggest.classList.add('hidden');
+      }
+    });
+
+    function updateTokenSection() {
+      const show = serverNeedsToken;
+      tokenSection.classList.toggle('hidden', !show);
+      if (!show) return;
+      if (!getToken()) {
+        tokenHint.textContent = '⚠ 請輸入 API Token';
+        tokenHint.style.color = '#fbbf24';
+      } else {
+        tokenHint.textContent = '請輸入 API Token';
+        tokenHint.style.color = '#505870';
+      }
+    }
+
+    function updateOpenBtn() {
+      openBtn.classList.toggle('ready', !openBtn.disabled);
+    }
+
+    function updateAddBtn() {
+      addBtn.classList.toggle('ready', !addBtn.disabled);
+    }
+
+    function updateActionButtons(apiEnabled) {
+      const canUse = apiEnabled && (!serverNeedsToken || getToken());
+      openBtn.disabled = !canUse || !accepting;
+      addBtn.disabled = !canUse;
+      updateOpenBtn();
+      updateAddBtn();
+    }
+
+    function renderSetlist(data) {
+      setlistData = data || { entries: [], index: -1, total: 0 };
+      const total = setlistData.total || (setlistData.entries || []).length;
+      const hasSchedule = total > 0;
+      tabSchedule.classList.toggle('hidden', !hasSchedule);
+      if (!hasSchedule && activeTab === 'schedule') {
+        switchTab('open');
+      }
+
+      setlistBox.innerHTML = '';
+      if (!hasSchedule) {
+        setlistBox.innerHTML = '<div class="setlist-empty">桌面端尚未建立排程</div>';
+        scheduleHint.textContent = '請在桌面端「排程模式」加入詩歌';
+        prevBtn.disabled = true;
+        nextBtn.disabled = true;
+        return;
+      }
+
+      const idx = setlistData.index >= 0 ? setlistData.index : 0;
+      const pos = idx + 1;
+      scheduleHint.textContent = `共 ${total} 首 · 目前第 ${pos} 首`;
+      (setlistData.entries || []).forEach((entry, i) => {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'setlist-item' + (i === idx ? ' current' : '');
+        const book = entry.book || '';
+        const num = entry.num || '';
+        const text = num ? `${book} / ${num}` : book;
+        btn.innerHTML = `<span class="idx">${i + 1}.</span>${text}`;
+        btn.addEventListener('click', () => openSetlistIndex(i));
+        setlistBox.appendChild(btn);
+      });
+
+      const canAct = accepting && (!serverNeedsToken || getToken());
+      prevBtn.disabled = !canAct || total <= 1;
+      nextBtn.disabled = !canAct;
+    }
+
+    async function loadSetlist() {
+      try {
+        const { ok, status, data } = await api('/api/setlist');
+        if (status === 401) return;
+        if (ok) renderSetlist(data);
+      } catch (_) {}
+    }
+
+    async function openSetlistIndex(index) {
+      scheduleResult.classList.remove('hidden');
+      scheduleResult.textContent = '開啟中…';
+      const { ok, status, data } = await api('/api/setlist/open', {
+        method: 'POST',
+        body: JSON.stringify({ index }),
+      });
+      if (status === 401) {
+        scheduleResult.textContent = '⚠ API Token 不正確';
+        return;
+      }
+      if (status === 503 || data.status === 'not_accepting') {
+        scheduleResult.textContent = data.message || '桌面端暫停接受';
+        return;
+      }
+      scheduleResult.textContent = formatOpenPolicyResult(data, '✅ 已開啟');
+      if (data.setlist) renderSetlist(data.setlist);
+    }
+
+    async function refreshHealth() {
+      try {
+        const { ok, data } = await api('/api/health');
+        if (!ok) throw new Error('health failed');
+        accepting = !!data.accepting;
+        serverNeedsToken = !!data.has_token;
+        updateTokenSection();
+        if (!data.api_enabled) {
+          setStatus('桌面端 API 未啟用', 'warn');
+          updateActionButtons(false);
+          prevBtn.disabled = true;
+          nextBtn.disabled = true;
+          return;
+        }
+        if (serverNeedsToken && !getToken()) {
+          setStatus('請輸入 API Token', 'warn');
+          updateActionButtons(false);
+          prevBtn.disabled = true;
+          nextBtn.disabled = true;
+          return;
+        }
+        if (!accepting) {
+          setStatus('已連線 · 可加入排程（開檔暫停）', 'warn');
+        } else {
+          setStatus('已連線 · 可發送開檔請求', 'ok');
+        }
+        updateActionButtons(true);
+        if (data.setlist) renderSetlist(data.setlist);
+        else loadSetlist();
+      } catch (e) {
+        setStatus('無法連線桌面端', 'warn');
+        updateActionButtons(false);
+        prevBtn.disabled = true;
+        nextBtn.disabled = true;
+      }
+      updateOpenBtn();
+      updateAddBtn();
+    }
+
+    async function loadBooks() {
+      try {
+        const { ok, status, data } = await api('/api/books');
+        if (status === 401) {
+          setStatus('API Token 不正確', 'warn');
+          updateActionButtons(false);
+          return;
+        }
+        if (!ok || !Array.isArray(data)) return;
+        booklist.innerHTML = '';
+        data.forEach(b => {
+          const o = document.createElement('option');
+          o.value = String(b.index);
+          o.label = `${b.index}. ${b.name}`;
+          booklist.appendChild(o);
+        });
+      } catch (_) {}
+    }
+
+    openBtn.addEventListener('click', async () => {
+      openResult.classList.remove('hidden');
+      openResult.textContent = '發送中…';
+      const body = JSON.stringify({ book: bookInput.value.trim(), num: numInput.value.trim() });
+      const { ok, status, data } = await api('/api/open', { method: 'POST', body });
+      if (status === 401) {
+        openResult.textContent = '⚠ API Token 不正確';
+        return;
+      }
+      if (status === 503 || data.status === 'not_accepting') {
+        openResult.textContent = data.message || '桌面端暫停接受';
+        return;
+      }
+      openResult.textContent = formatOpenPolicyResult(data, '✅ 已開啟');
+    });
+
+    addBtn.addEventListener('click', async () => {
+      openResult.classList.remove('hidden');
+      openResult.textContent = '加入排程中…';
+      const body = JSON.stringify({ book: bookInput.value.trim(), num: numInput.value.trim() });
+      const { status, data } = await api('/api/setlist/add', { method: 'POST', body });
+      if (status === 401) {
+        openResult.textContent = '⚠ API Token 不正確';
+        return;
+      }
+      if (data.status === 'added') {
+        openResult.textContent = '✅ 已加入排程';
+        if (data.setlist) renderSetlist(data.setlist);
+        return;
+      }
+      if (data.status === 'not_found') {
+        openResult.textContent = '⚠ 找不到書冊';
+      } else if (data.status === 'ambiguous') {
+        openResult.textContent = '⚠ ' + (data.message || '書冊不明確');
+      } else if (data.status === 'invalid') {
+        openResult.textContent = '⚠ ' + (data.message || '請輸入書冊或詩歌號');
+      } else if (data.status === 'disabled') {
+        openResult.textContent = data.message || '桌面端 API 未啟用';
+      } else {
+        openResult.textContent = data.message || '⚠ 無法加入排程';
+      }
+    });
+
+    prevBtn.addEventListener('click', async () => {
+      if (!setlistData.entries || !setlistData.entries.length) return;
+      let idx = setlistData.index >= 0 ? setlistData.index : 0;
+      idx = (idx - 1 + setlistData.entries.length) % setlistData.entries.length;
+      await openSetlistIndex(idx);
+    });
+
+    nextBtn.addEventListener('click', async () => {
+      scheduleResult.classList.remove('hidden');
+      scheduleResult.textContent = '下一首…';
+      const { ok, status, data } = await api('/api/next', { method: 'POST', body: '{}' });
+      if (status === 401) {
+        scheduleResult.textContent = '⚠ API Token 不正確';
+        return;
+      }
+      if (status === 503 || data.status === 'not_accepting') {
+        scheduleResult.textContent = data.message || '桌面端暫停接受';
+        return;
+      }
+      scheduleResult.textContent = formatOpenPolicyResult(data, '✅ 已開啟下一首');
+      if (data.setlist) renderSetlist(data.setlist);
+    });
+
+    let tokenDebounce;
+    tokenInput.addEventListener('input', () => {
+      clearTimeout(tokenDebounce);
+      tokenDebounce = setTimeout(() => {
+        saveToken();
+        updateTokenSection();
+        entriesBook = '';
+        refreshHealth();
+        loadBooks();
+        loadSetlist();
+      }, 400);
+    });
+
+    loadSavedToken();
+    refreshHealth();
+    loadBooks();
+    setInterval(refreshHealth, 5000);
+  </script>
+</body>
+</html>

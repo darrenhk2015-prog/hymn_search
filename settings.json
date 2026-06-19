@@ -1,0 +1,125 @@
+{
+  "version": 2,
+  "hymn_folder": "",
+  "theme": "light",
+  "font_size": 13,
+  "search_mode": "book",
+  "open_overlay": true,
+  "overlay_duration": 10,
+  "overlay_mode": "center_then_corner",
+  "display_duplicate": true,
+  "keyword_instant": true,
+  "book_auto_focus_hymn": true,
+  "click_to_open": false,
+  "remote_api_enabled": true,
+  "remote_accept": true,
+  "remote_port": 8765,
+  "remote_policy": "confirm",
+  "remote_token": "",
+  "operator_mode": true,
+  "pinned_books": [],
+  "recent_hymns": [
+    "05 神家詩歌 / P02  耶和華尼西.doc",
+    "S1神家詩歌合訂本1大字拍子版 / 2\t祢這份愛",
+    "S1神家詩歌合訂本1大字拍子版 / 1\t祢這份愛",
+    "01 神家詩歌 / P001  001 父的名.doc",
+    "01 神家詩歌 / P002  002 可敬可親紳 003 宇宙講故事.doc"
+  ],
+  "setlist": [
+    {
+      "book": "05 神家詩歌",
+      "num": "P02  耶和華尼西.doc"
+    },
+    {
+      "book": "S1神家詩歌合訂本1大字拍子版",
+      "num": "1\t祢這份愛"
+    },
+    {
+      "book": "S1神家詩歌合訂本1大字拍子版",
+      "num": "1\t祢這份愛"
+    },
+    {
+      "book": "S1神家詩歌合訂本1大字拍子版",
+      "num": "2\t祢這份愛"
+    }
+  ],
+  "setlist_index": 1,
+  "session_history": [
+    {
+      "book": "05 神家詩歌",
+      "num": "P02  耶和華尼西.doc",
+      "label": "05 神家詩歌 · P02  耶和華尼西.doc"
+    },
+    {
+      "book": "S1神家詩歌合訂本1大字拍子版",
+      "num": "2\t祢這份愛",
+      "label": "S1神家詩歌合訂本1大字拍子版 · 2\t祢這份愛 · P.21"
+    },
+    {
+      "book": "S1神家詩歌合訂本1大字拍子版",
+      "num": "1\t祢這份愛",
+      "label": "S1神家詩歌合訂本1大字拍子版 · 1\t祢這份愛 · P.18"
+    },
+    {
+      "book": "01 神家詩歌",
+      "num": "P001  001 父的名.doc",
+      "label": "01 神家詩歌 · P001  001 父的名.doc"
+    },
+    {
+      "book": "01 神家詩歌",
+      "num": "P002  002 可敬可親紳 003 宇宙講故事.doc",
+      "label": "01 神家詩歌 · P002  002 可敬可親紳 003 宇宙講故事.doc"
+    },
+    {
+      "book": "12 神家詩歌",
+      "num": "P44.永遠愛的傷痕.docx",
+      "label": "12 神家詩歌 · P44.永遠愛的傷痕.docx"
+    },
+    {
+      "book": "08 神家詩歌",
+      "num": "P02  天地情深.doc",
+      "label": "08 神家詩歌 · P02  天地情深.doc"
+    },
+    {
+      "book": "",
+      "num": "9\t獨行奇事的阿爸",
+      "label": " · 9\t獨行奇事的阿爸 · P.23"
+    },
+    {
+      "book": "11 神家詩歌",
+      "num": "P006   活在父子聖靈的愛圈.doc",
+      "label": "11 神家詩歌 · "
+    },
+    {
+      "book": "08 神家詩歌",
+      "num": "P04  最深親情！最高父愛！.doc",
+      "label": "08 神家詩歌 · P04  最深親情！最高父愛！.doc"
+    },
+    {
+      "book": "08 神家詩歌",
+      "num": "P32  永遠的投入.doc",
+      "label": "08 神家詩歌 · P32  永遠的投入.doc"
+    },
+    {
+      "book": "04 神家詩歌",
+      "num": "P06 人子美麗的路程.doc",
+      "label": "04 神家詩歌 · P06 人子美麗的路程.doc"
+    },
+    {
+      "book": "20 神家詩歌",
+      "num": "20.因祂受的刑罰，我們得平安.docx",
+      "label": "20 神家詩歌 · "
+    },
+    {
+      "book": "01 神家詩歌",
+      "num": "P001  001 父的名.doc",
+      "label": "01 神家詩歌 · "
+    }
+  ],
+  "session_cursor": 0,
+  "show_preview": true,
+  "auto_rescan": true,
+  "startup_tray": false,
+  "minimize_to_tray": false,
+  "last_opened": "05 神家詩歌 · P02  耶和華尼西.doc"
+}

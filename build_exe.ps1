@@ -10,8 +10,21 @@ $ErrorActionPreference = 'Stop'
 $Root = Split-Path -Parent $MyInvocation.MyCommand.Path
 Set-Location $Root
 
+$VenvPython = Join-Path $Root '.venv\Scripts\python.exe'
+if (Test-Path $VenvPython) {
+    $Python = $VenvPython
+    Write-Host "Using venv: $Python"
+} else {
+    $Python = 'python'
+    Write-Host "Using system python (no .venv found)"
+}
+
+Write-Host "Installing dependencies..."
+& $Python -m pip install -r requirements.txt -q
+& $Python -c "import qrcode; from PIL import Image; print('qrcode + Pillow OK')"
+
 if (-not (Test-Path 'assets\app.ico')) {
-    python scripts\make_icon.py
+    & $Python scripts\make_icon.py
 }
 
 $VersionPath = Join-Path $Root 'version.py'
@@ -30,19 +43,42 @@ if ($versionContent -match 'APP_VERSION\s*=\s*(\d+)') {
         'APP_VERSION\s*=\s*\d+',
         "APP_VERSION = $buildVer"
     )
+    $buildDate = Get-Date -Format 'yyyy-MM-dd'
+    if ($versionContent -match 'BUILD_DATE\s*=') {
+        $versionContent = [regex]::Replace(
+            $versionContent,
+            "BUILD_DATE\s*=\s*'[^']*'",
+            "BUILD_DATE = '$buildDate'"
+        )
+    } else {
+        $versionContent = $versionContent.TrimEnd() + "`nBUILD_DATE = '$buildDate'`n"
+    }
     [System.IO.File]::WriteAllText($VersionPath, $versionContent)
     Write-Host "Build version: $buildVer"
 } else {
     throw "Cannot parse APP_VERSION in version.py"
 }
 
-pyinstaller --noconfirm --onefile --windowed `
+& $Python -m PyInstaller --noconfirm --onefile --windowed `
     --name "HymnSearch" `
     --icon "assets\app.ico" `
     --add-data "assets;assets" `
     --add-data "hymn_remote\static;hymn_remote\static" `
     --hidden-import fitz `
     --hidden-import version `
+    --hidden-import hymn_features.fuzzy `
+    --hidden-import hymn_features.session_store `
+    --hidden-import hymn_features.preview `
+    --hidden-import hymn_features.mixin `
+    --hidden-import qrcode `
+    --hidden-import qrcode.image `
+    --hidden-import qrcode.image.pil `
+    --hidden-import qrcode.main `
+    --hidden-import PIL `
+    --hidden-import PIL.Image `
+    --collect-submodules qrcode `
+    --collect-all pillow `
+    --hidden-import pypinyin `
     --hidden-import hymn_remote.api `
     --hidden-import hymn_remote.server `
     --hidden-import uvicorn.logging `

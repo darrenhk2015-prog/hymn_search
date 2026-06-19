@@ -4,3 +4,5 @@ python-docx
 pyinstaller
 fastapi
 uvicorn[standard]
+qrcode[pil]
+pypinyin

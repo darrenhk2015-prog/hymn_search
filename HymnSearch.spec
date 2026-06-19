@@ -1,17 +1,23 @@
 # -*- mode: python ; coding: utf-8 -*-
 from PyInstaller.utils.hooks import collect_submodules
+from PyInstaller.utils.hooks import collect_all
 
-hiddenimports = ['fitz', 'hymn_remote.api', 'hymn_remote.server', 'uvicorn.logging', 'uvicorn.loops', 'uvicorn.loops.auto', 'uvicorn.protocols.http.auto', 'uvicorn.lifespan.on']
+datas = [('assets', 'assets'), ('hymn_remote\\static', 'hymn_remote\\static')]
+binaries = []
+hiddenimports = ['fitz', 'version', 'hymn_features.fuzzy', 'hymn_features.session_store', 'hymn_features.preview', 'hymn_features.mixin', 'qrcode', 'qrcode.image', 'qrcode.image.pil', 'qrcode.main', 'PIL', 'PIL.Image', 'pypinyin', 'hymn_remote.api', 'hymn_remote.server', 'uvicorn.logging', 'uvicorn.loops', 'uvicorn.loops.auto', 'uvicorn.protocols.http.auto', 'uvicorn.lifespan.on']
+hiddenimports += collect_submodules('qrcode')
 hiddenimports += collect_submodules('uvicorn')
 hiddenimports += collect_submodules('fastapi')
 hiddenimports += collect_submodules('starlette')
+tmp_ret = collect_all('pillow')
+datas += tmp_ret[0]; binaries += tmp_ret[1]; hiddenimports += tmp_ret[2]
 
 
 a = Analysis(
     ['hymn_search.py'],
     pathex=[],
-    binaries=[],
-    datas=[('assets', 'assets'), ('hymn_remote\\static', 'hymn_remote\\static')],
+    binaries=binaries,
+    datas=datas,
     hiddenimports=hiddenimports,
     hookspath=[],
     hooksconfig={},
