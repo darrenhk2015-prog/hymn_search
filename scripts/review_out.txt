@@ -1,0 +1,60 @@
+﻿=== JSON key patterns ===
+  total: 1432
+  h: 722
+  s: 710
+  h_vol_zero_pad: 1
+  h_vol_no_pad: 721
+  h_hymn_2digit: 517
+  h_hymn_3digit: 167
+  sample_h: ['h08-24', 'h10-115', 'h10-124', 'h10-125', 'h10-127', 'h10-182', 'h10-242', 'h10-245']
+  sample_s: ['s01-041', 's01-042', 's1-001', 's1-002', 's1-003', 's1-004', 's1-005', 's1-006']
+
+=== Settings session_history ===
+  [MISS] ??               json=False  book='16 蟡振閰拇?' num='08.銝?????尼蟡?docx'
+  [OK] h13-18   book_p  json=True  book='13 蟡振閰拇?' num='P18.銝餌??丐.doc'
+  [OK] h8-08    book_p  json=False  book='08 蟡振閰拇?' num='P08  銝餌??嗥??舀??.doc'
+  [OK] h1-04    book_p  json=False  book='01 蟡振閰拇?' num='P004  005 憭拍??.doc'
+  [OK] h13-52   book_p  json=True  book='13 蟡振閰拇?' num='P52.?鈭箄?祉???.docx'
+  [MISS] ??               json=False  book='' num='79\t?祉敺抵???憟?
+  [MISS] ??               json=False  book='' num='44\t?砍銋????
+  [OK] h1-56    book_p  json=False  book='01 蟡振閰拇?' num='P056  053 靽∪???.doc'
+  [OK] h1-06    book_p  json=False  book='01 蟡振閰拇?' num='P006  007 ?嗆?  008  撖嗉眼???doc'
+  [OK] h5-02    book_p  json=False  book='05 蟡振閰拇?' num='P02  ?嗅??臬側镼?doc'
+  [MISS] ??               json=False  book='S1蟡振閰拇?????憭批????? num='2\t蟡ａ遢??
+  [MISS] ??               json=False  book='S1蟡振閰拇?????憭批????? num='1\t蟡ａ遢??
+  [OK] h1-01    book_p  json=False  book='01 蟡振閰拇?' num='P001  001 ?嗥???doc'
+  [OK] h1-02    book_p  json=False  book='01 蟡振閰拇?' num='P002  002 ?舀?航扛蝝?003 摰?雓?鈭?doc'
+  [OK] h12-44   book_p  json=True  book='12 蟡振閰拇?' num='P44.瘞賊????瑞?.docx'
+  [OK] h8-02    book_p  json=False  book='08 蟡振閰拇?' num='P02  憭拙?楛.doc'
+  [MISS] ??               json=False  book='' num='9\t?刻?憟????
+  [OK] h11-06   book_p  json=False  book='11 蟡振閰拇?' num='P006   瘣餃?嗅???????doc'
+  [OK] h8-04    book_p  json=False  book='08 蟡振閰拇?' num='P04  ?瘛梯扛???擃??.doc'
+  [OK] h8-32    book_p  json=False  book='08 蟡振閰拇?' num='P32  瘞賊?????doc'
+  [OK] h4-06    book_p  json=False  book='04 蟡振閰拇?' num='P06 鈭箏?蝢??楝蝔?doc'
+  [MISS] ??               json=False  book='20 蟡振閰拇?' num='20.?????蔑嚗???撟喳?.docx'
+  [OK] h1-01    book_p  json=False  book='01 蟡振閰拇?' num='P001  001 ?嗥???doc'
+  => 16/23 resolved
+
+=== Sample local files (first 40) ===
+  books: 31, files: 1667
+  => 200/200 resolved in sample
+
+=== Book name patterns ===
+  NN 蟡振閰拇?: 23
+  other: 6
+  S series: 2
+
+=== Filename patterns (sample 200) ===
+  Pnnn: 200
+
+=== Edge case tests ===
+  h13-52     json=True  src=book_p  url=map      | 13蟡振閰拇? / P52. ?鈭箄?祉???.docx
+  h13-52     json=True  src=book_p  url=map      | 13 蟡振閰拇? / P52.?鈭箄?祉???.docx
+  h1-01      json=False src=book_p  url=fallback | 01 蟡振閰拇? / P001  001 ?嗥???doc
+  h1-56      json=False src=book_p  url=fallback | 01 蟡振閰拇? / P056  053 靽∪???.doc
+  h5-02      json=False src=book_p  url=fallback | 05 蟡振閰拇? / P02  ?嗅??臬側镼?doc
+  h22-07     json=False src=h_tag   url=fallback | 22 蟡振閰拇? / H22-07 甇瑚?甇瑚誨
+  ??         json=False src=        url=none     | S1蟡振閰拇?????憭批?????/ 2	蟡ａ遢??
+  ??         json=False src=        url=none     |  / 79	?祉敺抵???憟?
+  h12-44     json=True  src=book_p  url=map      | 12 蟡振閰拇? / P44.瘞賊????瑞?.docx
+  h8-04      json=False src=book_p  url=fallback | 08 蟡振閰拇? / P04  ?瘛梯扛???擃??.doc

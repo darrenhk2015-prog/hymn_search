@@ -111,6 +111,20 @@ class EnhancementMixin:
             'recent_hymns', 'last_opened', 'session_history', 'session_cursor',
         ) if k in self._settings})
         self._update_footer_status()
+        self._sync_viewer_now_playing(book_name, hymn_ref, label, payload=payload)
+
+    def _sync_viewer_now_playing(self, book_name='', hymn_ref='', label='', payload=None):
+        remote = getattr(self, '_remote', None)
+        if remote is None:
+            return
+        filename = ''
+        if payload and payload.get('kind') == 'file':
+            filename = payload.get('name') or os.path.basename(payload.get('path', ''))
+        from hymn_remote.viewer_hymn_map import resolve_viewer_hymn
+        info = resolve_viewer_hymn(
+            book_name, hymn_ref, label, filename=filename, payload=payload,
+        )
+        remote.state.set_now_viewing(info)
 
     def _open_hymn_ref(self, book_ref, num_ref='', record=True):
         matches = resolve_open_request(self.books, book_ref, num_ref)

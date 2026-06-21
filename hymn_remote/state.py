@@ -40,6 +40,11 @@ class RemoteControlState:
         self._get_books: Optional[Callable] = None
         self._get_setlist_info: Optional[Callable] = None
         self.operation_log = RemoteOperationLog()
+        self._now_viewing: dict = {
+            'book': '', 'num': '', 'label': '',
+            'code': '', 'web_url': '', 'title': '', 'mapped': False, 'ts': 0.0,
+        }
+        self.viewer_show_debug = False
 
     def set_handlers(
         self,
@@ -108,6 +113,22 @@ class RemoteControlState:
     def set_port(self, port: int):
         with self._lock:
             self.port = port
+
+    def set_viewer_show_debug(self, show: bool):
+        with self._lock:
+            self.viewer_show_debug = bool(show)
+
+    def get_viewer_show_debug(self) -> bool:
+        with self._lock:
+            return bool(self.viewer_show_debug)
+
+    def set_now_viewing(self, info: dict):
+        with self._lock:
+            self._now_viewing = dict(info or {})
+
+    def get_now_viewing(self) -> dict:
+        with self._lock:
+            return dict(self._now_viewing)
 
     def check_token(self, header_token: str) -> bool:
         with self._lock:

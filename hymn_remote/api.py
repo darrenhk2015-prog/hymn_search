@@ -139,8 +139,33 @@ def create_app(state: RemoteControlState) -> FastAPI:
         _check_token(x_api_token)
         return state.reject_pending(req_id, _client_ip(request))
 
+    @app.get('/api/view/now')
+    def view_now():
+        if not state.api_enabled:
+            return JSONResponse(
+                status_code=503,
+                content={'status': 'disabled', 'label': '', 'web_url': '', 'show_debug': False},
+            )
+        data = state.get_now_viewing()
+        data['show_debug'] = state.get_viewer_show_debug()
+        return data
+
+    @app.get('/view')
+    def viewer_page_alias():
+        page = static / 'viewer.html'
+        if page.is_file():
+            return FileResponse(page)
+        return JSONResponse({'message': 'viewer.html not found'})
+
     @app.get('/')
-    def mobile_page():
+    def viewer_page():
+        page = static / 'viewer.html'
+        if page.is_file():
+            return FileResponse(page)
+        return JSONResponse({'message': 'viewer.html not found'})
+
+    @app.get('/admin')
+    def admin_page():
         index = static / 'mobile.html'
         if index.is_file():
             return FileResponse(index)

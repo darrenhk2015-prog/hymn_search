@@ -129,5 +129,10 @@ class RemoteServer:
         self._thread = None
         self._server = None
 
-    def url(self):
-        return f"http://{get_lan_ip()}:{self.state.port}"
+    def url(self, path: str = ''):
+        base = f"http://{get_lan_ip()}:{self.state.port}"
+        if not path:
+            return base
+        if not path.startswith('/'):
+            path = '/' + path
+        return base + path

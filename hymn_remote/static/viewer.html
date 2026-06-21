@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <title>詩歌</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body {
+      height: 100%;
+      background: #0a0c14;
+      color: #e8ecf8;
+      font-family: 'Segoe UI', 'PingFang TC', 'Microsoft YaHei', sans-serif;
+      overflow: hidden;
+    }
+    #bar {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      min-height: 52px;
+      padding: 10px 14px;
+      padding-top: max(10px, env(safe-area-inset-top));
+      background: #121528;
+      border-bottom: 1px solid #2a2f4a;
+    }
+    #title {
+      flex: 1;
+      font-size: 0.95rem;
+      font-weight: 600;
+      line-height: 1.35;
+      word-break: break-word;
+    }
+    #badge {
+      font-size: 0.72rem;
+      color: #7c86a8;
+      white-space: nowrap;
+    }
+    #frameWrap {
+      position: absolute;
+      left: 0;
+      right: 0;
+      top: 52px;
+      bottom: 0;
+      background: #fff;
+    }
+    #frameWrap.with-safe {
+      top: calc(52px + env(safe-area-inset-top));
+      bottom: env(safe-area-inset-bottom);
+    }
+    iframe {
+      width: 100%;
+      height: 100%;
+      border: none;
+      background: #fff;
+    }
+    #placeholder {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      height: 100%;
+      padding: 24px;
+      text-align: center;
+      color: #6b7394;
+      font-size: 1rem;
+      line-height: 1.6;
+      background: #0a0c14;
+    }
+    #placeholder.hidden { display: none; }
+    .hidden { display: none !important; }
+    .dot {
+      display: inline-block;
+      width: 8px;
+      height: 8px;
+      margin-right: 8px;
+      border-radius: 50%;
+      background: #34d399;
+      vertical-align: middle;
+    }
+    .dot.off { background: #505870; }
+    #debugBar {
+      position: fixed;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      z-index: 20;
+      max-height: 38vh;
+      overflow: auto;
+      padding: 8px 12px;
+      padding-bottom: max(8px, env(safe-area-inset-bottom));
+      background: rgba(10, 12, 20, 0.94);
+      border-top: 1px solid #3a4060;
+      font-size: 0.68rem;
+      line-height: 1.45;
+      color: #9aa3c4;
+      font-family: Consolas, 'Courier New', monospace;
+      word-break: break-all;
+    }
+    #debugBar b { color: #c4caf0; font-weight: 600; }
+    #frameWrap.with-debug {
+      bottom: calc(110px + env(safe-area-inset-bottom));
+    }
+  </style>
+</head>
+<body>
+  <div id="bar">
+    <span id="liveDot" class="dot off"></span>
+    <div id="title">連線中…</div>
+    <div id="badge"></div>
+  </div>
+  <div id="frameWrap" class="with-safe">
+    <div id="placeholder">等待詩歌開始…</div>
+    <iframe id="frame" class="hidden" title="詩歌內容"></iframe>
+  </div>
+  <div id="debugBar" class="hidden">debug: 等待資料…</div>
+
+  <script>
+    const POLL_MS = 2000;
+    const titleEl = document.getElementById('title');
+    const badgeEl = document.getElementById('badge');
+    const frameEl = document.getElementById('frame');
+    const frameWrapEl = document.getElementById('frameWrap');
+    const placeholderEl = document.getElementById('placeholder');
+    const liveDot = document.getElementById('liveDot');
+    const debugEl = document.getElementById('debugBar');
+    let lastKey = '';
+    let lastUrl = '';
+    let showDebug = false;
+
+    function esc(s) {
+      return String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    }
+
+    function applyDebugVisibility() {
+      debugEl.classList.toggle('hidden', !showDebug);
+      frameWrapEl.classList.toggle('with-debug', showDebug);
+    }
+
+    function updateDebug(data, err) {
+      if (!showDebug) return;
+      if (err) {
+        debugEl.innerHTML = '<b>debug</b> error: ' + esc(err);
+        return;
+      }
+      if (!data) {
+        debugEl.innerHTML = '<b>debug</b> (no data)';
+        return;
+      }
+      const lines = [
+        ['viewer_source', data.viewer_source || '—'],
+        ['match_source', data.code_source || '—'],
+        ['query_title', data.query_title || '—'],
+        ['matched_title', data.matched_title || '—'],
+        ['match_score', data.match_score != null ? data.match_score : '—'],
+        ['source', data.url_source || '—'],
+        ['mapped', data.mapped ? 'yes' : 'no'],
+        ['code', data.code || '—'],
+        ['drive_file_id', data.drive_file_id || '—'],
+        ['drive_name', data.drive_name || '—'],
+        ['drive_rel', data.drive_rel || '—'],
+        ['iframe_url', data.web_url || '—'],
+        ['book', data.book || '—'],
+        ['num', data.num || '—'],
+        ['label', data.label || '—'],
+      ];
+      debugEl.innerHTML = '<b>debug</b><br>' + lines.map(
+        ([k, v]) => esc(k) + ': ' + esc(v)
+      ).join('<br>');
+    }
+
+    function setLive(on) {
+      liveDot.classList.toggle('off', !on);
+    }
+
+    function showPlaceholder(msg) {
+      placeholderEl.textContent = msg;
+      placeholderEl.classList.remove('hidden');
+      frameEl.classList.add('hidden');
+      frameEl.removeAttribute('src');
+      lastUrl = '';
+    }
+
+    function showFrame(url, heading) {
+      titleEl.textContent = heading || '詩歌';
+      placeholderEl.classList.add('hidden');
+      frameEl.classList.remove('hidden');
+      if (url !== lastUrl) {
+        lastUrl = url;
+        frameEl.src = url;
+      }
+    }
+
+    async function poll() {
+      try {
+        const res = await fetch('/api/view/now', { cache: 'no-store' });
+        if (!res.ok) {
+          setLive(false);
+          updateDebug(null, 'HTTP ' + res.status);
+          if (res.status === 503) {
+            showPlaceholder('聚會畫面尚未啟動');
+          } else {
+            showPlaceholder('無法連線');
+          }
+          badgeEl.textContent = '';
+          return;
+        }
+        const data = await res.json();
+        if (typeof data.show_debug === 'boolean' && data.show_debug !== showDebug) {
+          showDebug = data.show_debug;
+          applyDebugVisibility();
+        }
+        updateDebug(data);
+        setLive(true);
+        const key = [data.ts, data.drive_file_id, data.label, data.web_url].join('|');
+        if (key === lastKey) return;
+        lastKey = key;
+
+        if (!data.label && !data.web_url) {
+          badgeEl.textContent = '';
+          showPlaceholder('等待詩歌開始…');
+          titleEl.textContent = '詩歌';
+          return;
+        }
+
+        const heading = data.title || data.label || '詩歌';
+        badgeEl.textContent = data.viewer_source === 'web'
+          ? (data.code ? data.code.toUpperCase() : 'Web')
+          : (data.mapped ? 'Drive' : '');
+
+        if (data.web_url) {
+          showFrame(data.web_url, heading);
+        } else {
+          titleEl.textContent = heading;
+          badgeEl.textContent = '';
+          showPlaceholder('此詩歌暫無網頁內容\n（僅本地檔案）');
+        }
+      } catch (e) {
+        setLive(false);
+        updateDebug(null, e.message || String(e));
+        titleEl.textContent = '詩歌';
+        badgeEl.textContent = '';
+        showPlaceholder('無法連線');
+      }
+    }
+
+    applyDebugVisibility();
+    poll();
+    setInterval(poll, POLL_MS);
+  </script>
+</body>
+</html>

@@ -27,6 +27,13 @@ if (-not (Test-Path 'assets\app.ico')) {
     & $Python scripts\make_icon.py
 }
 
+$GdriveIndex = Join-Path $Root 'hymn_remote\data\gdrive_hymn_index.json'
+if (-not (Test-Path $GdriveIndex)) {
+    Write-Host "Building Google Drive hymn index (first time)..."
+    & $Python -m pip install gdown -q
+    & $Python scripts\build_gdrive_hymn_map.py
+}
+
 $VersionPath = Join-Path $Root 'version.py'
 if (-not (Test-Path $VersionPath)) {
     @'
@@ -64,6 +71,7 @@ if ($versionContent -match 'APP_VERSION\s*=\s*(\d+)') {
     --icon "assets\app.ico" `
     --add-data "assets;assets" `
     --add-data "hymn_remote\static;hymn_remote\static" `
+    --add-data "hymn_remote\data;hymn_remote\data" `
     --hidden-import fitz `
     --hidden-import version `
     --hidden-import hymn_features.fuzzy `
@@ -80,6 +88,9 @@ if ($versionContent -match 'APP_VERSION\s*=\s*(\d+)') {
     --collect-all pillow `
     --hidden-import pypinyin `
     --hidden-import hymn_remote.api `
+    --hidden-import hymn_remote.web_hymn_map `
+    --hidden-import hymn_remote.gdrive_hymn_map `
+    --hidden-import hymn_remote.viewer_hymn_map `
     --hidden-import hymn_remote.server `
     --hidden-import uvicorn.logging `
     --hidden-import uvicorn.loops `

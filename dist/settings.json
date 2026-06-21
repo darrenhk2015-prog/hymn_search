@@ -1,0 +1,68 @@
+{
+  "version": 2,
+  "hymn_folder": "",
+  "theme": "light",
+  "font_size": 13,
+  "search_mode": "book",
+  "open_overlay": true,
+  "overlay_duration": 10,
+  "overlay_mode": "corner",
+  "display_duplicate": false,
+  "keyword_instant": true,
+  "book_auto_focus_hymn": true,
+  "click_to_open": false,
+  "remote_api_enabled": true,
+  "remote_accept": true,
+  "remote_port": 8765,
+  "remote_policy": "auto_single",
+  "remote_token": "darren",
+  "viewer_show_debug": false,
+  "operator_mode": false,
+  "pinned_books": [],
+  "recent_hymns": [
+    "06 神家詩歌 / P01   常伴的主，愛念比海沙更多.doc",
+    "06 神家詩歌 / P38   黎明已來到.doc",
+    "22 神家詩歌 / H22-07 歷世歷代所隱藏的奧祕",
+    "05 神家詩歌 / P06  釋放、昂首.doc"
+  ],
+  "setlist": [],
+  "setlist_index": -1,
+  "session_history": [
+    {
+      "book": "06 神家詩歌",
+      "num": "P01   常伴的主，愛念比海沙更多.doc",
+      "label": "06 神家詩歌 · P01   常伴的主，愛念比海沙更多.doc"
+    },
+    {
+      "book": "",
+      "num": "145\t或生或死晝夜與主同活",
+      "label": " · 145\t或生或死晝夜與主同活 · P.258"
+    },
+    {
+      "book": "",
+      "num": "31\t奇愛的專注，恆動的思念",
+      "label": " · 31\t奇愛的專注，恆動的思念 · P.63"
+    },
+    {
+      "book": "06 神家詩歌",
+      "num": "P38   黎明已來到.doc",
+      "label": "06 神家詩歌 · "
+    },
+    {
+      "book": "22 神家詩歌",
+      "num": "H22-07 歷世歷代所隱藏的奧祕",
+      "label": "22 神家詩歌 · H22-07 歷世歷代所隱藏的奧祕 · P.8"
+    },
+    {
+      "book": "05 神家詩歌",
+      "num": "P06  釋放、昂首.doc",
+      "label": "05 神家詩歌 · P06  釋放、昂首.doc"
+    }
+  ],
+  "session_cursor": 0,
+  "show_preview": true,
+  "auto_rescan": true,
+  "startup_tray": false,
+  "minimize_to_tray": false,
+  "last_opened": "06 神家詩歌 · P01   常伴的主，愛念比海沙更多.doc"
+}

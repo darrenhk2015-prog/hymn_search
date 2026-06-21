@@ -1,3 +1,5 @@
+# Build tools (optional): gdown — crawl public Drive folder for viewer index
+#   pip install gdown && python scripts/build_gdrive_hymn_map.py
 PyQt6
 PyMuPDF
 python-docx

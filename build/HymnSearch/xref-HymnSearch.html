@@ -214,9 +214,12 @@ imports:
  &#8226;   <a href="#hymn_features.preview">hymn_features.preview</a>
  &#8226;   <a href="#hymn_features.session_store">hymn_features.session_store</a>
  &#8226;   <a href="#hymn_remote.api">hymn_remote.api</a>
+ &#8226;   <a href="#hymn_remote.gdrive_hymn_map">hymn_remote.gdrive_hymn_map</a>
  &#8226;   <a href="#hymn_remote.resolver">hymn_remote.resolver</a>
  &#8226;   <a href="#hymn_remote.server">hymn_remote.server</a>
  &#8226;   <a href="#hymn_remote.state">hymn_remote.state</a>
+ &#8226;   <a href="#hymn_remote.viewer_hymn_map">hymn_remote.viewer_hymn_map</a>
+ &#8226;   <a href="#hymn_remote.web_hymn_map">hymn_remote.web_hymn_map</a>
  &#8226;   <a href="#io">io</a>
  &#8226;   <a href="#json">json</a>
  &#8226;   <a href="#keyword">keyword</a>
@@ -3956,6 +3959,8 @@ imported by:
  &#8226;   <a href="#docx.text.paragraph">docx.text.paragraph</a>
  &#8226;   <a href="#docx.text.run">docx.text.run</a>
  &#8226;   <a href="#docx.types">docx.types</a>
+ &#8226;   <a href="#hymn_remote.gdrive_hymn_map">hymn_remote.gdrive_hymn_map</a>
+ &#8226;   <a href="#hymn_remote.viewer_hymn_map">hymn_remote.viewer_hymn_map</a>
  &#8226;   <a href="#importlib.metadata">importlib.metadata</a>
  &#8226;   <a href="#importlib.metadata._meta">importlib.metadata._meta</a>
  &#8226;   <a href="#importlib.resources.readers">importlib.resources.readers</a>
@@ -19152,7 +19157,9 @@ imports:
   </div>
   <div class="import">
 imported by:
-    <a href="#hymn_remote.resolver">hymn_remote.resolver</a>
+    <a href="#hymn_remote.gdrive_hymn_map">hymn_remote.gdrive_hymn_map</a>
+ &#8226;   <a href="#hymn_remote.resolver">hymn_remote.resolver</a>
+ &#8226;   <a href="#hymn_remote.web_hymn_map">hymn_remote.web_hymn_map</a>
  &#8226;   <a href="#hymn_search">hymn_search</a>
  &#8226;   <a href="#hymn_search.py">hymn_search.py</a>
 
@@ -19172,6 +19179,7 @@ imports:
  &#8226;   <a href="#hymn_features.preview">hymn_features.preview</a>
  &#8226;   <a href="#hymn_features.session_store">hymn_features.session_store</a>
  &#8226;   <a href="#hymn_remote.resolver">hymn_remote.resolver</a>
+ &#8226;   <a href="#hymn_remote.viewer_hymn_map">hymn_remote.viewer_hymn_map</a>
  &#8226;   <a href="#hymn_search">hymn_search</a>
  &#8226;   <a href="#io">io</a>
  &#8226;   <a href="#json">json</a>
@@ -19236,10 +19244,13 @@ imported by:
 <span class="moduletype">Package</span>  <div class="import">
 imported by:
     <a href="#hymn_remote.api">hymn_remote.api</a>
+ &#8226;   <a href="#hymn_remote.gdrive_hymn_map">hymn_remote.gdrive_hymn_map</a>
  &#8226;   <a href="#hymn_remote.operation_log">hymn_remote.operation_log</a>
  &#8226;   <a href="#hymn_remote.resolver">hymn_remote.resolver</a>
  &#8226;   <a href="#hymn_remote.server">hymn_remote.server</a>
  &#8226;   <a href="#hymn_remote.state">hymn_remote.state</a>
+ &#8226;   <a href="#hymn_remote.viewer_hymn_map">hymn_remote.viewer_hymn_map</a>
+ &#8226;   <a href="#hymn_remote.web_hymn_map">hymn_remote.web_hymn_map</a>
 
   </div>
 
@@ -19265,6 +19276,31 @@ imports:
   <div class="import">
 imported by:
     <a href="#hymn_remote.server">hymn_remote.server</a>
+ &#8226;   <a href="#hymn_search.py">hymn_search.py</a>
+
+  </div>
+
+</div>
+
+<div class="node">
+  <a name="hymn_remote.gdrive_hymn_map"></a>
+  <a target="code" href="///C:/python/hymn_search/hymn_remote/gdrive_hymn_map.py" type="text/plain"><tt>hymn_remote.gdrive_hymn_map</tt></a>
+<span class="moduletype">SourceModule</span>  <div class="import">
+imports:
+    <a href="#__future__">__future__</a>
+ &#8226;   <a href="#hymn_features.fuzzy">hymn_features.fuzzy</a>
+ &#8226;   <a href="#hymn_remote">hymn_remote</a>
+ &#8226;   <a href="#hymn_remote.web_hymn_map">hymn_remote.web_hymn_map</a>
+ &#8226;   <a href="#json">json</a>
+ &#8226;   <a href="#pathlib">pathlib</a>
+ &#8226;   <a href="#re">re</a>
+ &#8226;   <a href="#sys">sys</a>
+ &#8226;   <a href="#time">time</a>
+
+  </div>
+  <div class="import">
+imported by:
+    <a href="#hymn_remote.viewer_hymn_map">hymn_remote.viewer_hymn_map</a>
  &#8226;   <a href="#hymn_search.py">hymn_search.py</a>
 
   </div>
@@ -19358,6 +19394,52 @@ imported by:
     <a href="#hymn_remote.api">hymn_remote.api</a>
  &#8226;   <a href="#hymn_remote.server">hymn_remote.server</a>
  &#8226;   <a href="#hymn_search">hymn_search</a>
+ &#8226;   <a href="#hymn_search.py">hymn_search.py</a>
+
+  </div>
+
+</div>
+
+<div class="node">
+  <a name="hymn_remote.viewer_hymn_map"></a>
+  <a target="code" href="///C:/python/hymn_search/hymn_remote/viewer_hymn_map.py" type="text/plain"><tt>hymn_remote.viewer_hymn_map</tt></a>
+<span class="moduletype">SourceModule</span>  <div class="import">
+imports:
+    <a href="#__future__">__future__</a>
+ &#8226;   <a href="#hymn_remote">hymn_remote</a>
+ &#8226;   <a href="#hymn_remote.gdrive_hymn_map">hymn_remote.gdrive_hymn_map</a>
+ &#8226;   <a href="#hymn_remote.web_hymn_map">hymn_remote.web_hymn_map</a>
+ &#8226;   <a href="#os">os</a>
+ &#8226;   <a href="#re">re</a>
+
+  </div>
+  <div class="import">
+imported by:
+    <a href="#hymn_features.mixin">hymn_features.mixin</a>
+ &#8226;   <a href="#hymn_search.py">hymn_search.py</a>
+
+  </div>
+
+</div>
+
+<div class="node">
+  <a name="hymn_remote.web_hymn_map"></a>
+  <a target="code" href="///C:/python/hymn_search/hymn_remote/web_hymn_map.py" type="text/plain"><tt>hymn_remote.web_hymn_map</tt></a>
+<span class="moduletype">SourceModule</span>  <div class="import">
+imports:
+    <a href="#hymn_features.fuzzy">hymn_features.fuzzy</a>
+ &#8226;   <a href="#hymn_remote">hymn_remote</a>
+ &#8226;   <a href="#json">json</a>
+ &#8226;   <a href="#pathlib">pathlib</a>
+ &#8226;   <a href="#re">re</a>
+ &#8226;   <a href="#sys">sys</a>
+ &#8226;   <a href="#time">time</a>
+
+  </div>
+  <div class="import">
+imported by:
+    <a href="#hymn_remote.gdrive_hymn_map">hymn_remote.gdrive_hymn_map</a>
+ &#8226;   <a href="#hymn_remote.viewer_hymn_map">hymn_remote.viewer_hymn_map</a>
  &#8226;   <a href="#hymn_search.py">hymn_search.py</a>
 
   </div>
@@ -20583,6 +20665,8 @@ imported by:
  &#8226;   <a href="#fastapi.routing">fastapi.routing</a>
  &#8226;   <a href="#hymn_features.mixin">hymn_features.mixin</a>
  &#8226;   <a href="#hymn_features.session_store">hymn_features.session_store</a>
+ &#8226;   <a href="#hymn_remote.gdrive_hymn_map">hymn_remote.gdrive_hymn_map</a>
+ &#8226;   <a href="#hymn_remote.web_hymn_map">hymn_remote.web_hymn_map</a>
  &#8226;   <a href="#hymn_search">hymn_search</a>
  &#8226;   <a href="#hymn_search.py">hymn_search.py</a>
  &#8226;   <a href="#importlib.metadata">importlib.metadata</a>
@@ -22985,6 +23069,7 @@ imported by:
  &#8226;   <a href="#hymn_features.mixin">hymn_features.mixin</a>
  &#8226;   <a href="#hymn_features.preview">hymn_features.preview</a>
  &#8226;   <a href="#hymn_remote.server">hymn_remote.server</a>
+ &#8226;   <a href="#hymn_remote.viewer_hymn_map">hymn_remote.viewer_hymn_map</a>
  &#8226;   <a href="#hymn_search">hymn_search</a>
  &#8226;   <a href="#hymn_search.py">hymn_search.py</a>
  &#8226;   <a href="#importlib.metadata">importlib.metadata</a>
@@ -23612,6 +23697,8 @@ imported by:
  &#8226;   <a href="#dotenv.main">dotenv.main</a>
  &#8226;   <a href="#fastapi.encoders">fastapi.encoders</a>
  &#8226;   <a href="#hymn_remote.api">hymn_remote.api</a>
+ &#8226;   <a href="#hymn_remote.gdrive_hymn_map">hymn_remote.gdrive_hymn_map</a>
+ &#8226;   <a href="#hymn_remote.web_hymn_map">hymn_remote.web_hymn_map</a>
  &#8226;   <a href="#importlib.metadata">importlib.metadata</a>
  &#8226;   <a href="#importlib.resources._common">importlib.resources._common</a>
  &#8226;   <a href="#importlib.resources.abc">importlib.resources.abc</a>
@@ -30042,7 +30129,10 @@ imported by:
  &#8226;   <a href="#http.cookies">http.cookies</a>
  &#8226;   <a href="#hymn_features.fuzzy">hymn_features.fuzzy</a>
  &#8226;   <a href="#hymn_features.preview">hymn_features.preview</a>
+ &#8226;   <a href="#hymn_remote.gdrive_hymn_map">hymn_remote.gdrive_hymn_map</a>
  &#8226;   <a href="#hymn_remote.resolver">hymn_remote.resolver</a>
+ &#8226;   <a href="#hymn_remote.viewer_hymn_map">hymn_remote.viewer_hymn_map</a>
+ &#8226;   <a href="#hymn_remote.web_hymn_map">hymn_remote.web_hymn_map</a>
  &#8226;   <a href="#hymn_search">hymn_search</a>
  &#8226;   <a href="#hymn_search.py">hymn_search.py</a>
  &#8226;   <a href="#idna.core">idna.core</a>
@@ -36086,7 +36176,9 @@ imported by:
  &#8226;   <a href="#http.client">http.client</a>
  &#8226;   <a href="#http.server">http.server</a>
  &#8226;   <a href="#hymn_features.mixin">hymn_features.mixin</a>
+ &#8226;   <a href="#hymn_remote.gdrive_hymn_map">hymn_remote.gdrive_hymn_map</a>
  &#8226;   <a href="#hymn_remote.server">hymn_remote.server</a>
+ &#8226;   <a href="#hymn_remote.web_hymn_map">hymn_remote.web_hymn_map</a>
  &#8226;   <a href="#hymn_search">hymn_search</a>
  &#8226;   <a href="#hymn_search.py">hymn_search.py</a>
  &#8226;   <a href="#importlib">importlib</a>
@@ -36601,8 +36693,10 @@ imported by:
  &#8226;   <a href="#http.cookiejar">http.cookiejar</a>
  &#8226;   <a href="#http.cookies">http.cookies</a>
  &#8226;   <a href="#http.server">http.server</a>
+ &#8226;   <a href="#hymn_remote.gdrive_hymn_map">hymn_remote.gdrive_hymn_map</a>
  &#8226;   <a href="#hymn_remote.operation_log">hymn_remote.operation_log</a>
  &#8226;   <a href="#hymn_remote.server">hymn_remote.server</a>
+ &#8226;   <a href="#hymn_remote.web_hymn_map">hymn_remote.web_hymn_map</a>
  &#8226;   <a href="#hymn_search">hymn_search</a>
  &#8226;   <a href="#hymn_search.py">hymn_search.py</a>
  &#8226;   <a href="#logging">logging</a>

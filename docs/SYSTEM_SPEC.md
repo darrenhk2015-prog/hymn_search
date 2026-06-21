@@ -3,7 +3,7 @@
 **版本：** Phase 1 + 增強功能（排程、Mobile 遙控、Session）  
 **主程式：** `hymn_search.py` / `HymnSearch.exe`  
 **設定版本：** `SETTINGS_VERSION = 2`  
-**最後更新：** 2026-06-18
+**最後更新：** 2026-06-19
 
 ---
 
@@ -29,7 +29,8 @@
 |------|------|
 | **司琴 / 投影操作員** | 搜尋詩歌、開啟檔案、管理排程清單、辨識目前書冊 |
 | **Mobile 使用者** | 同 Wi‑Fi 下以瀏覽器開檔、瀏覽排程、下一首 |
-| **管理員** | 維護詩歌資料夾、建立全文索引、設定 API Token / 開檔策略 |
+| **會眾 / 投影輔助** | 同 Wi‑Fi 下開啟 `/` 或 `/view` 觀看頁，同步顯示操作員正在開啟的詩歌 |
+| **管理員** | 維護詩歌資料夾、建立全文索引、更新 mapping JSON、設定 API Token / 開檔策略 |
 
 ---
 
@@ -48,10 +49,15 @@
 │  hymn_remote/                                                 │
 │  ├── server.py    — uvicorn 背景 Thread                       │
 │  ├── api.py       — FastAPI 路由                              │
-│  ├── state.py     — 執行緒安全狀態、開檔策略、待確認佇列       │
+│  ├── state.py     — 執行緒安全狀態、開檔策略、待確認佇列、     │
+│  │                  會眾觀看 now_playing                       │
 │  ├── resolver.py  — 書冊/詩歌解析（無 Qt 依賴）               │
+│  ├── viewer_hymn_map.py — 會眾 iframe URL（PDF→網站、Word→Drive）│
+│  ├── web_hymn_map.py    — 教會網站 code→URL（PDF 用）          │
+│  ├── gdrive_hymn_map.py — Google Drive 檔案 ID（Word 用）      │
 │  ├── operation_log.py — 遙控操作記錄                          │
-│  └── static/mobile.html — Mobile 分頁 UI                      │
+│  ├── data/        — cog_hymn_urls.json、gdrive_hymn_index.json │
+│  └── static/      — viewer.html（會眾）、mobile.html（操作員）  │
 └─────────────────────────────────────────────────────────────┘
 
 hymn_features/
@@ -113,6 +119,7 @@ hymn_features/
 - 單一搜索結果：按鈕顯示「Open」，Enter 直接開啟
 - **一點即開**：設定或頂欄可切換（單擊列表即開檔）
 - 開啟後寫入 **Session 歷史**、**最近詩歌**、footer「上次：…」
+- 若 Mobile API 已啟用，同步更新 **會眾觀看** 狀態（`set_now_viewing`）
 
 ### 3.4 書名置頂提示（Overlay）
 
@@ -150,7 +157,8 @@ hymn_features/
 | 設定面板 | 四 Tab：一般 / 開檔 / Mobile / 關於 |
 | 設定匯出/匯入 | JSON（`EXPORT_KEYS` 子集） |
 | 系統匣 | 可啟動最小化、關閉最小化到 Tray |
-| Mobile QR | 設定 → Mobile Tab 顯示 LAN URL QR Code |
+| Mobile QR | 設定 → Mobile Tab 顯示會眾觀看 URL QR Code（指向 `/`） |
+| 會眾觀看除錯 | 設定 → Mobile「會眾觀看顯示除錯列」（預設關閉） |
 | 遙控操作記錄 | 設定 → Mobile Tab 列表（記憶體，重啟清空） |
 | 快捷鍵說明 | `?` 鍵開啟對話框 |
 
@@ -177,7 +185,16 @@ hymn_features/
 
 ---
 
-## 4. Mobile 遙控 HTTP API
+## 4. Mobile 遙控與會眾觀看 HTTP API
+
+### 4.0 頁面路由
+
+| URL | 檔案 | 用途 |
+|-----|------|------|
+| `/` | `viewer.html` | **會眾觀看**（預設首頁；QR Code 指向此 URL） |
+| `/view` | `viewer.html` | 會眾觀看（別名） |
+| `/admin` | `mobile.html` | **操作員遙控**（開檔、排程） |
+| `/api/docs` | Swagger | API 文件 |
 
 ### 4.1 基本資訊
 
@@ -185,7 +202,8 @@ hymn_features/
 |------|-----|
 | 預設 Port | `8765`（`DEFAULT_PORT`，設定可改） |
 | Base URL | `http://{LAN_IP}:{port}/` |
-| Mobile 頁面 | `GET /` → `mobile.html` |
+| 會眾觀看頁 | `GET /` 或 `GET /view` → `viewer.html` |
+| 操作員頁 | `GET /admin` → `mobile.html` |
 | API 文件 | `GET /api/docs`（Swagger UI） |
 | 認證 Header | `X-Api-Token: {token}`（若桌面端設定了 Token；空 Token = 不驗證） |
 | 啟用條件 | 桌面「啟用 Mobile API」+「接受請求」均為 ON |
@@ -194,7 +212,10 @@ hymn_features/
 
 | 方法 | 路徑 | 需 Token | 需 accepting | 說明 |
 |------|------|----------|--------------|------|
-| GET | `/` | — | — | Mobile 分頁 UI |
+| GET | `/` | — | — | 會眾觀看 UI |
+| GET | `/view` | — | — | 會眾觀看 UI（別名） |
+| GET | `/admin` | — | — | 操作員 Mobile UI |
+| GET | `/api/view/now` | 否 | — | 目前播放詩歌（iframe URL 等） |
 | GET | `/api/health` | 否 | — | 連線與狀態快照 |
 | GET | `/api/books` | 是* | — | 書冊列表（自動完成） |
 | GET | `/api/entries` | 是* | — | 指定書冊的檔案/書籤 |
@@ -382,6 +403,36 @@ hymn_features/
 
 確認或拒絕 Mobile 待辦（`confirm` 策略）。桌面端亦可按 Enter 或點「開啟/忽略」。
 
+#### `GET /api/view/now`
+
+**無需 Token**；供會眾觀看頁輪詢（約 2 秒）。API 未啟用時回 `503`。
+
+**回應範例：**
+
+```json
+{
+  "book": "01 神家詩歌",
+  "num": "P001  001 父的名.doc",
+  "label": "01 神家詩歌 · P001  001 父的名.doc",
+  "title": "001 父的名",
+  "web_url": "https://drive.google.com/file/d/…/preview",
+  "viewer_source": "gdrive",
+  "code_source": "filename",
+  "drive_file_id": "1v48cbBT…",
+  "drive_name": "P001  001 父的名.doc",
+  "mapped": true,
+  "show_debug": false,
+  "ts": 1718692200.0
+}
+```
+
+| 欄位 | 說明 |
+|------|------|
+| `web_url` | iframe 載入 URL |
+| `viewer_source` | `web`（教會網站）或 `gdrive`（Google Drive preview） |
+| `show_debug` | 是否顯示 viewer 底部除錯列（來自 `viewer_show_debug` 設定） |
+| `code` | PDF 時教會網站詩歌 code（如 `h13-52`） |
+
 ### 4.4 Mobile 開檔策略（`remote_policy`）
 
 適用於 **`/api/open`**、**`/api/next`**、**`/api/setlist/open`**（排程會先更新索引，再依策略開檔）。
@@ -403,7 +454,40 @@ Token 可存 `localStorage`（key: `hymn_remote_api_token`），或 URL `?token=
 
 **開檔結果提示：** `opened` → 已開啟；`queued` / `ui_populated` →「等待操作員操作」；其餘（`not_found`、`failed` 等）→「無法開啟」。
 
-### 4.6 桌面 ↔ API 回調（內部介面）
+### 4.6 會眾觀看 UI（`viewer.html`）
+
+| 項目 | 說明 |
+|------|------|
+| 輪詢 | `GET /api/view/now`，約 2 秒 |
+| 顯示 | 頂部書名 + iframe 載入 `web_url` |
+| 同步 | 桌面端開檔時由 `_sync_viewer_now_playing` 更新 |
+| 除錯列 | 預設隱藏；設定「會眾觀看顯示除錯列」= ON 時顯示 mapping 詳情 |
+
+### 4.7 會眾 iframe Mapping（`viewer_hymn_map.py`）
+
+桌面開檔後，依**檔案類型**選擇 iframe 來源：
+
+| 開啟類型 | `viewer_source` | 資料來源 | iframe URL |
+|----------|-----------------|----------|------------|
+| `.pdf` 檔案 | `web` | `cog_hymn_urls.json` + `web_hymn_map.py` | `churchofgod.org.hk/hymns/…` |
+| PDF 書籤（`bookmark`） | `web` | 同上 | 同上 |
+| 全文搜索 PDF（`content_pdf`） | `web` | 同上 | 同上 |
+| `.doc` / `.docx` / `.odt` | `gdrive` | `gdrive_hymn_index.json` + `gdrive_hymn_map.py` | `drive.google.com/file/d/{id}/preview` |
+
+**Drive 對應邏輯（Word）：** 書冊 + 檔名 → P 編號 → 歌名模糊匹配；S 合訂本可跨 01–10 冊以歌名搜尋。
+
+**網站對應邏輯（PDF）：** 書冊 + P 編號 / 標籤 / 歌名 → 詩歌 code（如 `h13-52`、`s1-2`）→ 網站 URL。
+
+**Mapping 資料檔：**
+
+| 檔案 | 建立方式 |
+|------|----------|
+| `hymn_remote/data/cog_hymn_urls.json` | `python scripts/build_hymn_url_map.py` |
+| `hymn_remote/data/gdrive_hymn_index.json` | `python scripts/build_gdrive_hymn_map.py`（需 `gdown`） |
+
+兩者皆打包入 exe（`hymn_remote/data`）；更新後須重建 exe。詳見 [BUILD.md](BUILD.md)。
+
+### 4.8 桌面 ↔ API 回調（內部介面）
 
 `RemoteServer.set_handlers(...)` 註冊：
 
@@ -489,6 +573,7 @@ Token 可存 `localStorage`（key: `hymn_remote_api_token`），或 URL `?token=
 | `remote_port` | int | 8765 | API 埠 |
 | `remote_policy` | str | `auto_single` | 開檔策略 |
 | `remote_token` | str | `""` | API Token（空=不驗證） |
+| `viewer_show_debug` | bool | false | 會眾 `/view` 頁顯示 mapping 除錯列 |
 | `operator_mode` | bool | false | **已廢棄**，匯入相容保留 |
 | `pinned_books` | list | [] | 釘選書名 |
 | `recent_hymns` | list | [] | 最近詩歌 |
@@ -524,6 +609,8 @@ Token 可存 `localStorage`（key: `hymn_remote_api_token`），或 URL `?token=
 | `MAX_SESSION_HISTORY` | 50 | Session 歷史上限 |
 | `settings.json` | `{app_dir}/` | UI 設定 |
 | `content_index.json.gz` | `{hymn_folder}/` | 全文索引快取 |
+| `cog_hymn_urls.json` | `hymn_remote/data/`（打包） | PDF → 教會網站 URL |
+| `gdrive_hymn_index.json` | `hymn_remote/data/`（打包） | Word → Google Drive 檔案 ID |
 | `remote_api.log` | `{app_dir}/` | uvicorn 啟動錯誤 log |
 
 ---
@@ -571,12 +658,22 @@ hymn_search/
 ├── hymn_remote/
 │   ├── server.py               # uvicorn 生命週期
 │   ├── api.py                  # HTTP 路由
-│   ├── state.py                # 遙控狀態、策略、待辦
+│   ├── state.py                # 遙控狀態、策略、待辦、now_viewing
 │   ├── resolver.py             # 書冊/詩歌解析
+│   ├── viewer_hymn_map.py      # 會眾 iframe 分流（PDF/Word）
+│   ├── web_hymn_map.py         # 教會網站 mapping
+│   ├── gdrive_hymn_map.py      # Google Drive mapping
 │   ├── operation_log.py        # 操作記錄
-│   └── static/mobile.html      # Mobile UI
+│   ├── data/                   # mapping JSON（打包）
+│   └── static/
+│       ├── viewer.html         # 會眾觀看
+│       └── mobile.html         # 操作員遙控
 ├── scripts/
 │   ├── make_icon.py
+│   ├── build_hymn_url_map.py   # 重建 cog_hymn_urls.json
+│   ├── build_gdrive_hymn_map.py # 重建 gdrive_hymn_index.json
+│   ├── review_hymn_map.py
+│   ├── review_gdrive_map.py
 │   ├── add_firewall_rule.ps1
 │   └── add_firewall_rule.cmd
 ├── build_exe.ps1               # 打包 + 版本遞增 + BUILD_DATE
@@ -613,6 +710,8 @@ hymn_search/
 | PyInstaller exe | 首次啟動較慢；防毒可能誤報 |
 | 同步畫面 | 切換後視窗位置可能略為移動 |
 | Mobile API | 僅 LAN；無 HTTPS；Token 為明文 Header |
+| 會眾 Drive preview | Drive 資料夾須「知道連結的使用者均可檢視」 |
+| Mapping JSON | 內嵌於 exe；更新需重建並重新打包 |
 | 遙控記錄 | 僅記憶體，重啟清空 |
 | `operator_mode` | 已移除 UI，舊設定鍵保留相容 |
 | API 執行緒 | 必須經 Signal / `_invoke_on_main` 操作 Qt，否則 QTimer 警告 |
@@ -625,3 +724,4 @@ hymn_search/
 |------|------|
 | 2026-06 | Phase 1 初版 |
 | 2026-06-18 | 四種搜尋模式（含排程）、Mobile API 全端點、Session/釘選/Tray、設定 v2、移除操作員模式 UI |
+| 2026-06-19 | 會眾觀看（`/view`）、混合 mapping（PDF→教會網站、Word→Google Drive）、`viewer_show_debug`、mapping 建置腳本 |

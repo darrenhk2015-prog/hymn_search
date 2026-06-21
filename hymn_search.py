@@ -829,6 +829,7 @@ def default_settings():
         'remote_port': DEFAULT_PORT,
         'remote_policy': OPEN_POLICY_AUTO,
         'remote_token': '',
+        'viewer_show_debug': False,
         'operator_mode': False,
         'pinned_books': [],
         'recent_hymns': [],
@@ -883,6 +884,7 @@ def normalize_settings(raw):
     if merged['remote_policy'] not in (OPEN_POLICY_AUTO, OPEN_POLICY_CONFIRM, OPEN_POLICY_UI):
         merged['remote_policy'] = OPEN_POLICY_AUTO
     merged['remote_token'] = str(merged['remote_token'] or '')
+    merged['viewer_show_debug'] = bool(merged.get('viewer_show_debug'))
     folder = str(merged.get('hymn_folder') or '').strip()
     merged['hymn_folder'] = os.path.abspath(folder) if folder else ''
     merged['operator_mode'] = bool(merged.get('operator_mode'))
@@ -2481,10 +2483,17 @@ class MainWindow(QMainWindow, EnhancementMixin):
         self.inp_remote_token.setPlaceholderText("留空 = 不驗證")
         self.inp_remote_token.textChanged.connect(self._on_remote_token_changed)
 
-        self.lbl_remote_url = QLabel("URL")
+        self.lbl_remote_url = QLabel("遙控 URL")
         self.lbl_remote_url.setMinimumWidth(label_min_w)
         self.remote_url_lbl = QLabel("—")
         self.remote_url_lbl.setWordWrap(True)
+        self.remote_url_lbl.setToolTip("操作員遙控頁（/admin）")
+
+        self.lbl_viewer_url = QLabel("會眾觀看")
+        self.lbl_viewer_url.setMinimumWidth(label_min_w)
+        self.viewer_url_lbl = QLabel("—")
+        self.viewer_url_lbl.setWordWrap(True)
+        self.viewer_url_lbl.setToolTip("預設首頁；QR Code 指向此 URL")
 
         remote_grid.addWidget(self.chk_remote_api, 0, 0, 1, 2)
         remote_grid.addWidget(self.chk_remote_accept, 1, 0, 1, 2)
@@ -2492,8 +2501,19 @@ class MainWindow(QMainWindow, EnhancementMixin):
         remote_grid.addWidget(self.spin_remote_port, 2, 1, Qt.AlignmentFlag.AlignLeft)
         remote_grid.addWidget(self.lbl_remote_token, 3, 0)
         remote_grid.addWidget(self.inp_remote_token, 3, 1)
-        remote_grid.addWidget(self.lbl_remote_url, 4, 0)
-        remote_grid.addWidget(self.remote_url_lbl, 4, 1)
+        remote_grid.addWidget(self.lbl_viewer_url, 4, 0)
+        remote_grid.addWidget(self.viewer_url_lbl, 4, 1)
+        remote_grid.addWidget(self.lbl_remote_url, 5, 0)
+        remote_grid.addWidget(self.remote_url_lbl, 5, 1)
+
+        self.chk_viewer_show_debug = QCheckBox("會眾觀看顯示除錯列")
+        self.chk_viewer_show_debug.setChecked(self._settings['viewer_show_debug'])
+        self.chk_viewer_show_debug.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.chk_viewer_show_debug.setToolTip(
+            "開啟後，手機 /view 頁面底部會顯示 mapping 除錯資訊"
+        )
+        self.chk_viewer_show_debug.toggled.connect(self._on_viewer_show_debug_toggled)
+        remote_grid.addWidget(self.chk_viewer_show_debug, 6, 0, 1, 2)
 
         self.remote_qr_lbl = QLabel("啟用 Mobile API 後顯示 QR")
         self.remote_qr_lbl.setObjectName('remoteQrLabel')
@@ -3128,6 +3148,7 @@ class MainWindow(QMainWindow, EnhancementMixin):
         self._remote.state.set_policy(s['remote_policy'])
         self._remote.state.set_token(s['remote_token'])
         self._remote.state.set_port(s['remote_port'])
+        self._remote.state.set_viewer_show_debug(s['viewer_show_debug'])
         self._set_search_mode(s['search_mode'])
         self._on_open_overlay_toggled(s['open_overlay'])
         if s['remote_api_enabled']:
@@ -3141,11 +3162,14 @@ class MainWindow(QMainWindow, EnhancementMixin):
             (self.chk_auto_rescan, 'auto_rescan'),
             (self.chk_startup_tray, 'startup_tray'),
             (self.chk_minimize_tray, 'minimize_to_tray'),
+            (self.chk_viewer_show_debug, 'viewer_show_debug'),
         ):
             chk.blockSignals(True)
             chk.setChecked(bool(s.get(key)))
             chk.blockSignals(False)
         self._apply_setlist_from_settings()
+        if s.get('remote_api_enabled') and s.get('last_opened'):
+            self._sync_viewer_now_playing(label=s['last_opened'])
         self._loading_settings = False
 
     def _on_settings_toggled(self, checked):
@@ -3529,16 +3553,20 @@ class MainWindow(QMainWindow, EnhancementMixin):
         self.chk_open_overlay.setStyleSheet(checkbox_style)
         self.chk_display_duplicate.setStyleSheet(checkbox_style)
         for chk in (self.chk_remote_api, self.chk_remote_accept,
+                    self.chk_viewer_show_debug,
                     self.chk_show_preview,
                     self.chk_auto_rescan, self.chk_startup_tray, self.chk_minimize_tray):
             chk.setStyleSheet(checkbox_style)
         for lbl in (self.lbl_remote_port,
-                    self.lbl_remote_token, self.lbl_remote_url):
+                    self.lbl_remote_token, self.lbl_remote_url, self.lbl_viewer_url):
             lbl.setStyleSheet(
                 f"font-size: {fs - 2}px; color: {t['muted']}; background: transparent;"
             )
         self.remote_url_lbl.setStyleSheet(
             f"font-size: {fs - 2}px; color: {t['accent_h']}; background: transparent;"
+        )
+        self.viewer_url_lbl.setStyleSheet(
+            f"font-size: {fs - 2}px; color: {t['ok']}; background: transparent;"
         )
         pending_style = f"""
             QFrame {{ background: {t['warn_bg']}; border-bottom: 1px solid {t['border']}; }}
@@ -3565,7 +3593,7 @@ class MainWindow(QMainWindow, EnhancementMixin):
 
         # Settings labels
         for lbl in (self.lbl_hymn_folder, self.lbl_theme, self.lbl_font, self.lbl_overlay_secs, self.lbl_overlay_pos, self.fs_lbl,
-                    self.lbl_remote_port, self.lbl_remote_token, self.lbl_remote_url):
+                    self.lbl_remote_port, self.lbl_remote_token, self.lbl_remote_url, self.lbl_viewer_url):
             lbl.setStyleSheet(f"font-size: {fs - 1}px; color: {t['text2']}; background: transparent;")
 
         # ── Content sep + file area ──────────────────────────────
@@ -4398,6 +4426,24 @@ class MainWindow(QMainWindow, EnhancementMixin):
     # ─────────────────────────────────────────────────────────────
     #  REMOTE — Mobile API 遙控開檔
     # ─────────────────────────────────────────────────────────────
+    def _remote_viewer_url(self):
+        if not self._remote.running:
+            return '—'
+        return self._remote.url()
+
+    def _remote_admin_url(self):
+        if not self._remote.running:
+            return '—'
+        return self._remote.url('/admin')
+
+    def _update_remote_url_labels(self):
+        if self._remote.running:
+            self.viewer_url_lbl.setText(self._remote_viewer_url())
+            self.remote_url_lbl.setText(self._remote_admin_url())
+        else:
+            self.remote_url_lbl.setText('—')
+            self.viewer_url_lbl.setText('—')
+
     def _on_remote_api_toggled(self, checked):
         self._remote.state.set_api_enabled(checked)
         if checked:
@@ -4409,6 +4455,7 @@ class MainWindow(QMainWindow, EnhancementMixin):
                 self._remote.state.set_api_enabled(False)
                 self.spin_remote_port.setEnabled(True)
                 self.remote_url_lbl.setText('—')
+                self.viewer_url_lbl.setText('—')
                 err = self._remote.last_error or 'port 可能已被佔用'
                 self._show_toast(
                     f'API 啟動失敗：{err}（詳情見 exe 旁 remote_api.log）',
@@ -4420,11 +4467,13 @@ class MainWindow(QMainWindow, EnhancementMixin):
                 self._persist_settings(remote_api_enabled=False, remote_accept=False)
                 return
             self.spin_remote_port.setEnabled(False)
-            self.remote_url_lbl.setText(self._remote.url())
+            self._update_remote_url_labels()
+            if self._settings.get('last_opened'):
+                self._sync_viewer_now_playing(label=self._settings['last_opened'])
         else:
             self._remote.stop()
             self.spin_remote_port.setEnabled(True)
-            self.remote_url_lbl.setText('—')
+            self._update_remote_url_labels()
             self._sync_remote_accept_checkboxes(checked=False)
         self._sync_remote_accept_enabled()
         self._update_remote_status_label()
@@ -4471,6 +4520,10 @@ class MainWindow(QMainWindow, EnhancementMixin):
         self._remote.state.set_token(text)
         self._persist_settings(remote_token=text)
         self._update_qr_code()
+
+    def _on_viewer_show_debug_toggled(self, checked):
+        self._remote.state.set_viewer_show_debug(checked)
+        self._persist_settings(viewer_show_debug=checked)
 
     def _on_remote_port_changed(self, val):
         self._remote.state.set_port(val)
