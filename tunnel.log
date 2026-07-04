@@ -1,0 +1,166 @@
+[2026-06-28 07:41:40] [INFO] test entry
+[2026-06-28 07:41:40] [INFO] simulated | mode=service port=8765 url=https://example.com/hymn
+[2026-06-28 07:42:25] [INFO] tunnel stop | mode=service port=8765 url=https://live.churchofgodtm.com/hymn_search
+[2026-06-28 07:42:31] [INFO] tunnel stop | mode=service port=8765 url=https://live.churchofgodtm.com/hymn_search
+[2026-06-28 07:42:49] [INFO] tunnel stop | mode=service port=8765 url=https://live.churchofgodtm.com/hymn_search
+[2026-06-28 07:43:11] [INFO] tunnel stop | mode=service port=8765 url=https://live.churchofgodtm.com/hymn_search
+[2026-06-28 07:45:23] [INFO] tunnel start | mode=service port=8765 url=https://live.churchofgodtm.com/hymn_search named_url=https://live.churchofgodtm.com/hymn_search service_installed=True service_running=True
+[2026-06-28 07:45:23] [ERROR] Cloudflare Zero Trust → Networks → Tunnels → Public Hostname：/hymn_search → http://127.0.0.1:8765（必須用 http，勿用 https 或 localhost）。 | mode=service port=8765 url=https://live.churchofgodtm.com/hymn_search
+[2026-06-28 07:45:29] [INFO] tunnel stop | mode=service port=8765 url=https://live.churchofgodtm.com/hymn_search
+[2026-06-28 08:50:29] [INFO] tunnel start | mode=service port=8765 url=https://live.churchofgodtm.com/hymn_search named_url=https://live.churchofgodtm.com/hymn_search service_installed=True service_running=True use_https=True
+[2026-06-28 08:50:30] [ERROR] Cloudflare 仍回 error 1033，但本機 HTTPS 已就緒。請在 Zero Trust → Public Hostname → /hymn_search 開啟 No TLS Verify（origin 用 https://localhost:8765）。 | mode=service port=8765 url=https://live.churchofgodtm.com/hymn_search cf_error=1033
+[2026-06-28 08:50:30] [ERROR] Cloudflare 仍回 error 1033，但本機 HTTPS 已就緒。請在 Zero Trust → Public Hostname → /hymn_search 開啟 No TLS Verify（origin 用 https://localhost:8765）。 | mode=service port=8765 url=https://live.churchofgodtm.com/hymn_search
+[2026-06-28 08:51:36] [INFO] tunnel stop | mode=service port=8765 url=https://live.churchofgodtm.com/hymn_search
+[2026-06-28 08:51:37] [INFO] tunnel start | mode=service port=8765 url=https://live.churchofgodtm.com/hymn_search named_url=https://live.churchofgodtm.com/hymn_search service_installed=True service_running=True use_https=True
+[2026-06-28 08:51:37] [ERROR] Cloudflare 仍回 error 1033，但本機 HTTPS 已就緒。請在 Zero Trust → Public Hostname → /hymn_search 開啟 No TLS Verify（origin 用 https://localhost:8765）。 | mode=service port=8765 url=https://live.churchofgodtm.com/hymn_search cf_error=1033
+[2026-06-28 08:51:37] [ERROR] Cloudflare 仍回 error 1033，但本機 HTTPS 已就緒。請在 Zero Trust → Public Hostname → /hymn_search 開啟 No TLS Verify（origin 用 https://localhost:8765）。 | mode=service port=8765 url=https://live.churchofgodtm.com/hymn_search
+[2026-06-28 08:52:44] [INFO] tunnel stop | mode=service port=8765 url=https://live.churchofgodtm.com/hymn_search
+[2026-06-28 08:52:45] [INFO] tunnel start | mode=service port=8765 url=https://live.churchofgodtm.com/hymn_search named_url=https://live.churchofgodtm.com/hymn_search service_installed=True service_running=True use_https=True
+[2026-06-28 08:52:45] [ERROR] Cloudflare 仍回 error 1033，但本機 HTTPS 已就緒。請在 Zero Trust → Public Hostname → /hymn_search 開啟 No TLS Verify（origin 用 https://localhost:8765）。 | mode=service port=8765 url=https://live.churchofgodtm.com/hymn_search cf_error=1033
+[2026-06-28 08:52:45] [ERROR] Cloudflare 仍回 error 1033，但本機 HTTPS 已就緒。請在 Zero Trust → Public Hostname → /hymn_search 開啟 No TLS Verify（origin 用 https://localhost:8765）。 | mode=service port=8765 url=https://live.churchofgodtm.com/hymn_search
+[2026-06-28 08:52:53] [INFO] tunnel stop | mode=service port=8765 url=https://live.churchofgodtm.com/hymn_search
+[2026-06-28 08:52:56] [INFO] tunnel start | mode=service port=8765 url=https://live.churchofgodtm.com/hymn_search named_url=https://live.churchofgodtm.com/hymn_search service_installed=True service_running=True use_https=True
+[2026-06-28 08:52:57] [ERROR] Cloudflare 仍回 error 1033，但本機 HTTPS 已就緒。請在 Zero Trust → Public Hostname → /hymn_search 開啟 No TLS Verify（origin 用 https://localhost:8765）。 | mode=service port=8765 url=https://live.churchofgodtm.com/hymn_search cf_error=1033
+[2026-06-28 08:52:57] [ERROR] Cloudflare 仍回 error 1033，但本機 HTTPS 已就緒。請在 Zero Trust → Public Hostname → /hymn_search 開啟 No TLS Verify（origin 用 https://localhost:8765）。 | mode=service port=8765 url=https://live.churchofgodtm.com/hymn_search
+[2026-06-28 08:59:58] [INFO] tunnel stop | mode=service port=8765 url=https://live.churchofgodtm.com/hymn_search
+[2026-06-28 09:00:54] [INFO] tunnel start | mode=service port=8765 url=https://live.churchofgodtm.com/hymn_search named_url=https://live.churchofgodtm.com/hymn_search service_installed=True service_running=True use_https=True
+[2026-06-28 09:00:55] [ERROR] Cloudflare error 502：tunnel 已通，但 origin 回應失敗。請確認 origin 為 https://127.0.0.1:8765、No TLS Verify 已開，並重啟 cloudflared Windows 服務。 | mode=service port=8765 url=https://live.churchofgodtm.com/hymn_search cf_error=1033
+[2026-06-28 09:00:55] [ERROR] Cloudflare error 502：tunnel 已通，但 origin 回應失敗。請確認 origin 為 https://127.0.0.1:8765、No TLS Verify 已開，並重啟 cloudflared Windows 服務。 | mode=service port=8765 url=https://live.churchofgodtm.com/hymn_search
+[2026-06-28 09:04:44] [INFO] tunnel stop | mode=service port=8765 url=https://live.churchofgodtm.com/hymn_search
+[2026-06-28 09:04:46] [INFO] tunnel start | mode=service port=8765 url=https://live.churchofgodtm.com/hymn_search named_url=https://live.churchofgodtm.com/hymn_search service_installed=True service_running=True use_https=True
+[2026-06-28 09:04:46] [INFO] tunnel stop | mode=service port=8765 url=https://live.churchofgodtm.com/hymn_search
+[2026-06-28 09:04:50] [ERROR] Cloudflare error 502：tunnel 已通，但 origin 回應失敗。請確認 origin 為 https://127.0.0.1:8765、No TLS Verify 已開，並重啟 cloudflared Windows 服務。 | mode=service port=8765 url=https://live.churchofgodtm.com/hymn_search cf_error=1033
+[2026-06-28 09:04:50] [ERROR] Cloudflare error 502：tunnel 已通，但 origin 回應失敗。請確認 origin 為 https://127.0.0.1:8765、No TLS Verify 已開，並重啟 cloudflared Windows 服務。 | mode=service port=8765 url=https://live.churchofgodtm.com/hymn_search
+[2026-06-28 09:04:54] [INFO] tunnel start | mode=service port=8765 url=https://live.churchofgodtm.com/hymn_search named_url=https://live.churchofgodtm.com/hymn_search service_installed=True service_running=True use_https=True
+[2026-06-28 09:04:54] [ERROR] Cloudflare error 502：tunnel 已通，但 origin 回應失敗。請確認 origin 為 https://127.0.0.1:8765、No TLS Verify 已開，並重啟 cloudflared Windows 服務。 | mode=service port=8765 url=https://live.churchofgodtm.com/hymn_search cf_error=1033
+[2026-06-28 09:04:54] [ERROR] Cloudflare error 502：tunnel 已通，但 origin 回應失敗。請確認 origin 為 https://127.0.0.1:8765、No TLS Verify 已開，並重啟 cloudflared Windows 服務。 | mode=service port=8765 url=https://live.churchofgodtm.com/hymn_search
+[2026-06-28 09:08:42] [INFO] tunnel stop | mode=service port=8765 url=https://live.churchofgodtm.com/hymn_search
+[2026-06-28 09:18:20] [INFO] tunnel start | mode=service port=8765 url=https://live.churchofgodtm.com/hymn_search named_url=https://live.churchofgodtm.com/hymn_search service_installed=True service_running=True use_https=False
+[2026-06-28 09:18:20] [ERROR] Cloudflare Zero Trust → Networks → Tunnels → Public Hostname：/hymn_search → http://127.0.0.1:8765（必須用 http，勿用 https 或 localhost）。 | mode=service port=8765 url=https://live.churchofgodtm.com/hymn_search
+[2026-06-28 09:29:15] [INFO] tunnel stop | mode=service port=8765 url=https://live.churchofgodtm.com/hymn_search
+[2026-06-28 09:29:16] [INFO] tunnel start | mode=service port=8765 url=https://live.churchofgodtm.com/hymn_search named_url=https://live.churchofgodtm.com/hymn_search service_installed=True service_running=True use_https=False
+[2026-06-28 09:29:16] [ERROR] Cloudflare Zero Trust → Networks → Tunnels → Public Hostname：/hymn_search → http://127.0.0.1:8765（必須用 http，勿用 https 或 localhost）。 | mode=service port=8765 url=https://live.churchofgodtm.com/hymn_search
+[2026-06-28 09:31:12] [INFO] tunnel stop | mode=service port=8765 url=https://live.churchofgodtm.com/hymn_search
+[2026-06-28 09:31:31] [INFO] tunnel start | mode=service port=8765 url=https://live.churchofgodtm.com/hymn_search named_url=https://live.churchofgodtm.com/hymn_search service_installed=True service_running=True use_https=False
+[2026-06-28 09:31:31] [ERROR] Cloudflare Zero Trust → Networks → Tunnels → Public Hostname：/hymn_search → http://127.0.0.1:8765（必須用 http，勿用 https 或 localhost）。 | mode=service port=8765 url=https://live.churchofgodtm.com/hymn_search
+[2026-06-28 09:31:42] [INFO] tunnel stop | mode=service port=8765 url=https://live.churchofgodtm.com/hymn_search
+[2026-06-28 09:31:43] [INFO] tunnel start | mode=service port=8765 url=https://live.churchofgodtm.com/hymn_search named_url=https://live.churchofgodtm.com/hymn_search service_installed=True service_running=True use_https=False
+[2026-06-28 09:31:43] [ERROR] Cloudflare Zero Trust → Networks → Tunnels → Public Hostname：/hymn_search → http://127.0.0.1:8765（必須用 http，勿用 https 或 localhost）。 | mode=service port=8765 url=https://live.churchofgodtm.com/hymn_search
+[2026-06-28 09:33:38] [INFO] tunnel stop | mode=service port=8765 url=https://live.churchofgodtm.com/hymn_search
+[2026-06-28 09:47:40] [INFO] tunnel start | mode=service port=8765 url=https://live.churchofgodtm.com/hymn_search named_url=https://live.churchofgodtm.com/hymn_search service_installed=True service_running=True use_https=False
+[2026-06-28 09:47:41] [ERROR] Cloudflare Zero Trust → Networks → Tunnels → Public Hostname：/hymn_search → http://127.0.0.1:8765（必須用 http，勿用 https 或 localhost）。 | mode=service port=8765 url=https://live.churchofgodtm.com/hymn_search
+[2026-06-28 09:48:08] [INFO] tunnel stop | mode=service port=8765 url=https://live.churchofgodtm.com/hymn_search
+[2026-06-28 09:48:14] [INFO] tunnel start | mode=service port=8765 url=http://live.churchofgodtm.com/hymn_search named_url=http://live.churchofgodtm.com/hymn_search service_installed=True service_running=True use_https=False
+[2026-06-28 09:48:15] [ERROR] Cloudflare Zero Trust → Networks → Tunnels → Public Hostname：/hymn_search → http://127.0.0.1:8765（必須用 http，勿用 https 或 localhost）。 | mode=service port=8765 url=http://live.churchofgodtm.com/hymn_search
+[2026-06-28 10:00:44] [INFO] tunnel stop | mode=service port=8765 url=http://live.churchofgodtm.com/hymn_search
+[2026-06-28 10:01:12] [INFO] tunnel start | mode=service port=8765 url=https://live.churchofgodtm.com/hymn_search named_url=https://live.churchofgodtm.com/hymn_search service_installed=True service_running=True use_https=False
+[2026-06-28 10:01:30] [INFO] tunnel stop | mode=service port=8765 url=https://live.churchofgodtm.com/hymn_search
+[2026-06-28 10:01:31] [INFO] tunnel start | mode=service port=8765 url=https://live.churchofgodtm.com/hymn_search named_url=https://live.churchofgodtm.com/hymn_search service_installed=True service_running=True use_https=False
+[2026-06-28 10:02:03] [INFO] tunnel stop | mode=service port=8765 url=https://live.churchofgodtm.com/hymn_search
+[2026-06-28 23:49:26] [INFO] tunnel start | mode=service port=8765 url=https://live.churchofgodtm.com/hymn_search named_url=https://live.churchofgodtm.com/hymn_search service_installed=True service_running=True use_https=False
+[2026-06-28 23:50:22] [INFO] tunnel url assigned | mode=service port=8765 url=https://live.churchofgodtm.com/hymn_search
+[2026-06-28 23:51:12] [INFO] tunnel stop | mode=service port=8765 url=https://live.churchofgodtm.com/hymn_search
+[2026-06-28 23:51:17] [INFO] tunnel start | mode=service port=8765 url=https://live.churchofgodtm.com/hymn_search named_url=https://live.churchofgodtm.com/hymn_search service_installed=True service_running=True use_https=False
+[2026-06-28 23:51:17] [INFO] tunnel url assigned | mode=service port=8765 url=https://live.churchofgodtm.com/hymn_search
+[2026-06-28 23:52:18] [ERROR] Cloudflare Zero Trust → Networks → Tunnels → Public Hostname：/hymn_search → http://127.0.0.1:8765（必須用 http，勿用 https 或 localhost）。 | mode=service port=8765 url=https://live.churchofgodtm.com/hymn_search probe=無法連線至 Cloudflare — 請檢查網路或 DNS
+[2026-06-28 23:52:18] [ERROR] 無法連線至 Cloudflare — 請檢查網路或 DNS | mode=service port=8765 url=https://live.churchofgodtm.com/hymn_search
+[2026-06-28 23:54:37] [INFO] tunnel stop | mode=service port=8765 url=https://live.churchofgodtm.com/hymn_search
+[2026-06-28 23:54:39] [INFO] tunnel start | mode=service port=8765 url=https://live.churchofgodtm.com/hymn_search named_url=https://live.churchofgodtm.com/hymn_search service_installed=True service_running=True use_https=False
+[2026-06-28 23:54:39] [INFO] tunnel url assigned | mode=service port=8765 url=https://live.churchofgodtm.com/hymn_search
+[2026-06-28 23:54:40] [INFO] tunnel stop | mode=service port=8765 url=https://live.churchofgodtm.com/hymn_search
+[2026-06-28 23:54:41] [INFO] tunnel start | mode=service port=8765 url=https://live.churchofgodtm.com/hymn_search named_url=https://live.churchofgodtm.com/hymn_search service_installed=True service_running=True use_https=False
+[2026-06-28 23:54:41] [INFO] tunnel url assigned | mode=service port=8765 url=https://live.churchofgodtm.com/hymn_search
+[2026-06-28 23:54:42] [ERROR] Cloudflare Zero Trust → Networks → Tunnels → Public Hostname：/hymn_search → http://127.0.0.1:8765（必須用 http，勿用 https 或 localhost）。 | mode=service port=8765 url=https://live.churchofgodtm.com/hymn_search probe=無法連線至 Cloudflare — 請檢查網路或 DNS
+[2026-06-28 23:54:42] [ERROR] 無法連線至 Cloudflare — 請檢查網路或 DNS | mode=service port=8765 url=https://live.churchofgodtm.com/hymn_search
+[2026-06-28 23:54:45] [INFO] tunnel stop | mode=service port=8765 url=https://live.churchofgodtm.com/hymn_search
+[2026-06-28 23:54:45] [ERROR] Cloudflare Zero Trust → Networks → Tunnels → Public Hostname：/hymn_search → http://127.0.0.1:8765（必須用 http，勿用 https 或 localhost）。 | mode=service port=8765 url=https://live.churchofgodtm.com/hymn_search probe=無法連線至 Cloudflare — 請檢查網路或 DNS
+[2026-06-28 23:54:45] [ERROR] 無法連線至 Cloudflare — 請檢查網路或 DNS | mode=service port=8765 url=https://live.churchofgodtm.com/hymn_search
+[2026-06-28 23:54:45] [INFO] tunnel start | mode=service port=8765 url=https://live.churchofgodtm.com/hymn_search named_url=https://live.churchofgodtm.com/hymn_search service_installed=True service_running=True use_https=False
+[2026-06-28 23:54:46] [INFO] tunnel url assigned | mode=service port=8765 url=https://live.churchofgodtm.com/hymn_search
+[2026-06-28 23:54:54] [INFO] tunnel stop | mode=service port=8765 url=https://live.churchofgodtm.com/hymn_search
+[2026-06-28 23:54:54] [ERROR] Cloudflare Zero Trust → Networks → Tunnels → Public Hostname：/hymn_search → http://127.0.0.1:8765（必須用 http，勿用 https 或 localhost）。 | mode=service port=8765 url=https://live.churchofgodtm.com/hymn_search probe=無法連線至 Cloudflare — 請檢查網路或 DNS
+[2026-06-28 23:54:54] [ERROR] 無法連線至 Cloudflare — 請檢查網路或 DNS | mode=service port=8765 url=https://live.churchofgodtm.com/hymn_search
+[2026-06-28 23:54:58] [INFO] tunnel start | mode=service port=8765 url=https://live.churchofgodtm.com/hymn_search named_url=https://live.churchofgodtm.com/hymn_search service_installed=True service_running=True use_https=False
+[2026-06-28 23:54:58] [INFO] tunnel url assigned | mode=service port=8765 url=https://live.churchofgodtm.com/hymn_search
+[2026-06-28 23:55:59] [ERROR] Cloudflare Zero Trust → Networks → Tunnels → Public Hostname：/hymn_search → http://127.0.0.1:8765（必須用 http，勿用 https 或 localhost）。 | mode=service port=8765 url=https://live.churchofgodtm.com/hymn_search probe=無法連線至 Cloudflare — 請檢查網路或 DNS
+[2026-06-28 23:55:59] [ERROR] 無法連線至 Cloudflare — 請檢查網路或 DNS | mode=service port=8765 url=https://live.churchofgodtm.com/hymn_search
+[2026-06-29 00:06:20] [INFO] tunnel stop | mode=service port=8765 url=https://live.churchofgodtm.com/hymn_search
+[2026-06-29 00:06:20] [INFO] tunnel start | mode=service port=8765 url=https://live.churchofgodtm.com/hymn_search named_url=https://live.churchofgodtm.com/hymn_search service_installed=True service_running=True use_https=False
+[2026-06-29 00:06:21] [INFO] tunnel url assigned | mode=service port=8765 url=https://live.churchofgodtm.com/hymn_search
+[2026-06-29 00:06:21] [INFO] tunnel ready | mode=service port=8765 url=https://live.churchofgodtm.com/hymn_search local_dns_ok=False
+[2026-06-29 00:09:36] [INFO] tunnel stop | mode=service port=8765 url=https://live.churchofgodtm.com/hymn_search
+[2026-06-29 00:19:48] [INFO] tunnel start | mode=service port=8765 url=https://live.churchofgodtm.com/hymn_search named_url=https://live.churchofgodtm.com/hymn_search service_installed=True service_running=True use_https=False
+[2026-06-29 00:19:48] [INFO] tunnel url assigned | mode=service port=8765 url=https://live.churchofgodtm.com/hymn_search
+[2026-06-29 00:19:48] [INFO] tunnel ready | mode=service port=8765 url=https://live.churchofgodtm.com/hymn_search local_dns_ok=False
+[2026-06-29 00:20:00] [INFO] tunnel stop | mode=service port=8765 url=https://live.churchofgodtm.com/hymn_search
+[2026-06-29 00:20:54] [INFO] tunnel start | mode=service port=8765 url=https://live.churchofgodtm.com/hymn_search named_url=https://live.churchofgodtm.com/hymn_search service_installed=True service_running=True use_https=False
+[2026-06-29 00:20:54] [INFO] tunnel url assigned | mode=service port=8765 url=https://live.churchofgodtm.com/hymn_search
+[2026-06-29 00:20:54] [INFO] tunnel ready | mode=service port=8765 url=https://live.churchofgodtm.com/hymn_search local_dns_ok=False
+[2026-06-29 00:21:05] [INFO] tunnel stop | mode=service port=8765 url=https://live.churchofgodtm.com/hymn_search
+[2026-06-29 00:21:09] [INFO] tunnel start | mode=service port=8765 url=https://live.churchofgodtm.com/hymn_search named_url=https://live.churchofgodtm.com/hymn_search service_installed=True service_running=True use_https=False
+[2026-06-29 00:21:09] [INFO] tunnel url assigned | mode=service port=8765 url=https://live.churchofgodtm.com/hymn_search
+[2026-06-29 00:21:09] [INFO] tunnel ready | mode=service port=8765 url=https://live.churchofgodtm.com/hymn_search local_dns_ok=True
+[2026-06-29 00:29:18] [INFO] tunnel stop | mode=service port=8765 url=https://live.churchofgodtm.com/hymn_search
+[2026-06-29 00:30:23] [INFO] tunnel start | mode=service port=8765 url=https://live.churchofgodtm.com/hymn_search named_url=https://live.churchofgodtm.com/hymn_search service_installed=True service_running=True use_https=False
+[2026-06-29 00:30:23] [INFO] tunnel url assigned | mode=service port=8765 url=https://live.churchofgodtm.com/hymn_search
+[2026-06-29 00:30:23] [INFO] tunnel ready | mode=service port=8765 url=https://live.churchofgodtm.com/hymn_search local_dns_ok=True
+[2026-06-29 01:02:26] [INFO] tunnel stop | mode=service port=8765 url=https://live.churchofgodtm.com/hymn_search
+[2026-06-29 01:37:03] [INFO] tunnel start | mode=service port=8765 url=https://live.churchofgodtm.com/hymn_search named_url=https://live.churchofgodtm.com/hymn_search service_installed=True service_running=True use_https=False
+[2026-06-29 01:37:03] [INFO] tunnel url assigned | mode=service port=8765 url=https://live.churchofgodtm.com/hymn_search
+[2026-06-29 01:37:04] [INFO] tunnel ready | mode=service port=8765 url=https://live.churchofgodtm.com/hymn_search local_dns_ok=True
+[2026-06-29 01:37:15] [INFO] tunnel stop | mode=service port=8765 url=https://live.churchofgodtm.com/hymn_search
+[2026-06-30 08:12:23] [INFO] tunnel start | mode=service port=8765 url=https://live.churchofgodtm.com/hymn_search named_url=https://live.churchofgodtm.com/hymn_search service_installed=True service_running=True use_https=False
+[2026-06-30 08:12:23] [INFO] tunnel url assigned | mode=service port=8765 url=https://live.churchofgodtm.com/hymn_search
+[2026-06-30 08:12:23] [INFO] tunnel ready | mode=service port=8765 url=https://live.churchofgodtm.com/hymn_search local_dns_ok=True
+[2026-06-30 08:17:43] [INFO] tunnel stop | mode=service port=8765 url=https://live.churchofgodtm.com/hymn_search
+[2026-06-30 08:17:54] [INFO] tunnel start | mode=service port=8765 url=https://live.churchofgodtm.com/hymn_search named_url=https://live.churchofgodtm.com/hymn_search service_installed=True service_running=True use_https=False
+[2026-06-30 08:17:54] [INFO] tunnel url assigned | mode=service port=8765 url=https://live.churchofgodtm.com/hymn_search
+[2026-06-30 08:17:55] [INFO] tunnel ready | mode=service port=8765 url=https://live.churchofgodtm.com/hymn_search local_dns_ok=True
+[2026-06-30 08:24:30] [INFO] tunnel stop | mode=service port=8765 url=https://live.churchofgodtm.com/hymn_search
+[2026-06-30 08:26:20] [INFO] tunnel start | mode=service port=8765 url=https://live.churchofgodtm.com/hymn_search named_url=https://live.churchofgodtm.com/hymn_search service_installed=True service_running=True use_https=False
+[2026-06-30 08:26:20] [INFO] tunnel url assigned | mode=service port=8765 url=https://live.churchofgodtm.com/hymn_search
+[2026-06-30 08:26:21] [INFO] tunnel ready | mode=service port=8765 url=https://live.churchofgodtm.com/hymn_search local_dns_ok=True
+[2026-06-30 22:59:24] [INFO] tunnel start | mode=service port=8765 url=https://live.churchofgodtm.com/hymn_search named_url=https://live.churchofgodtm.com/hymn_search service_installed=True service_running=True use_https=False
+[2026-06-30 22:59:24] [INFO] tunnel url assigned | mode=service port=8765 url=https://live.churchofgodtm.com/hymn_search
+[2026-06-30 23:00:00] [INFO] tunnel ready | mode=service port=8765 url=https://live.churchofgodtm.com/hymn_search local_dns_ok=True
+[2026-06-30 23:18:59] [INFO] tunnel stop | mode=service port=8765 url=https://live.churchofgodtm.com/hymn_search
+[2026-06-30 23:19:09] [INFO] tunnel start | mode=service port=8765 url=https://live.churchofgodtm.com/hymn_search named_url=https://live.churchofgodtm.com/hymn_search service_installed=True service_running=True use_https=False
+[2026-06-30 23:19:09] [INFO] tunnel url assigned | mode=service port=8765 url=https://live.churchofgodtm.com/hymn_search
+[2026-06-30 23:19:10] [INFO] tunnel ready | mode=service port=8765 url=https://live.churchofgodtm.com/hymn_search local_dns_ok=True
+[2026-06-30 23:22:09] [INFO] tunnel stop | mode=service port=8765 url=https://live.churchofgodtm.com/hymn_search
+[2026-06-30 23:22:54] [INFO] tunnel start | mode=service port=8765 url=https://live.churchofgodtm.com/hymn_search named_url=https://live.churchofgodtm.com/hymn_search service_installed=True service_running=True use_https=False
+[2026-06-30 23:22:54] [INFO] tunnel url assigned | mode=service port=8765 url=https://live.churchofgodtm.com/hymn_search
+[2026-06-30 23:22:54] [INFO] tunnel ready | mode=service port=8765 url=https://live.churchofgodtm.com/hymn_search local_dns_ok=True
+[2026-06-30 23:23:27] [INFO] tunnel stop | mode=service port=8765 url=https://live.churchofgodtm.com/hymn_search
+[2026-06-30 23:26:33] [INFO] tunnel start | mode=service port=8765 url=https://live.churchofgodtm.com/hymn_search named_url=https://live.churchofgodtm.com/hymn_search service_installed=True service_running=True use_https=False
+[2026-06-30 23:26:34] [INFO] tunnel url assigned | mode=service port=8765 url=https://live.churchofgodtm.com/hymn_search
+[2026-06-30 23:26:34] [INFO] tunnel ready | mode=service port=8765 url=https://live.churchofgodtm.com/hymn_search local_dns_ok=True
+[2026-06-30 23:28:27] [INFO] tunnel stop | mode=service port=8765 url=https://live.churchofgodtm.com/hymn_search
+[2026-07-01 06:58:38] [INFO] tunnel start | mode=service port=8765 url=https://live.churchofgodtm.com/hymn_search named_url=https://live.churchofgodtm.com/hymn_search service_installed=True service_running=True use_https=False
+[2026-07-01 06:58:39] [INFO] tunnel url assigned | mode=service port=8765 url=https://live.churchofgodtm.com/hymn_search
+[2026-07-01 06:58:42] [INFO] tunnel ready | mode=service port=8765 url=https://live.churchofgodtm.com/hymn_search local_dns_ok=True
+[2026-07-01 07:00:18] [INFO] tunnel stop | mode=service port=8765 url=https://live.churchofgodtm.com/hymn_search
+[2026-07-01 07:06:22] [INFO] tunnel start | mode=service port=8765 url=https://live.churchofgodtm.com/hymn_search named_url=https://live.churchofgodtm.com/hymn_search service_installed=True service_running=True use_https=False
+[2026-07-01 07:06:23] [INFO] tunnel url assigned | mode=service port=8765 url=https://live.churchofgodtm.com/hymn_search
+[2026-07-01 07:06:23] [INFO] tunnel ready | mode=service port=8765 url=https://live.churchofgodtm.com/hymn_search local_dns_ok=True
+[2026-07-01 07:07:43] [INFO] tunnel stop | mode=service port=8765 url=https://live.churchofgodtm.com/hymn_search
+[2026-07-01 07:13:39] [INFO] tunnel start | mode=service port=8765 url=https://live.churchofgodtm.com/hymn_search named_url=https://live.churchofgodtm.com/hymn_search service_installed=True service_running=True use_https=False
+[2026-07-01 07:13:39] [INFO] tunnel url assigned | mode=service port=8765 url=https://live.churchofgodtm.com/hymn_search
+[2026-07-01 07:13:41] [INFO] tunnel ready | mode=service port=8765 url=https://live.churchofgodtm.com/hymn_search local_dns_ok=True
+[2026-07-01 07:16:49] [INFO] tunnel stop | mode=service port=8765 url=https://live.churchofgodtm.com/hymn_search
+[2026-07-01 07:18:32] [INFO] tunnel start | mode=service port=8765 url=https://live.churchofgodtm.com/hymn_search named_url=https://live.churchofgodtm.com/hymn_search service_installed=True service_running=True use_https=False
+[2026-07-01 07:18:32] [INFO] tunnel url assigned | mode=service port=8765 url=https://live.churchofgodtm.com/hymn_search
+[2026-07-01 07:18:32] [INFO] tunnel ready | mode=service port=8765 url=https://live.churchofgodtm.com/hymn_search local_dns_ok=True
+[2026-07-01 07:19:37] [INFO] tunnel stop | mode=service port=8765 url=https://live.churchofgodtm.com/hymn_search
+[2026-07-01 07:19:45] [INFO] tunnel start | mode=service port=8765 url=https://live.churchofgodtm.com/hymn_search named_url=https://live.churchofgodtm.com/hymn_search service_installed=True service_running=True use_https=False
+[2026-07-01 07:19:45] [INFO] tunnel url assigned | mode=service port=8765 url=https://live.churchofgodtm.com/hymn_search
+[2026-07-01 07:19:45] [INFO] tunnel ready | mode=service port=8765 url=https://live.churchofgodtm.com/hymn_search local_dns_ok=True
+[2026-07-01 07:44:45] [INFO] tunnel stop | mode=service port=8765 url=https://live.churchofgodtm.com/hymn_search
+[2026-07-01 07:44:56] [INFO] tunnel start | mode=service port=8765 url=https://live.churchofgodtm.com/hymn_search named_url=https://live.churchofgodtm.com/hymn_search service_installed=True service_running=True use_https=False
+[2026-07-01 07:44:56] [INFO] tunnel url assigned | mode=service port=8765 url=https://live.churchofgodtm.com/hymn_search
+[2026-07-01 07:44:57] [INFO] tunnel ready | mode=service port=8765 url=https://live.churchofgodtm.com/hymn_search local_dns_ok=True
+[2026-07-01 07:52:14] [INFO] tunnel stop | mode=service port=8765 url=https://live.churchofgodtm.com/hymn_search
+[2026-07-01 07:52:28] [INFO] tunnel start | mode=service port=8765 url=https://live.churchofgodtm.com/hymn_search named_url=https://live.churchofgodtm.com/hymn_search service_installed=True service_running=True use_https=False
+[2026-07-01 07:52:28] [INFO] tunnel url assigned | mode=service port=8765 url=https://live.churchofgodtm.com/hymn_search
+[2026-07-01 07:52:28] [INFO] tunnel ready | mode=service port=8765 url=https://live.churchofgodtm.com/hymn_search local_dns_ok=True
+[2026-07-01 07:53:55] [INFO] tunnel stop | mode=service port=8765 url=https://live.churchofgodtm.com/hymn_search

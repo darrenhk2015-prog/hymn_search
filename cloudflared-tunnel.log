@@ -1,0 +1,67 @@
+2026-06-27T23:17:13Z INF Starting tunnel tunnelID=9be67e86-dcb1-4d78-ba9b-e1d600bb770f
+2026-06-27T23:17:13Z INF Version 2026.6.1 (Checksum 5253e66f1f493c4e13539749f1aa86fd0c61e3072900fec29a44ba046a6d97e2)
+2026-06-27T23:17:13Z INF GOOS: windows, GOVersion: go1.26.4, GoArch: amd64
+2026-06-27T23:17:13Z INF Settings: map[no-autoupdate:true token:*****]
+2026-06-27T23:17:13Z INF cloudflared will not automatically update on Windows systems.
+2026-06-27T23:17:13Z INF Generated Connector ID: 83b50118-1c87-4610-8ce9-8c5407671861
+2026-06-27T23:17:13Z INF Initial protocol quic
+2026-06-27T23:17:13Z INF ICMP proxy will use 192.168.0.122 as source for IPv4
+2026-06-27T23:17:13Z INF ICMP proxy will use fd3f:8dc9:4bed:adad:c9a:ab4:72e2:c9b8 in zone Wi-Fi as source for IPv6
+2026-06-27T23:17:13Z INF ICMP proxy will use 192.168.0.122 as source for IPv4
+2026-06-27T23:17:13Z INF Tunnel connection curve preferences: [X25519MLKEM768 CurveID(65074) CurveP256] connIndex=0 event=0 ip=198.41.200.73
+2026-06-27T23:17:13Z INF ICMP proxy will use fd3f:8dc9:4bed:adad:c9a:ab4:72e2:c9b8 in zone Wi-Fi as source for IPv6
+2026-06-27T23:17:13Z INF Starting metrics server on 127.0.0.1:20243/metrics
+2026-06-27T23:17:14Z INF Registered tunnel connection connIndex=0 connection=34c2aaac-66ef-48af-8401-5f9670e949c3 event=0 ip=198.41.200.73 location=hkg11 protocol=quic
+2026-06-27T23:17:14Z INF Tunnel connection curve preferences: [X25519MLKEM768 CurveID(65074) CurveP256] connIndex=1 event=0 ip=198.41.192.27
+2026-06-27T23:17:14Z INF cloudflared does not support loading the system root certificate pool on Windows. Please use --origin-ca-pool <PATH> to specify the path to the certificate pool
+2026-06-27T23:17:14Z INF cloudflared does not support loading the system root certificate pool on Windows. Please use --origin-ca-pool <PATH> to specify the path to the certificate pool
+2026-06-27T23:17:14Z INF Updated to new configuration config="{\"ingress\":[{\"hostname\":\"live.churchofgodtm.com\",\"path\":\"hymn_search\",\"service\":\"https://localhost:8765\"},{\"hostname\":\"live.churchofgodtm.com\",\"path\":\"pptlive\",\"service\":\"https://localhost:8763\"},{\"service\":\"http_status:404\"}],\"warp-routing\":{\"enabled\":false}}" version=2
+2026-06-27T23:17:14Z INF Registered tunnel connection connIndex=1 connection=ca338132-5bb5-41d7-947e-c7ca0dfcf2bb event=0 ip=198.41.192.27 location=hkg05 protocol=quic
+2026-06-27T23:17:15Z INF Tunnel connection curve preferences: [X25519MLKEM768 CurveID(65074) CurveP256] connIndex=2 event=0 ip=198.41.200.43
+2026-06-27T23:17:15Z INF Registered tunnel connection connIndex=2 connection=5583e89d-b942-4624-9f15-b263f2d6199f event=0 ip=198.41.200.43 location=hkg12 protocol=quic
+2026-06-27T23:17:16Z INF Tunnel connection curve preferences: [X25519MLKEM768 CurveID(65074) CurveP256] connIndex=3 event=0 ip=198.41.192.77
+2026-06-27T23:17:16Z ERR failed to run the datagram handler error="context canceled" connIndex=3 event=0 ip=198.41.192.77
+2026-06-27T23:17:16Z WRN failed to serve tunnel connection error="control stream encountered a failure while serving" connIndex=3 event=0 ip=198.41.192.77
+2026-06-27T23:17:16Z WRN Serve tunnel error error="control stream encountered a failure while serving" connIndex=3 event=0 ip=198.41.192.77
+2026-06-27T23:17:16Z INF Retrying connection in up to 2s connIndex=3 event=0 ip=198.41.192.77
+2026-06-27T23:17:17Z WRN Connection terminated error="control stream encountered a failure while serving" connIndex=3
+2026-06-27T23:17:19Z INF Tunnel connection curve preferences: [X25519MLKEM768 CurveID(65074) CurveP256] connIndex=3 event=0 ip=198.41.192.77
+2026-06-27T23:17:19Z ERR failed to run the datagram handler error="context canceled" connIndex=3 event=0 ip=198.41.192.77
+2026-06-27T23:17:19Z WRN failed to serve tunnel connection error="control stream encountered a failure while serving" connIndex=3 event=0 ip=198.41.192.77
+2026-06-27T23:17:19Z WRN Serve tunnel error error="control stream encountered a failure while serving" connIndex=3 event=0 ip=198.41.192.77
+2026-06-27T23:17:19Z INF Retrying connection in up to 4s connIndex=3 event=0 ip=198.41.192.77
+2026-06-27T23:17:19Z INF +-------------------------------------------------------------------------------------+
+2026-06-27T23:17:19Z INF |                               CONNECTIVITY PRE-CHECKS                               |
+2026-06-27T23:17:19Z INF +-------------------------------------------------------------------------------------+
+2026-06-27T23:17:19Z INF |  COMPONENT         TARGET                     STATUS  DETAILS                       |
+2026-06-27T23:17:19Z INF |  DNS Resolution    region1.v2.argotunnel.com  PASS    DNS Resolved successfully     |
+2026-06-27T23:17:19Z INF |  DNS Resolution    region2.v2.argotunnel.com  PASS    DNS Resolved successfully     |
+2026-06-27T23:17:19Z INF |  UDP Connectivity  region1.v2.argotunnel.com  PASS    QUIC connection successful    |
+2026-06-27T23:17:19Z INF |  UDP Connectivity  region2.v2.argotunnel.com  PASS    QUIC connection successful    |
+2026-06-27T23:17:19Z INF |  TCP Connectivity  region1.v2.argotunnel.com  PASS    HTTP/2 connection successful  |
+2026-06-27T23:17:19Z INF |  TCP Connectivity  region2.v2.argotunnel.com  PASS    HTTP/2 connection successful  |
+2026-06-27T23:17:19Z INF |  Cloudflare API    api.cloudflare.com:443     PASS    API is reachable              |
+2026-06-27T23:17:19Z INF |                                                                                     |
+2026-06-27T23:17:19Z INF |  SUMMARY: Environment is healthy. cloudflared will use 'quic' as primary protocol.  |
+2026-06-27T23:17:19Z INF +-------------------------------------------------------------------------------------+
+2026-06-27T23:17:19Z INF precheck component="DNS Resolution" details="DNS Resolved successfully" run_id=1b0f99b5-87c0-4265-b068-0883fe30f4d5 status=pass target=region1.v2.argotunnel.com
+2026-06-27T23:17:19Z INF precheck component="DNS Resolution" details="DNS Resolved successfully" run_id=1b0f99b5-87c0-4265-b068-0883fe30f4d5 status=pass target=region2.v2.argotunnel.com
+2026-06-27T23:17:19Z INF precheck component="UDP Connectivity" details="QUIC connection successful" run_id=1b0f99b5-87c0-4265-b068-0883fe30f4d5 status=pass target=region1.v2.argotunnel.com
+2026-06-27T23:17:19Z INF precheck component="UDP Connectivity" details="QUIC connection successful" run_id=1b0f99b5-87c0-4265-b068-0883fe30f4d5 status=pass target=region2.v2.argotunnel.com
+2026-06-27T23:17:19Z INF precheck component="TCP Connectivity" details="HTTP/2 connection successful" run_id=1b0f99b5-87c0-4265-b068-0883fe30f4d5 status=pass target=region1.v2.argotunnel.com
+2026-06-27T23:17:19Z INF precheck component="TCP Connectivity" details="HTTP/2 connection successful" run_id=1b0f99b5-87c0-4265-b068-0883fe30f4d5 status=pass target=region2.v2.argotunnel.com
+2026-06-27T23:17:19Z INF precheck component="Cloudflare API" details="API is reachable" run_id=1b0f99b5-87c0-4265-b068-0883fe30f4d5 status=pass target=api.cloudflare.com:443
+2026-06-27T23:17:19Z INF precheck complete hard_fail=false run_id=1b0f99b5-87c0-4265-b068-0883fe30f4d5 suggested_protocol=quic
+2026-06-27T23:17:22Z WRN Connection terminated error="control stream encountered a failure while serving" connIndex=3
+2026-06-27T23:17:29Z INF Tunnel connection curve preferences: [X25519MLKEM768 CurveID(65074) CurveP256] connIndex=3 event=0 ip=198.41.192.77
+2026-06-27T23:17:29Z ERR failed to run the datagram handler error="context canceled" connIndex=3 event=0 ip=198.41.192.77
+2026-06-27T23:17:29Z WRN failed to serve tunnel connection error="control stream encountered a failure while serving" connIndex=3 event=0 ip=198.41.192.77
+2026-06-27T23:17:29Z WRN Serve tunnel error error="control stream encountered a failure while serving" connIndex=3 event=0 ip=198.41.192.77
+2026-06-27T23:17:29Z INF Retrying connection in up to 8s connIndex=3 event=0 ip=198.41.192.77
+2026-06-27T23:17:37Z WRN Connection terminated error="control stream encountered a failure while serving" connIndex=3
+2026-06-27T23:18:28Z INF Tunnel connection curve preferences: [X25519MLKEM768 CurveID(65074) CurveP256] connIndex=3 event=0 ip=198.41.192.77
+2026-06-27T23:18:28Z ERR failed to run the datagram handler error="context canceled" connIndex=3 event=0 ip=198.41.192.77
+2026-06-27T23:18:28Z WRN failed to serve tunnel connection error="control stream encountered a failure while serving" connIndex=3 event=0 ip=198.41.192.77
+2026-06-27T23:18:28Z WRN Serve tunnel error error="control stream encountered a failure while serving" connIndex=3 event=0 ip=198.41.192.77
+2026-06-27T23:18:28Z INF Retrying connection in up to 16s connIndex=3 event=0 ip=198.41.192.77
+2026-06-27T23:18:41Z WRN Connection terminated error="control stream encountered a failure while serving" connIndex=3
