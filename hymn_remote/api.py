@@ -2,7 +2,7 @@
 from pathlib import Path
 
 from fastapi import FastAPI, Header, HTTPException, Request
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
@@ -29,7 +29,7 @@ def _client_ip(request: Request) -> str:
     return ''
 
 
-def create_app(state: RemoteControlState) -> FastAPI:
+def create_app(state: RemoteControlState, path_prefix: str = '') -> FastAPI:
     app = FastAPI(title='Hymn Search Remote', docs_url='/api/docs', redoc_url=None)
     static = _static_dir()
 
@@ -174,4 +174,18 @@ def create_app(state: RemoteControlState) -> FastAPI:
     if static.is_dir():
         app.mount('/static', StaticFiles(directory=str(static)), name='static')
 
+    prefix = (path_prefix or '').strip().rstrip('/')
+    if prefix:
+        if not prefix.startswith('/'):
+            prefix = '/' + prefix
+        gateway = FastAPI(title='Hymn Search Remote Gateway')
+
+        @gateway.get(prefix, include_in_schema=False)
+        def redirect_prefix_to_slash():
+            return RedirectResponse(url=f'{prefix}/', status_code=308)
+
+        # Tunnel: /hymn_search/... ; local LAN: /admin, /api/... (no prefix)
+        gateway.mount(prefix, app)
+        gateway.mount('/', app)
+        return gateway
     return app

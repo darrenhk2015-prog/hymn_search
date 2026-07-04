@@ -108,7 +108,7 @@ class EnhancementMixin:
             label = meta.get('label') or label
         self._settings = record_open(self._settings, book_name, hymn_ref, label)
         self._persist_settings(**{k: self._settings[k] for k in (
-            'recent_hymns', 'last_opened', 'session_history', 'session_cursor',
+            'last_opened', 'session_history', 'session_cursor',
         ) if k in self._settings})
         self._update_footer_status()
         self._sync_viewer_now_playing(book_name, hymn_ref, label, payload=payload)
@@ -510,11 +510,14 @@ class EnhancementMixin:
 
     # ── Remote QR / log ─────────────────────────────────────────────────────
 
-    def _qr_pixmap_from_url(self, url, size=128):
+    def _qr_pixmap_from_url(self, url, size=128, border=4):
         from io import BytesIO
         import qrcode
         buf = BytesIO()
-        qrcode.make(url).save(buf, format='PNG')
+        qr = qrcode.QRCode(border=max(1, int(border)))
+        qr.add_data(url)
+        qr.make(fit=True)
+        qr.make_image(fill_color='black', back_color='white').save(buf, format='PNG')
         png = bytes(buf.getvalue())
         self._qr_png_cache = png
         qimg = QImage.fromData(png, 'PNG')
@@ -533,24 +536,36 @@ class EnhancementMixin:
 
     def _update_qr_code(self):
         lbl = getattr(self, 'remote_qr_lbl', None)
-        if lbl is None:
-            return
-        lbl.clear()
-        if not getattr(self._remote, 'running', False):
-            lbl.setText('啟用 Mobile API 後顯示 QR')
-            lbl.setToolTip('')
-            return
-        url = self._remote.url()
-        lbl.setToolTip(url)
-        try:
-            pix = self._qr_pixmap_from_url(url, size=128)
-            lbl.setPixmap(pix)
-        except ImportError:
-            lbl.setText('缺少 qrcode\n請 pip install')
-            lbl.setToolTip(url)
-        except Exception as exc:
-            lbl.setText('QR 無法顯示')
-            lbl.setToolTip(f'{url}\n({exc})')
+        if lbl is not None:
+            lbl.clear()
+            if not getattr(self._remote, 'running', False):
+                lbl.setText('啟用 Mobile API 後顯示 QR')
+                lbl.setToolTip('')
+            else:
+                if hasattr(self, '_remote_share_url'):
+                    url = self._remote_share_url()
+                elif hasattr(self, '_remote_public_base_url'):
+                    url = self._remote_public_base_url()
+                else:
+                    url = self._remote.url()
+                if not url:
+                    lbl.setText('啟用 Mobile API 後顯示 QR')
+                    lbl.setToolTip('')
+                else:
+                    mode = '外網' if getattr(self, 'enable_tunnel', False) else '本機 WiFi'
+                    lbl.setToolTip(f'{url}\n（{mode}）')
+                    try:
+                        pix = self._qr_pixmap_from_url(url, size=128)
+                        lbl.setPixmap(pix)
+                    except ImportError:
+                        lbl.setText('缺少 qrcode\n請 pip install')
+                        lbl.setToolTip(url)
+                    except Exception as exc:
+                        lbl.setText('QR 無法顯示')
+                        lbl.setToolTip(f'{url}\n({exc})')
+        sync = getattr(self, '_sync_desktop_qr_overlay', None)
+        if sync:
+            sync()
 
     def _refresh_remote_log_view(self):
         view = getattr(self, 'remote_log_list', None)

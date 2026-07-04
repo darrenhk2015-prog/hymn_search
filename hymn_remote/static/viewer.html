@@ -116,6 +116,14 @@
 
   <script>
     const POLL_MS = 2000;
+    function apiBasePath() {
+      const p = window.location.pathname;
+      const m = p.match(/^(.*)\/(admin|view)\/?$/);
+      if (m) return m[1];
+      if (p.endsWith('/')) return p.slice(0, -1);
+      return p === '/' ? '' : p;
+    }
+    const API_BASE = apiBasePath();
     const titleEl = document.getElementById('title');
     const badgeEl = document.getElementById('badge');
     const frameEl = document.getElementById('frame');
@@ -192,7 +200,7 @@
 
     async function poll() {
       try {
-        const res = await fetch('/api/view/now', { cache: 'no-store' });
+        const res = await fetch(API_BASE + '/api/view/now', { cache: 'no-store' });
         if (!res.ok) {
           setLive(false);
           updateDebug(null, 'HTTP ' + res.status);

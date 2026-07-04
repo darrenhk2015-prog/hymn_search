@@ -218,6 +218,7 @@ imports:
  &#8226;   <a href="#hymn_remote.resolver">hymn_remote.resolver</a>
  &#8226;   <a href="#hymn_remote.server">hymn_remote.server</a>
  &#8226;   <a href="#hymn_remote.state">hymn_remote.state</a>
+ &#8226;   <a href="#hymn_remote.tunnel">hymn_remote.tunnel</a>
  &#8226;   <a href="#hymn_remote.viewer_hymn_map">hymn_remote.viewer_hymn_map</a>
  &#8226;   <a href="#hymn_remote.web_hymn_map">hymn_remote.web_hymn_map</a>
  &#8226;   <a href="#io">io</a>
@@ -3960,6 +3961,8 @@ imported by:
  &#8226;   <a href="#docx.text.run">docx.text.run</a>
  &#8226;   <a href="#docx.types">docx.types</a>
  &#8226;   <a href="#hymn_remote.gdrive_hymn_map">hymn_remote.gdrive_hymn_map</a>
+ &#8226;   <a href="#hymn_remote.local_tls">hymn_remote.local_tls</a>
+ &#8226;   <a href="#hymn_remote.tunnel">hymn_remote.tunnel</a>
  &#8226;   <a href="#hymn_remote.viewer_hymn_map">hymn_remote.viewer_hymn_map</a>
  &#8226;   <a href="#importlib.metadata">importlib.metadata</a>
  &#8226;   <a href="#importlib.metadata._meta">importlib.metadata._meta</a>
@@ -18878,6 +18881,7 @@ imported by:
     <a href="#fastapi.openapi.utils">fastapi.openapi.utils</a>
  &#8226;   <a href="#http.cookiejar">http.cookiejar</a>
  &#8226;   <a href="#http.server">http.server</a>
+ &#8226;   <a href="#hymn_remote.tunnel">hymn_remote.tunnel</a>
  &#8226;   <a href="#logging.handlers">logging.handlers</a>
  &#8226;   <a href="#urllib.request">urllib.request</a>
  &#8226;   <a href="#xmlrpc.client">xmlrpc.client</a>
@@ -19245,10 +19249,12 @@ imported by:
 imported by:
     <a href="#hymn_remote.api">hymn_remote.api</a>
  &#8226;   <a href="#hymn_remote.gdrive_hymn_map">hymn_remote.gdrive_hymn_map</a>
+ &#8226;   <a href="#hymn_remote.local_tls">hymn_remote.local_tls</a>
  &#8226;   <a href="#hymn_remote.operation_log">hymn_remote.operation_log</a>
  &#8226;   <a href="#hymn_remote.resolver">hymn_remote.resolver</a>
  &#8226;   <a href="#hymn_remote.server">hymn_remote.server</a>
  &#8226;   <a href="#hymn_remote.state">hymn_remote.state</a>
+ &#8226;   <a href="#hymn_remote.tunnel">hymn_remote.tunnel</a>
  &#8226;   <a href="#hymn_remote.viewer_hymn_map">hymn_remote.viewer_hymn_map</a>
  &#8226;   <a href="#hymn_remote.web_hymn_map">hymn_remote.web_hymn_map</a>
 
@@ -19308,6 +19314,29 @@ imported by:
 </div>
 
 <div class="node">
+  <a name="hymn_remote.local_tls"></a>
+  <a target="code" href="///C:/python/hymn_search/hymn_remote/local_tls.py" type="text/plain"><tt>hymn_remote.local_tls</tt></a>
+<span class="moduletype">SourceModule</span>  <div class="import">
+imports:
+    <a href="#__future__">__future__</a>
+ &#8226;   <a href="#hymn_remote">hymn_remote</a>
+ &#8226;   <a href="#os">os</a>
+ &#8226;   <a href="#pathlib">pathlib</a>
+ &#8226;   <a href="#shutil">shutil</a>
+ &#8226;   <a href="#subprocess">subprocess</a>
+ &#8226;   <a href="#sys">sys</a>
+
+  </div>
+  <div class="import">
+imported by:
+    <a href="#hymn_remote.server">hymn_remote.server</a>
+ &#8226;   <a href="#hymn_remote.tunnel">hymn_remote.tunnel</a>
+
+  </div>
+
+</div>
+
+<div class="node">
   <a name="hymn_remote.operation_log"></a>
   <a target="code" href="///C:/python/hymn_search/hymn_remote/operation_log.py" type="text/plain"><tt>hymn_remote.operation_log</tt></a>
 <span class="moduletype">SourceModule</span>  <div class="import">
@@ -19355,6 +19384,7 @@ imported by:
 imports:
     <a href="#hymn_remote">hymn_remote</a>
  &#8226;   <a href="#hymn_remote.api">hymn_remote.api</a>
+ &#8226;   <a href="#hymn_remote.local_tls">hymn_remote.local_tls</a>
  &#8226;   <a href="#hymn_remote.state">hymn_remote.state</a>
  &#8226;   <a href="#io">io</a>
  &#8226;   <a href="#os">os</a>
@@ -19393,7 +19423,44 @@ imports:
 imported by:
     <a href="#hymn_remote.api">hymn_remote.api</a>
  &#8226;   <a href="#hymn_remote.server">hymn_remote.server</a>
+ &#8226;   <a href="#hymn_remote.tunnel">hymn_remote.tunnel</a>
  &#8226;   <a href="#hymn_search">hymn_search</a>
+ &#8226;   <a href="#hymn_search.py">hymn_search.py</a>
+
+  </div>
+
+</div>
+
+<div class="node">
+  <a name="hymn_remote.tunnel"></a>
+  <a target="code" href="///C:/python/hymn_search/hymn_remote/tunnel.py" type="text/plain"><tt>hymn_remote.tunnel</tt></a>
+<span class="moduletype">SourceModule</span>  <div class="import">
+imports:
+    <a href="#__future__">__future__</a>
+ &#8226;   <a href="#http.client">http.client</a>
+ &#8226;   <a href="#hymn_remote">hymn_remote</a>
+ &#8226;   <a href="#hymn_remote.local_tls">hymn_remote.local_tls</a>
+ &#8226;   <a href="#hymn_remote.state">hymn_remote.state</a>
+ &#8226;   <a href="#logging">logging</a>
+ &#8226;   <a href="#os">os</a>
+ &#8226;   <a href="#pathlib">pathlib</a>
+ &#8226;   <a href="#re">re</a>
+ &#8226;   <a href="#shutil">shutil</a>
+ &#8226;   <a href="#socket">socket</a>
+ &#8226;   <a href="#ssl">ssl</a>
+ &#8226;   <a href="#subprocess">subprocess</a>
+ &#8226;   <a href="#sys">sys</a>
+ &#8226;   <a href="#threading">threading</a>
+ &#8226;   <a href="#time">time</a>
+ &#8226;   <a href="#typing">typing</a>
+ &#8226;   <a href="#urllib.error">urllib.error</a>
+ &#8226;   <a href="#urllib.parse">urllib.parse</a>
+ &#8226;   <a href="#urllib.request">urllib.request</a>
+
+  </div>
+  <div class="import">
+imported by:
+    <a href="#hymn_search">hymn_search</a>
  &#8226;   <a href="#hymn_search.py">hymn_search.py</a>
 
   </div>
@@ -19468,6 +19535,7 @@ imports:
  &#8226;   <a href="#hymn_remote.resolver">hymn_remote.resolver</a>
  &#8226;   <a href="#hymn_remote.server">hymn_remote.server</a>
  &#8226;   <a href="#hymn_remote.state">hymn_remote.state</a>
+ &#8226;   <a href="#hymn_remote.tunnel">hymn_remote.tunnel</a>
  &#8226;   <a href="#json">json</a>
  &#8226;   <a href="#os">os</a>
  &#8226;   <a href="#qrcode">qrcode</a>
@@ -20877,6 +20945,7 @@ imported by:
  &#8226;   <a href="#fastapi.logger">fastapi.logger</a>
  &#8226;   <a href="#hashlib">hashlib</a>
  &#8226;   <a href="#http.cookiejar">http.cookiejar</a>
+ &#8226;   <a href="#hymn_remote.tunnel">hymn_remote.tunnel</a>
  &#8226;   <a href="#logging.config">logging.config</a>
  &#8226;   <a href="#logging.handlers">logging.handlers</a>
  &#8226;   <a href="#multiprocessing.util">multiprocessing.util</a>
@@ -23068,7 +23137,9 @@ imported by:
  &#8226;   <a href="#http.server">http.server</a>
  &#8226;   <a href="#hymn_features.mixin">hymn_features.mixin</a>
  &#8226;   <a href="#hymn_features.preview">hymn_features.preview</a>
+ &#8226;   <a href="#hymn_remote.local_tls">hymn_remote.local_tls</a>
  &#8226;   <a href="#hymn_remote.server">hymn_remote.server</a>
+ &#8226;   <a href="#hymn_remote.tunnel">hymn_remote.tunnel</a>
  &#8226;   <a href="#hymn_remote.viewer_hymn_map">hymn_remote.viewer_hymn_map</a>
  &#8226;   <a href="#hymn_search">hymn_search</a>
  &#8226;   <a href="#hymn_search.py">hymn_search.py</a>
@@ -23698,6 +23769,8 @@ imported by:
  &#8226;   <a href="#fastapi.encoders">fastapi.encoders</a>
  &#8226;   <a href="#hymn_remote.api">hymn_remote.api</a>
  &#8226;   <a href="#hymn_remote.gdrive_hymn_map">hymn_remote.gdrive_hymn_map</a>
+ &#8226;   <a href="#hymn_remote.local_tls">hymn_remote.local_tls</a>
+ &#8226;   <a href="#hymn_remote.tunnel">hymn_remote.tunnel</a>
  &#8226;   <a href="#hymn_remote.web_hymn_map">hymn_remote.web_hymn_map</a>
  &#8226;   <a href="#importlib.metadata">importlib.metadata</a>
  &#8226;   <a href="#importlib.resources._common">importlib.resources._common</a>
@@ -30131,6 +30204,7 @@ imported by:
  &#8226;   <a href="#hymn_features.preview">hymn_features.preview</a>
  &#8226;   <a href="#hymn_remote.gdrive_hymn_map">hymn_remote.gdrive_hymn_map</a>
  &#8226;   <a href="#hymn_remote.resolver">hymn_remote.resolver</a>
+ &#8226;   <a href="#hymn_remote.tunnel">hymn_remote.tunnel</a>
  &#8226;   <a href="#hymn_remote.viewer_hymn_map">hymn_remote.viewer_hymn_map</a>
  &#8226;   <a href="#hymn_remote.web_hymn_map">hymn_remote.web_hymn_map</a>
  &#8226;   <a href="#hymn_search">hymn_search</a>
@@ -34387,6 +34461,8 @@ imported by:
  &#8226;   <a href="#click.formatting">click.formatting</a>
  &#8226;   <a href="#click.shell_completion">click.shell_completion</a>
  &#8226;   <a href="#http.server">http.server</a>
+ &#8226;   <a href="#hymn_remote.local_tls">hymn_remote.local_tls</a>
+ &#8226;   <a href="#hymn_remote.tunnel">hymn_remote.tunnel</a>
  &#8226;   <a href="#multiprocessing.util">multiprocessing.util</a>
  &#8226;   <a href="#pathlib">pathlib</a>
  &#8226;   <a href="#setuptools._distutils.spawn">setuptools._distutils.spawn</a>
@@ -34572,6 +34648,7 @@ imported by:
  &#8226;   <a href="#http.client">http.client</a>
  &#8226;   <a href="#http.server">http.server</a>
  &#8226;   <a href="#hymn_remote.server">hymn_remote.server</a>
+ &#8226;   <a href="#hymn_remote.tunnel">hymn_remote.tunnel</a>
  &#8226;   <a href="#logging.handlers">logging.handlers</a>
  &#8226;   <a href="#multiprocessing.connection">multiprocessing.connection</a>
  &#8226;   <a href="#multiprocessing.forkserver">multiprocessing.forkserver</a>
@@ -34709,6 +34786,7 @@ imported by:
  &#8226;   <a href="#ftplib">ftplib</a>
  &#8226;   <a href="#http.client">http.client</a>
  &#8226;   <a href="#http.server">http.server</a>
+ &#8226;   <a href="#hymn_remote.tunnel">hymn_remote.tunnel</a>
  &#8226;   <a href="#logging.handlers">logging.handlers</a>
  &#8226;   <a href="#setuptools.config._validate_pyproject.formats">setuptools.config._validate_pyproject.formats</a>
  &#8226;   <a href="#smtplib">smtplib</a>
@@ -36030,6 +36108,8 @@ imported by:
  &#8226;   <a href="#click._termui_impl">click._termui_impl</a>
  &#8226;   <a href="#click.shell_completion">click.shell_completion</a>
  &#8226;   <a href="#http.server">http.server</a>
+ &#8226;   <a href="#hymn_remote.local_tls">hymn_remote.local_tls</a>
+ &#8226;   <a href="#hymn_remote.tunnel">hymn_remote.tunnel</a>
  &#8226;   <a href="#hymn_search">hymn_search</a>
  &#8226;   <a href="#hymn_search.py">hymn_search.py</a>
  &#8226;   <a href="#multiprocessing.popen_spawn_win32">multiprocessing.popen_spawn_win32</a>
@@ -36177,7 +36257,9 @@ imported by:
  &#8226;   <a href="#http.server">http.server</a>
  &#8226;   <a href="#hymn_features.mixin">hymn_features.mixin</a>
  &#8226;   <a href="#hymn_remote.gdrive_hymn_map">hymn_remote.gdrive_hymn_map</a>
+ &#8226;   <a href="#hymn_remote.local_tls">hymn_remote.local_tls</a>
  &#8226;   <a href="#hymn_remote.server">hymn_remote.server</a>
+ &#8226;   <a href="#hymn_remote.tunnel">hymn_remote.tunnel</a>
  &#8226;   <a href="#hymn_remote.web_hymn_map">hymn_remote.web_hymn_map</a>
  &#8226;   <a href="#hymn_search">hymn_search</a>
  &#8226;   <a href="#hymn_search.py">hymn_search.py</a>
@@ -36623,6 +36705,7 @@ imported by:
  &#8226;   <a href="#hymn_remote.operation_log">hymn_remote.operation_log</a>
  &#8226;   <a href="#hymn_remote.server">hymn_remote.server</a>
  &#8226;   <a href="#hymn_remote.state">hymn_remote.state</a>
+ &#8226;   <a href="#hymn_remote.tunnel">hymn_remote.tunnel</a>
  &#8226;   <a href="#hymn_search">hymn_search</a>
  &#8226;   <a href="#hymn_search.py">hymn_search.py</a>
  &#8226;   <a href="#importlib.util">importlib.util</a>
@@ -36696,6 +36779,7 @@ imported by:
  &#8226;   <a href="#hymn_remote.gdrive_hymn_map">hymn_remote.gdrive_hymn_map</a>
  &#8226;   <a href="#hymn_remote.operation_log">hymn_remote.operation_log</a>
  &#8226;   <a href="#hymn_remote.server">hymn_remote.server</a>
+ &#8226;   <a href="#hymn_remote.tunnel">hymn_remote.tunnel</a>
  &#8226;   <a href="#hymn_remote.web_hymn_map">hymn_remote.web_hymn_map</a>
  &#8226;   <a href="#hymn_search">hymn_search</a>
  &#8226;   <a href="#hymn_search.py">hymn_search.py</a>
@@ -37424,6 +37508,7 @@ imported by:
  &#8226;   <a href="#h11._writers">h11._writers</a>
  &#8226;   <a href="#httptools.parser.protocol">httptools.parser.protocol</a>
  &#8226;   <a href="#hymn_remote.state">hymn_remote.state</a>
+ &#8226;   <a href="#hymn_remote.tunnel">hymn_remote.tunnel</a>
  &#8226;   <a href="#idna.core">idna.core</a>
  &#8226;   <a href="#idna.uts46data">idna.uts46data</a>
  &#8226;   <a href="#importlib.metadata">importlib.metadata</a>
@@ -38306,7 +38391,8 @@ imports:
   </div>
   <div class="import">
 imported by:
-    <a href="#pathlib">pathlib</a>
+    <a href="#hymn_remote.tunnel">hymn_remote.tunnel</a>
+ &#8226;   <a href="#pathlib">pathlib</a>
  &#8226;   <a href="#urllib.request">urllib.request</a>
 
   </div>
@@ -38337,6 +38423,7 @@ imported by:
  &#8226;   <a href="#http.cookiejar">http.cookiejar</a>
  &#8226;   <a href="#http.cookies">http.cookies</a>
  &#8226;   <a href="#http.server">http.server</a>
+ &#8226;   <a href="#hymn_remote.tunnel">hymn_remote.tunnel</a>
  &#8226;   <a href="#logging.handlers">logging.handlers</a>
  &#8226;   <a href="#lxml.ElementInclude">lxml.ElementInclude</a>
  &#8226;   <a href="#lxml.html">lxml.html</a>
@@ -38408,6 +38495,7 @@ imports:
   <div class="import">
 imported by:
     <a href="#http.cookiejar">http.cookiejar</a>
+ &#8226;   <a href="#hymn_remote.tunnel">hymn_remote.tunnel</a>
  &#8226;   <a href="#lxml.ElementInclude">lxml.ElementInclude</a>
  &#8226;   <a href="#lxml.html">lxml.html</a>
  &#8226;   <a href="#lxml.html.html5parser">lxml.html.html5parser</a>

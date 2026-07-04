@@ -167,6 +167,14 @@
     const tokenHint = document.getElementById('tokenHint');
     const tokenSection = document.getElementById('tokenSection');
     const TOKEN_KEY = 'hymn_remote_api_token';
+    function apiBasePath() {
+      const p = window.location.pathname;
+      const m = p.match(/^(.*)\/(admin|view)\/?$/);
+      if (m) return m[1];
+      if (p.endsWith('/')) return p.slice(0, -1);
+      return p === '/' ? '' : p;
+    }
+    const API_BASE = apiBasePath();
     let accepting = false;
     let serverNeedsToken = false;
     let allEntries = [];
@@ -186,7 +194,7 @@
     }
 
     async function api(path, opts = {}) {
-      const r = await fetch(path, {
+      const r = await fetch(API_BASE + path, {
         ...opts,
         headers: apiHeaders(opts.headers || {}),
       });

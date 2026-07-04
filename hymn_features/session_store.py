@@ -1,16 +1,17 @@
 """Recent hymns, pins, setlist, session history, settings export/import."""
 import json
 
-MAX_RECENT_HYMNS = 5
 MAX_SESSION_HISTORY = 50
 
 EXPORT_KEYS = (
     'theme', 'font_size', 'search_mode', 'open_overlay', 'overlay_duration',
     'overlay_mode', 'display_duplicate', 'keyword_instant', 'book_auto_focus_hymn',
     'click_to_open', 'remote_policy', 'remote_port', 'remote_token',
-    'operator_mode', 'pinned_books', 'recent_hymns', 'setlist',
+    'operator_mode', 'pinned_books', 'setlist',
     'setlist_index', 'session_history', 'session_cursor', 'show_preview',
     'auto_rescan', 'startup_tray', 'minimize_to_tray', 'last_opened',
+    'show_qr_code', 'qr_x', 'qr_y', 'qr_width', 'qr_height', 'qr_caption', 'qr_bg_color',
+    'qr_text_color', 'qr_text_size', 'qr_bg_opacity',
 )
 
 
@@ -23,26 +24,6 @@ def _as_str_list(value):
         if s and s not in out:
             out.append(s)
     return out
-
-
-def _touch_list(items, name, max_len):
-    name = str(name or '').strip()
-    if not name:
-        return items
-    out = [name] + [x for x in items if x != name]
-    return out[:max_len]
-
-
-def touch_recent_hymn(settings, book_name, hymn_ref):
-    settings = dict(settings or {})
-    book_name = str(book_name or '').strip()
-    hymn_ref = str(hymn_ref or '').strip()
-    if not book_name:
-        return settings
-    label = f"{book_name} / {hymn_ref}" if hymn_ref else book_name
-    recent = _as_str_list(settings.get('recent_hymns'))
-    settings['recent_hymns'] = _touch_list(recent, label, MAX_RECENT_HYMNS)
-    return settings
 
 
 def pinned_books(settings):
@@ -256,7 +237,7 @@ def import_settings_subset(settings, data):
             continue
         if key == 'setlist':
             settings[key] = parse_setlist(data[key])
-        elif key in ('pinned_books', 'recent_hymns', 'session_history'):
+        elif key in ('pinned_books', 'session_history'):
             val = data[key]
             settings[key] = val if isinstance(val, list) else _as_str_list(val)
         elif key == 'setlist_index':
@@ -341,7 +322,7 @@ def move_setlist_entry(settings, index, delta):
 
 
 def record_open(settings, book_name='', hymn_ref='', label=''):
-    settings = touch_recent_hymn(settings, book_name, hymn_ref)
+    settings = dict(settings or {})
     if label:
         settings['last_opened'] = label
     elif book_name and hymn_ref:

@@ -7,6 +7,7 @@ import time
 import traceback
 
 from .api import create_app
+from .local_tls import cloudflared_origin_ca_hint, deploy_cloudflared_origin_ca, ensure_localhost_cert
 from .state import RemoteControlState, DEFAULT_PORT
 
 
@@ -50,9 +51,12 @@ class RemoteServer:
     def __init__(self):
         self.state = RemoteControlState()
         self._thread = None
+        self._ipv6_thread = None
         self._server = None
+        self._ipv6_server = None
         self._app = None
         self._start_error = None
+        self._use_https = False
 
     def set_handlers(self, get_books, handle_open, handle_populate, handle_pending,
                      handle_setlist_prepare_next=None, get_setlist_info=None,
@@ -73,7 +77,8 @@ class RemoteServer:
 
     def _is_port_open(self, host, port):
         try:
-            s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            family = socket.AF_INET6 if ':' in host else socket.AF_INET
+            s = socket.socket(family, socket.SOCK_STREAM)
             s.settimeout(0.3)
             s.connect((host, port))
             s.close()
@@ -81,7 +86,7 @@ class RemoteServer:
         except OSError:
             return False
 
-    def _wait_until_listening(self, port, timeout=4.0):
+    def _wait_until_listening(self, port, timeout=4.0, use_https=False):
         deadline = time.time() + timeout
         while time.time() < deadline:
             if self._start_error:
@@ -89,48 +94,89 @@ class RemoteServer:
             if self._thread and not self._thread.is_alive():
                 return False
             if self._is_port_open('127.0.0.1', port):
-                return True
+                if not use_https or not sys.platform.startswith('win'):
+                    return True
+                if self._is_port_open('::1', port):
+                    return True
             time.sleep(0.1)
-        return self._is_port_open('127.0.0.1', port)
+        if not self._is_port_open('127.0.0.1', port):
+            return False
+        if use_https and sys.platform.startswith('win'):
+            return self._is_port_open('::1', port)
+        return True
 
-    def start(self, port=None):
-        if self._is_port_open('127.0.0.1', self.state.port) and self._thread and self._thread.is_alive():
+    def start(self, port=None, path_prefix='', use_https=False):
+        if (
+            self._is_port_open('127.0.0.1', self.state.port)
+            and self._thread
+            and self._thread.is_alive()
+            and self._use_https == bool(use_https)
+        ):
             return True
         port = port or self.state.port
         self.state.set_port(port)
         self._start_error = None
-        self._app = create_app(self.state)
+        self._use_https = bool(use_https)
+        self._app = create_app(self.state, path_prefix=path_prefix)
+        ssl_certfile = ssl_keyfile = None
+        if self._use_https:
+            try:
+                cert_path, key_path = ensure_localhost_cert(_app_dir())
+                ssl_certfile = str(cert_path)
+                ssl_keyfile = str(key_path)
+                deploy_cloudflared_origin_ca(cert_path)
+            except RuntimeError as exc:
+                self._start_error = str(exc)
+                self._use_https = False
+                _log_remote_error(exc)
+                return False
 
-        def _run():
+        def _run(host):
             try:
                 _prepare_stdio_for_uvicorn()
                 import uvicorn
                 config = uvicorn.Config(
                     self._app,
-                    host='0.0.0.0',
+                    host=host,
                     port=port,
                     log_level='warning',
                     access_log=False,
                     log_config=None,
+                    ssl_certfile=ssl_certfile,
+                    ssl_keyfile=ssl_keyfile,
                 )
-                self._server = uvicorn.Server(config)
-                self._server.run()
+                server = uvicorn.Server(config)
+                if host == '::':
+                    self._ipv6_server = server
+                else:
+                    self._server = server
+                server.run()
             except Exception as e:
                 self._start_error = str(e)
                 _log_remote_error(e)
 
-        self._thread = threading.Thread(target=_run, daemon=True, name='HymnRemoteAPI')
+        self._thread = threading.Thread(target=_run, args=('0.0.0.0',), daemon=True, name='HymnRemoteAPI')
         self._thread.start()
-        return self._wait_until_listening(port)
+        if self._use_https and sys.platform.startswith('win'):
+            self._ipv6_thread = threading.Thread(
+                target=_run, args=('::',), daemon=True, name='HymnRemoteAPI-IPv6'
+            )
+            self._ipv6_thread.start()
+        return self._wait_until_listening(port, use_https=self._use_https)
 
     def stop(self):
         if self._server:
             self._server.should_exit = True
+        if self._ipv6_server:
+            self._ipv6_server.should_exit = True
         self._thread = None
+        self._ipv6_thread = None
         self._server = None
+        self._ipv6_server = None
 
     def url(self, path: str = ''):
-        base = f"http://{get_lan_ip()}:{self.state.port}"
+        scheme = 'https' if self._use_https else 'http'
+        base = f"{scheme}://{get_lan_ip()}:{self.state.port}"
         if not path:
             return base
         if not path.startswith('/'):
