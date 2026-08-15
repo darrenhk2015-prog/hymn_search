@@ -1,3 +1,3 @@
 """Application build version (auto-incremented by build_exe.ps1)."""
-APP_VERSION = 9
-BUILD_DATE = '2026-06-30'
+APP_VERSION = 19
+BUILD_DATE = '2026-08-02'

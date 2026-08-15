@@ -1,14 +1,17 @@
 #!/usr/bin/env python3
-"""Build hymn_remote/data/gdrive_hymn_index.json from a public Google Drive folder.
+"""Build hymn_remote/data/gdrive_hymn_index.json from public Google Drive folders.
 
 Usage:
   pip install gdown
   python scripts/build_gdrive_hymn_map.py
 
-  # 換另一個 Drive 資料夾:
+  # 只重建主資料夾（含 01–23 Word 等）:
   python scripts/build_gdrive_hymn_map.py --folder-id YOUR_FOLDER_ID
 
-Output: hymn_remote/data/gdrive_hymn_index.json
+  # 略過 S1/S2 拆冊資料夾:
+  python scripts/build_gdrive_hymn_map.py --no-split-folders
+
+Output: hymn_remote/data/gdrive_hymn_index.json (+ copy beside project root)
 Rebuild exe after updating (build_exe.ps1 bundles hymn_remote/data).
 Drive folder must be shared as「知道連結的使用者均可檢視」.
 """
@@ -16,67 +19,58 @@ from __future__ import annotations
 
 import argparse
 import json
-import os
 import sys
-import time
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-DEFAULT_FOLDER_ID = '18uMCSYNDgipvGzHwlhyMcxrBaAcjChSZ'
-DEFAULT_URL = f'https://drive.google.com/drive/folders/{DEFAULT_FOLDER_ID}?usp=sharing'
+from hymn_remote.gdrive_index_build import (  # noqa: E402
+    DEFAULT_FOLDER_ID,
+    SPLIT_BOOK_FOLDERS,
+    build_index_payload,
+)
+
 OUT_PATH = ROOT / 'hymn_remote' / 'data' / 'gdrive_hymn_index.json'
-
-
-def _folder_url(folder_id: str) -> str:
-    return f'https://drive.google.com/drive/folders/{folder_id}?usp=sharing'
-
-
-def crawl_folder(url: str):
-    try:
-        import gdown
-    except ImportError as exc:
-        raise SystemExit('pip install gdown') from exc
-    files = gdown.download_folder(url, skip_download=True, quiet=True)
-    entries = []
-    for item in files:
-        rel = item.path.replace('\\', '/')
-        book, name = os.path.split(rel)
-        book = book.replace('\\', '/')
-        entries.append({
-            'id': item.id,
-            'book': book,
-            'name': name,
-            'rel': rel,
-        })
-    entries.sort(key=lambda e: (e['book'].lower(), e['name'].lower()))
-    return entries
+EXTERNAL_PATH = ROOT / 'gdrive_hymn_index.json'
 
 
 def main():
     ap = argparse.ArgumentParser(description='Build Google Drive hymn index JSON')
     ap.add_argument('--folder-id', default=DEFAULT_FOLDER_ID)
-    ap.add_argument('--url', default='')
+    ap.add_argument('--s1-folder-id', default=SPLIT_BOOK_FOLDERS[0][1])
+    ap.add_argument('--s2-folder-id', default=SPLIT_BOOK_FOLDERS[1][1])
+    ap.add_argument(
+        '--no-split-folders',
+        action='store_true',
+        help='Skip S1/S2 split-PDF folders (use only --folder-id tree)',
+    )
     ap.add_argument('-o', '--output', type=Path, default=OUT_PATH)
+    ap.add_argument(
+        '--no-external-copy',
+        action='store_true',
+        help=f'Do not also write {EXTERNAL_PATH.name} beside project root',
+    )
     args = ap.parse_args()
 
-    url = args.url or _folder_url(args.folder_id)
-    print(f'Listing {url} ...')
-    entries = crawl_folder(url)
-    payload = {
-        'version': 1,
-        'folder_id': args.folder_id,
-        'folder_url': url,
-        'built_at': time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime()),
-        'file_count': len(entries),
-        'entries': entries,
-    }
+    payload = build_index_payload(
+        folder_id=args.folder_id,
+        s1_folder_id=args.s1_folder_id,
+        s2_folder_id=args.s2_folder_id,
+        use_split_folders=not args.no_split_folders,
+        progress_cb=print,
+    )
     args.output.parent.mkdir(parents=True, exist_ok=True)
-    args.output.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding='utf-8')
-    books = sorted({e['book'] for e in entries if e['book']})
-    print(f'Wrote {len(entries)} files, {len(books)} book paths -> {args.output}')
+    text = json.dumps(payload, ensure_ascii=False, indent=2)
+    args.output.write_text(text, encoding='utf-8')
+    if not args.no_external_copy:
+        EXTERNAL_PATH.write_text(text, encoding='utf-8')
+
+    books = sorted({e['book'] for e in payload['entries'] if e['book']})
+    print(f"Wrote {payload['file_count']} files, {len(books)} book paths -> {args.output}")
+    if not args.no_external_copy:
+        print(f'Also wrote {EXTERNAL_PATH}')
     for b in books[:12]:
         print(f'  {b}')
     if len(books) > 12:

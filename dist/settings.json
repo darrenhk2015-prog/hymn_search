@@ -11,13 +11,13 @@
   "keyword_instant": true,
   "book_auto_focus_hymn": true,
   "click_to_open": false,
-  "remote_api_enabled": true,
-  "remote_accept": true,
+  "remote_api_enabled": false,
+  "remote_accept": false,
   "remote_port": 8765,
   "remote_use_https": false,
   "remote_policy": "auto_single",
   "remote_token": "",
-  "enable_tunnel": true,
+  "enable_tunnel": false,
   "cloudflared_path": "",
   "tunnel_mode": "service",
   "cloudflared_token": "eyJhIjoiY2M5NGFhNzkzZWI5MDlmYTJiNGQwYjRkMzJiZDllYmMiLCJ0IjoiOWJlNjdlODYtZGNiMS00ZDc4LWJhOWItZTFkNjAwYmI3NzBmIiwicyI6Ik5URXdNRGhoTmpNdE56RmxOaTAwWVRCbUxXSmhNR010TW1GbU1XSm1OVFEwTnpFdyJ9",
@@ -29,6 +29,11 @@
   "setlist": [],
   "setlist_index": -1,
   "session_history": [
+    {
+      "book": "01 神家詩歌",
+      "num": "P002  002 可敬可親紳 003 宇宙講故事.doc",
+      "label": "01 神家詩歌 · "
+    },
     {
       "book": "神家詩歌合訂本1大字拍子版",
       "num": "2",
@@ -110,7 +115,7 @@
   "auto_rescan": true,
   "startup_tray": false,
   "minimize_to_tray": false,
-  "last_opened": "P.2 · （參歌四6、二17、八14） 15-6-1987，滘西洲 註：沒藥山──預表迦略山。 主在其上為我們流血捨命，救贖我們。 乳香崗──預表主在高天榮…",
+  "last_opened": "01 神家詩歌 · ",
   "show_qr_code": false,
   "qr_x": 24,
   "qr_y": 24,

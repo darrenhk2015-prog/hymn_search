@@ -41,6 +41,7 @@
 """
 
 import os, sys, re, subprocess, zipfile, json, gzip, time, threading
+from pathlib import Path
 import fitz  # PyMuPDF
 
 from PyQt6.QtWidgets import (
@@ -67,6 +68,12 @@ from hymn_features.session_store import (
     add_setlist_entry, advance_setlist_index, clear_setlist, clamp_setlist, move_setlist_entry,
     parse_setlist, remove_setlist_at, session_history_list, setlist_index,
 )
+from hymn_features.display_flow import OpenFlowController, run_pdf_projection_flow, run_word_projection_flow
+from hymn_features.win_display import (
+    DISPLAY_SWITCH_CCD,
+    DISPLAY_SWITCH_LEGACY,
+    switch_windows_display_mode,
+)
 
 from hymn_remote.server import RemoteServer
 from hymn_remote.tunnel import (
@@ -84,6 +91,11 @@ from hymn_remote.tunnel import (
 from hymn_remote.state import (
     DEFAULT_PORT, OPEN_POLICY_AUTO, OPEN_POLICY_CONFIRM, OPEN_POLICY_UI,
 )
+from hymn_remote.gdrive_index_build import (
+    DEFAULT_FOLDER_ID as GDRIVE_DEFAULT_FOLDER_ID,
+    SPLIT_BOOK_FOLDERS as GDRIVE_SPLIT_BOOK_FOLDERS,
+)
+from hymn_remote.gdrive_hymn_map import ensure_external_index, get_index_info
 from hymn_remote.resolver import (
     resolve_books, resolve_targets, resolve_open_request,
     list_entries_for_book, summarize_match,
@@ -755,8 +767,8 @@ class IndexBuildWorker(QThread):
 #  OPENERS — 開啟檔案與 Windows 顯示模式
 # ══════════════════════════════════════════════════════════════
 # open_pdf_at_page：依序嘗試 Sumatra / Foxit / Adobe，否則系統預設。
-# switch_windows_display_mode：延伸桌面 ↔ 同步（複製）畫面（DisplaySwitch.exe）。
-def open_pdf_at_page(path, page):
+# switch_windows_display_mode：延伸桌面 ↔ 同步（複製）畫面（SetDisplayConfig API）。
+def open_pdf_at_page(path, page, *, presentation=False):
     if sys.platform == 'win32':
         for sp in [
             r"C:\Program Files\SumatraPDF\SumatraPDF.exe",
@@ -764,7 +776,11 @@ def open_pdf_at_page(path, page):
             os.path.expandvars(r"%LOCALAPPDATA%\SumatraPDF\SumatraPDF.exe"),
         ]:
             if os.path.exists(sp):
-                subprocess.Popen([sp, '-reuse-instance', '-page', str(page), path])
+                args = [sp, '-reuse-instance']
+                if presentation:
+                    args.append('-presentation')
+                args.extend(['-page', str(page), path])
+                subprocess.Popen(args)
                 return True, 'Sumatra PDF'
         for fp in [
             r"C:\Program Files\Foxit Software\Foxit PDF Reader\FoxitPDFReader.exe",
@@ -790,20 +806,25 @@ def open_pdf_at_page(path, page):
         return True, '系統預設'
 
 
-def switch_windows_display_mode(mode='duplicate'):
-    """Switch Windows multi-monitor layout: duplicate (/clone) or extend (/extend)."""
-    if sys.platform != 'win32':
-        return False
-    exe = os.path.join(os.environ.get('WINDIR', r'C:\Windows'), 'System32', 'DisplaySwitch.exe')
-    if not os.path.isfile(exe):
-        return False
-    flag = '/clone' if mode == 'duplicate' else '/extend'
-    try:
-        subprocess.Popen([exe, flag], shell=False)
-        return True
-    except Exception as e:
-        print(f"[WARN] DisplaySwitch: {e}")
-        return False
+def open_pdf_presentation(path):
+    """Open PDF; Sumatra uses -presentation to avoid a separate F11 toggle."""
+    if sys.platform == 'win32':
+        for sp in [
+            r"C:\Program Files\SumatraPDF\SumatraPDF.exe",
+            r"C:\Program Files (x86)\SumatraPDF\SumatraPDF.exe",
+            os.path.expandvars(r"%LOCALAPPDATA%\SumatraPDF\SumatraPDF.exe"),
+        ]:
+            if os.path.exists(sp):
+                subprocess.Popen([sp, '-reuse-instance', '-presentation', path])
+                return True, 'Sumatra PDF'
+        os.startfile(path)
+        return True, '系統預設'
+    elif sys.platform == 'darwin':
+        subprocess.Popen(['open', path])
+        return True, 'Preview'
+    else:
+        subprocess.Popen(['xdg-open', path])
+        return True, '系統預設'
 
 
 # ══════════════════════════════════════════════════════════════
@@ -818,6 +839,8 @@ OVERLAY_DURATION_ALWAYS = -1
 CENTER_OVERLAY_SECS = 5
 OVERLAY_MODE_CORNER = 'corner'
 OVERLAY_MODE_CENTER = 'center_then_corner'
+DEFAULT_OVERLAY_BG_COLOR = '#f59e0b'
+DEFAULT_OVERLAY_TEXT_COLOR = ''
 DEFAULT_QR_DESKTOP_SIZE = 140
 DEFAULT_QR_X = 24
 DEFAULT_QR_Y = 24
@@ -829,7 +852,7 @@ DEFAULT_QR_TEXT_COLOR = ''
 DEFAULT_QR_TEXT_SIZE = 12
 DEFAULT_QR_BG_OPACITY = 88
 
-SETTINGS_VERSION = 2
+SETTINGS_VERSION = 5
 
 
 def default_settings():
@@ -842,7 +865,12 @@ def default_settings():
         'open_overlay': True,
         'overlay_duration': DEFAULT_OVERLAY_SECS,
         'overlay_mode': OVERLAY_MODE_CORNER,
+        'overlay_bg_color': DEFAULT_OVERLAY_BG_COLOR,
+        'overlay_text_color': DEFAULT_OVERLAY_TEXT_COLOR,
         'display_duplicate': False,
+        'display_switch_mode': DISPLAY_SWITCH_CCD,
+        'word_auto_fullscreen': True,
+        'pdf_auto_fullscreen': False,
         'keyword_instant': True,
         'book_auto_focus_hymn': True,
         'click_to_open': False,
@@ -863,6 +891,9 @@ def default_settings():
         'named_tunnel_url': 'https://live.churchofgodtm.com/hymn_search/',
         'remote_path_prefix': '/hymn_search',
         'viewer_show_debug': False,
+        'gdrive_folder_id': GDRIVE_DEFAULT_FOLDER_ID,
+        'gdrive_s1_folder_id': GDRIVE_SPLIT_BOOK_FOLDERS[0][1],
+        'gdrive_s2_folder_id': GDRIVE_SPLIT_BOOK_FOLDERS[1][1],
         'operator_mode': False,
         'pinned_books': [],
         'setlist': [],
@@ -913,7 +944,19 @@ def normalize_settings(raw):
         merged['overlay_duration'] = DEFAULT_OVERLAY_SECS
     if merged['overlay_mode'] not in (OVERLAY_MODE_CORNER, OVERLAY_MODE_CENTER):
         merged['overlay_mode'] = OVERLAY_MODE_CORNER
+    merged['overlay_bg_color'] = _normalize_hex_color(
+        merged.get('overlay_bg_color'), DEFAULT_OVERLAY_BG_COLOR,
+    )
+    overlay_text_color = str(merged.get('overlay_text_color') or '').strip()
+    merged['overlay_text_color'] = (
+        _normalize_hex_color(overlay_text_color, DEFAULT_OVERLAY_TEXT_COLOR)
+        if overlay_text_color else DEFAULT_OVERLAY_TEXT_COLOR
+    )
     merged['display_duplicate'] = bool(merged['display_duplicate'])
+    mode = str(merged.get('display_switch_mode') or DISPLAY_SWITCH_CCD).strip().lower()
+    merged['display_switch_mode'] = mode if mode in (DISPLAY_SWITCH_CCD, DISPLAY_SWITCH_LEGACY) else DISPLAY_SWITCH_CCD
+    merged['word_auto_fullscreen'] = bool(merged.get('word_auto_fullscreen', True))
+    merged['pdf_auto_fullscreen'] = bool(merged.get('pdf_auto_fullscreen', False))
     merged['keyword_instant'] = bool(merged['keyword_instant'])
     merged['book_auto_focus_hymn'] = bool(merged['book_auto_focus_hymn'])
     merged['click_to_open'] = bool(merged['click_to_open'])
@@ -944,6 +987,15 @@ def normalize_settings(raw):
     if prefix and merged['named_tunnel_url']:
         merged['named_tunnel_url'] = normalize_tunnel_url(merged['named_tunnel_url']) + '/'
     merged['viewer_show_debug'] = bool(merged.get('viewer_show_debug'))
+    merged['gdrive_folder_id'] = str(merged.get('gdrive_folder_id') or GDRIVE_DEFAULT_FOLDER_ID).strip() or GDRIVE_DEFAULT_FOLDER_ID
+    merged['gdrive_s1_folder_id'] = (
+        str(merged.get('gdrive_s1_folder_id') or GDRIVE_SPLIT_BOOK_FOLDERS[0][1]).strip()
+        or GDRIVE_SPLIT_BOOK_FOLDERS[0][1]
+    )
+    merged['gdrive_s2_folder_id'] = (
+        str(merged.get('gdrive_s2_folder_id') or GDRIVE_SPLIT_BOOK_FOLDERS[1][1]).strip()
+        or GDRIVE_SPLIT_BOOK_FOLDERS[1][1]
+    )
     folder = str(merged.get('hymn_folder') or '').strip()
     merged['hymn_folder'] = os.path.abspath(folder) if folder else ''
     merged['operator_mode'] = bool(merged.get('operator_mode'))
@@ -1078,6 +1130,23 @@ def _overlay_subtitle(text):
     return text
 
 
+def _overlay_style_from_settings(settings):
+    s = settings or {}
+    text_color_raw = str(s.get('overlay_text_color') or s.get('text_color') or '').strip()
+    bg_raw = s.get('overlay_bg_color', s.get('bg_color'))
+    return {
+        'bg_color': _normalize_hex_color(bg_raw, DEFAULT_OVERLAY_BG_COLOR),
+        'text_color': (
+            _normalize_hex_color(text_color_raw, DEFAULT_OVERLAY_TEXT_COLOR)
+            if text_color_raw else DEFAULT_OVERLAY_TEXT_COLOR
+        ),
+    }
+
+
+def _overlay_style_is_normalized(style):
+    return isinstance(style, dict) and 'bg_color' in style
+
+
 def _ps_escape(text):
     return (text or '').replace("'", "''")
 
@@ -1150,7 +1219,6 @@ if ($open) {{ '1' }}
 
 class _BookNameOverlayPanel(QWidget):
     """單一螢幕上的書名浮層面板（圓角黃底、置頂、不搶焦點）。"""
-    _BG_COLOR = QColor('#f59e0b')
 
     def __init__(self, screen):
         super().__init__(
@@ -1162,6 +1230,8 @@ class _BookNameOverlayPanel(QWidget):
         self._screen = screen
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
         self.setAttribute(Qt.WidgetAttribute.WA_ShowWithoutActivating)
+        self._style = _overlay_style_from_settings({})
+        self._bg_qcolor = QColor(self._style['bg_color'])
         self._radius = 12
         self._placement = 'corner'
         self._mode = OVERLAY_MODE_CORNER
@@ -1170,8 +1240,10 @@ class _BookNameOverlayPanel(QWidget):
         self._anim_start_rect = None
         self._anim_end_rect = None
         self._book_label = QLabel(self)
+        self._book_label.setObjectName('overlayBookLabel')
         self._book_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self._item_label = QLabel(self)
+        self._item_label.setObjectName('overlayItemLabel')
         self._item_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self._item_label.setWordWrap(True)
         lay = QVBoxLayout(self)
@@ -1197,6 +1269,32 @@ class _BookNameOverlayPanel(QWidget):
         self._move_anim.valueChanged.connect(self._on_move_anim_frame)
         self._move_anim.finished.connect(self._on_move_to_corner_finished)
 
+    def _resolve_text_color(self):
+        raw = str(self._style.get('text_color') or '').strip()
+        if raw:
+            return raw
+        return _text_color_for_bg(self._style.get('bg_color', DEFAULT_OVERLAY_BG_COLOR))
+
+    def _apply_label_text_color(self, label, text_color, extra_style=''):
+        label.setStyleSheet(
+            f"QLabel#{label.objectName()} {{ color: {text_color}; background: transparent; {extra_style} }}"
+        )
+        pal = label.palette()
+        pal.setColor(QPalette.ColorRole.WindowText, QColor(text_color))
+        label.setPalette(pal)
+
+    def _apply_style(self, style=None):
+        if _overlay_style_is_normalized(style):
+            self._style = dict(style)
+        else:
+            self._style = _overlay_style_from_settings(style or {})
+        self._bg_qcolor = QColor(self._style['bg_color'])
+        if self._placement == 'center':
+            self._apply_center_style()
+        else:
+            self._apply_corner_style()
+        self.update()
+
     def _screen_geo(self):
         if self._screen is not None:
             return self._screen.availableGeometry()
@@ -1219,11 +1317,14 @@ class _BookNameOverlayPanel(QWidget):
 
         book_fs = int(round(self._lerp(48, 24, t)))
         item_fs = int(round(self._lerp(32, 18, t)))
-        self._book_label.setStyleSheet(
-            f"color: #ffffff; font-size: {book_fs}px; font-weight: bold; background: transparent;"
+        text_color = self._resolve_text_color()
+        self._apply_label_text_color(
+            self._book_label, text_color,
+            f"font-size: {book_fs}px; font-weight: bold;",
         )
-        self._item_label.setStyleSheet(
-            f"color: #ffffff; font-size: {item_fs}px; background: transparent;"
+        self._apply_label_text_color(
+            self._item_label, text_color,
+            f"font-size: {item_fs}px;",
         )
 
         self.setMinimumWidth(0)
@@ -1260,11 +1361,14 @@ class _BookNameOverlayPanel(QWidget):
         lay = self.layout()
         lay.setContentsMargins(28, 20, 28, 20)
         lay.setSpacing(8)
-        self._book_label.setStyleSheet(
-            "color: #ffffff; font-size: 24px; font-weight: bold; background: transparent;"
+        text_color = self._resolve_text_color()
+        self._apply_label_text_color(
+            self._book_label, text_color,
+            "font-size: 24px; font-weight: bold;",
         )
-        self._item_label.setStyleSheet(
-            "color: #ffffff; font-size: 18px; background: transparent;"
+        self._apply_label_text_color(
+            self._item_label, text_color,
+            "font-size: 18px;",
         )
         self._item_label.setMinimumWidth(280)
         self._item_label.setMaximumWidth(520)
@@ -1276,11 +1380,14 @@ class _BookNameOverlayPanel(QWidget):
         lay = self.layout()
         lay.setContentsMargins(48, 36, 48, 36)
         lay.setSpacing(14)
-        self._book_label.setStyleSheet(
-            "color: #ffffff; font-size: 48px; font-weight: bold; background: transparent;"
+        text_color = self._resolve_text_color()
+        self._apply_label_text_color(
+            self._book_label, text_color,
+            "font-size: 48px; font-weight: bold;",
         )
-        self._item_label.setStyleSheet(
-            "color: #ffffff; font-size: 32px; background: transparent;"
+        self._apply_label_text_color(
+            self._item_label, text_color,
+            "font-size: 32px;",
         )
         self._item_label.setMinimumWidth(440)
         self._item_label.setMaximumWidth(780)
@@ -1293,7 +1400,7 @@ class _BookNameOverlayPanel(QWidget):
             QRectF(0, 0, self.width(), self.height()),
             self._radius, self._radius,
         )
-        painter.fillPath(path, self._BG_COLOR)
+        painter.fillPath(path, self._bg_qcolor)
         super().paintEvent(event)
 
     def _ensure_on_screen(self):
@@ -1323,7 +1430,8 @@ class _BookNameOverlayPanel(QWidget):
         self._hide_timer.start(self._corner_duration * 1000)
 
     def _activate(self, book_name, watch_path, item_name='', duration_sec=DEFAULT_OVERLAY_SECS,
-                  mode=OVERLAY_MODE_CORNER):
+                  mode=OVERLAY_MODE_CORNER, style=None):
+        self._apply_style(style)
         self._corner_duration = self._normalize_duration(duration_sec)
         self._watch_path = watch_path or ''
         self._mode = mode
@@ -1519,6 +1627,9 @@ class BookNameOverlay:
             'item_name': ref._item_label.text() if ref._item_label.isVisible() else '',
             'watch_path': getattr(ref, '_watch_path', '') or '',
             'duration_sec': ref._corner_duration,
+            # Already shown once; after topology change resume at corner only.
+            'mode': OVERLAY_MODE_CORNER,
+            'style': dict(ref._style),
         }
         for panel in panels:
             panel._snap_to_corner()
@@ -1557,6 +1668,7 @@ class BookNameOverlay:
                     session.get('item_name', ''),
                     session['duration_sec'],
                     OVERLAY_MODE_CORNER,
+                    session.get('style'),
                 )
         cls._start_document_watch(session.get('watch_path', ''))
 
@@ -1577,14 +1689,14 @@ class BookNameOverlay:
 
     @classmethod
     def show_book(cls, book_name, watch_path='', item_name='', duration_sec=DEFAULT_OVERLAY_SECS,
-                  mode=OVERLAY_MODE_CORNER):
+                  mode=OVERLAY_MODE_CORNER, style=None):
         if not book_name:
             return
         cls._sync_panels()
         if not cls._panels:
             return
         for panel in cls._panels:
-            panel._activate(book_name, watch_path, item_name, duration_sec, mode)
+            panel._activate(book_name, watch_path, item_name, duration_sec, mode, style)
         cls._start_document_watch(watch_path)
 
     @classmethod
@@ -1930,50 +2042,11 @@ class DesktopQrOverlay:
             cls._apply_to_panel(panel, cached)
 
 
-def _schedule_word_focus_keys(doc_path='', after_callback=None):
-    """Word 開啟後送出 Enter、Alt+W、Alt+O，使視圖適合投影（無需 pywin32）。"""
-    def _worker():
-        time.sleep(2)
-        doc_name = os.path.splitext(os.path.basename(doc_path))[0].replace("'", "''")
-        ps = f"""
-$s = New-Object -ComObject WScript.Shell
-$p = Get-Process WINWORD -ErrorAction SilentlyContinue |
-    Where-Object {{ $_.MainWindowTitle -like '*{doc_name}*' }} |
-    Select-Object -First 1
-if (-not $p) {{
-    $p = Get-Process WINWORD -ErrorAction SilentlyContinue | Select-Object -First 1
-}}
-if ($p -and $p.MainWindowTitle) {{ [void]$s.AppActivate($p.MainWindowTitle) }}
-Start-Sleep -Milliseconds 250
-$s.SendKeys('{{ENTER}}')
-Start-Sleep -Milliseconds 150
-$s.SendKeys('%w')
-Start-Sleep -Milliseconds 150
-$s.SendKeys('%o')
-"""
-        try:
-            subprocess.run(
-                ['powershell', '-NoProfile', '-WindowStyle', 'Hidden', '-Command', ps],
-                check=False,
-                creationflags=getattr(subprocess, 'CREATE_NO_WINDOW', 0),
-            )
-        except Exception as e:
-            print(f"[WARN] Word focus keys: {e}")
-        if after_callback:
-            try:
-                after_callback()
-            except Exception as e:
-                print(f"[WARN] after Word focus keys: {e}")
-
-    threading.Thread(target=_worker, daemon=True).start()
-
-
-def open_docx(path, after_focus_keys=None):
-    """以系統預設方式開啟 Word 檔；可選在快捷鍵送出後執行回呼（如切換同步畫面）。"""
+def open_docx(path):
+    """以系統預設方式開啟 Word 檔。"""
     if sys.platform == 'win32':
         import ctypes
         ctypes.windll.shell32.ShellExecuteW(None, "open", path, None, None, 3)
-        _schedule_word_focus_keys(path, after_callback=after_focus_keys)
     elif sys.platform == 'darwin':
         subprocess.Popen(['open', path])
     else:
@@ -2077,7 +2150,10 @@ class MainWindow(QMainWindow, EnhancementMixin):
     - 三種搜尋模式切換、設定面板、主題與字體
     - 協調開檔流程（提示 → 開啟 → Word 快捷鍵 → 可選同步畫面）
     """
-    display_duplicate_requested = pyqtSignal()  # 從背景執行緒安全觸發顯示模式切換
+    display_duplicate_requested = pyqtSignal(int)  # generation — 全螢幕後安全觸發顯示模式切換
+    projection_ready = pyqtSignal(int)  # 背景執行緒 → 主執行緒：全螢幕就緒
+    open_flow_esc_cancelled = pyqtSignal()  # Esc 取消開檔流程
+    overlay_refresh_requested = pyqtSignal()  # 顯示模式切換後重新定位 overlay
     remote_open_payload = pyqtSignal(dict)
     remote_populate_ui = pyqtSignal(str, str, list)
     remote_pending_request = pyqtSignal(object)
@@ -2112,6 +2188,9 @@ class MainWindow(QMainWindow, EnhancementMixin):
         self.named_tunnel_url = self._settings['named_tunnel_url']
         self.remote_path_prefix = self._settings['remote_path_prefix']
         self.remote_use_https = self._settings['remote_use_https']
+        self._open_flow = OpenFlowController()
+        self._open_flow_generation = 0
+        self._open_flow.set_on_esc_cancelled(self.open_flow_esc_cancelled.emit)
 
         ver_suffix = f" v{APP_VERSION}"
         if BUILD_DATE:
@@ -2128,6 +2207,13 @@ class MainWindow(QMainWindow, EnhancementMixin):
         self.sched_entry_dropdown = DropdownList(self.theme_name)
         self.sched_entry_dropdown.text_selected.connect(self._on_sched_entry_picked)
         self.display_duplicate_requested.connect(self._switch_duplicate_with_overlay_fix)
+        self.projection_ready.connect(self._on_projection_ready)
+        self.open_flow_esc_cancelled.connect(
+            self._hide_overlay_on_esc, Qt.ConnectionType.QueuedConnection,
+        )
+        self.overlay_refresh_requested.connect(
+            self._refresh_overlays_after_display, Qt.ConnectionType.QueuedConnection,
+        )
         self.remote_open_payload.connect(self._on_remote_open_payload)
         self.remote_populate_ui.connect(self._on_remote_populate_ui)
         self.remote_pending_request.connect(self._on_remote_pending_request)
@@ -2157,6 +2243,11 @@ class MainWindow(QMainWindow, EnhancementMixin):
             self._app.installEventFilter(self)
         self._apply_theme()
         self._restore_saved_settings()
+        try:
+            ensure_external_index()
+        except Exception:
+            pass
+        self._refresh_gdrive_map_status()
         self._scan_all()
         self._apply_setlist_from_settings()
         self._update_footer_status()
@@ -2307,6 +2398,27 @@ class MainWindow(QMainWindow, EnhancementMixin):
         opts = QHBoxLayout(self.header_opts)
         opts.setContentsMargins(0, 0, 0, 0)
         opts.setSpacing(18)
+
+        self.chk_open_overlay_hdr = QCheckBox("書名提示")
+        self.chk_open_overlay_hdr.setChecked(self._settings['open_overlay'])
+        self.chk_open_overlay_hdr.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.chk_open_overlay_hdr.setToolTip("開啟 Word / PDF 時顯示置頂書名提示")
+        self.chk_open_overlay_hdr.toggled.connect(self._on_open_overlay_hdr_toggled)
+        opts.addWidget(self.chk_open_overlay_hdr)
+
+        self.chk_display_duplicate_hdr = QCheckBox("同步畫面")
+        self.chk_display_duplicate_hdr.setToolTip(
+            "開檔進入全螢幕後自動切換為同步（複製）畫面；"
+            "只儲存設定，勾選時唔會即時切換"
+        )
+        self.chk_display_duplicate_hdr.setChecked(self._settings['display_duplicate'])
+        self.chk_display_duplicate_hdr.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.chk_display_duplicate_hdr.toggled.connect(self._on_display_duplicate_hdr_toggled)
+        if sys.platform != 'win32':
+            self.chk_display_duplicate_hdr.setEnabled(False)
+            self.chk_display_duplicate_hdr.setToolTip("僅支援 Windows")
+        opts.addWidget(self.chk_display_duplicate_hdr)
+
         self.chk_remote_accept_hdr = QCheckBox("接受請求")
         self.chk_remote_accept_hdr.setChecked(self._settings['remote_accept'])
         self.chk_remote_accept_hdr.setEnabled(False)
@@ -2894,8 +3006,60 @@ class MainWindow(QMainWindow, EnhancementMixin):
         self.combo_overlay_pos.setCursor(Qt.CursorShape.PointingHandCursor)
         self.combo_overlay_pos.currentIndexChanged.connect(self._on_overlay_mode_changed)
 
+        self.lbl_overlay_bg = QLabel("提示背景")
+        self.lbl_overlay_bg.setMinimumWidth(label_min_w)
+        self.lbl_overlay_bg.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
+        (
+            self.overlay_bg_row,
+            self.inp_overlay_bg_color,
+            self.lbl_overlay_bg_preview,
+            self.btn_pick_overlay_bg_color,
+        ) = self._make_qr_color_row(
+            self._settings['overlay_bg_color'],
+            DEFAULT_OVERLAY_BG_COLOR,
+            "書名提示背景色",
+            allow_auto=False,
+        )
+        self.inp_overlay_bg_color.textChanged.connect(self._on_overlay_appearance_changed)
+        self.btn_pick_overlay_bg_color.clicked.connect(
+            lambda: self._pick_qr_color(
+                self.inp_overlay_bg_color, self.lbl_overlay_bg_preview, self._on_overlay_appearance_changed,
+            )
+        )
+
+        self.lbl_overlay_text_color = QLabel("提示字色")
+        self.lbl_overlay_text_color.setMinimumWidth(label_min_w)
+        self.lbl_overlay_text_color.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
+        (
+            self.overlay_text_color_row,
+            self.inp_overlay_text_color,
+            self.lbl_overlay_text_color_preview,
+            self.btn_pick_overlay_text_color,
+        ) = self._make_qr_color_row(
+            self._settings.get('overlay_text_color') or '',
+            '#ffffff',
+            "書名提示文字色（留空 = 依背景自動）",
+            allow_auto=True,
+        )
+        self.inp_overlay_text_color.textChanged.connect(self._on_overlay_appearance_changed)
+        self.btn_pick_overlay_text_color.clicked.connect(
+            lambda: self._pick_qr_color(
+                self.inp_overlay_text_color,
+                self.lbl_overlay_text_color_preview, self._on_overlay_appearance_changed,
+            )
+        )
+        self.btn_overlay_text_color_auto = QPushButton("自動")
+        self.btn_overlay_text_color_auto.setFixedWidth(52)
+        self.btn_overlay_text_color_auto.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_overlay_text_color_auto.setToolTip("依背景自動選擇文字顏色")
+        self.btn_overlay_text_color_auto.clicked.connect(self._reset_overlay_text_color_auto)
+        self.overlay_text_color_row.layout().addWidget(self.btn_overlay_text_color_auto)
+
         self.chk_display_duplicate = QCheckBox("切換同步畫面")
-        self.chk_display_duplicate.setToolTip("開啟 Word / PDF 後，將延伸桌面改為同步（複製）畫面")
+        self.chk_display_duplicate.setToolTip(
+            "開檔進入全螢幕後自動切換為同步（複製）畫面；"
+            "只儲存設定，勾選時唔會即時切換"
+        )
         self.chk_display_duplicate.setChecked(self._settings['display_duplicate'])
         self.chk_display_duplicate.setCursor(Qt.CursorShape.PointingHandCursor)
         self.chk_display_duplicate.toggled.connect(self._on_display_duplicate_toggled)
@@ -2903,12 +3067,57 @@ class MainWindow(QMainWindow, EnhancementMixin):
             self.chk_display_duplicate.setEnabled(False)
             self.chk_display_duplicate.setToolTip("僅支援 Windows")
 
+        self.lbl_display_switch_mode = QLabel("切換方式")
+        self.lbl_display_switch_mode.setMinimumWidth(label_min_w)
+        self.lbl_display_switch_mode.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
+        self.combo_display_switch_mode = QComboBox()
+        self.combo_display_switch_mode.addItem("快速（SetDisplayConfig）", DISPLAY_SWITCH_CCD)
+        self.combo_display_switch_mode.addItem("舊模式（DisplaySwitch）", DISPLAY_SWITCH_LEGACY)
+        self.combo_display_switch_mode.setToolTip(
+            "快速：直接 API，通常無 Win+P 側欄；"
+            "舊模式：DisplaySwitch.exe（會彈出切換提示）"
+        )
+        self.combo_display_switch_mode.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.combo_display_switch_mode.currentIndexChanged.connect(self._on_display_switch_mode_changed)
+        if sys.platform != 'win32':
+            self.lbl_display_switch_mode.setEnabled(False)
+            self.combo_display_switch_mode.setEnabled(False)
+
+        self.chk_word_auto_fullscreen = QCheckBox("Word 自動全螢幕")
+        self.chk_word_auto_fullscreen.setToolTip(
+            "開啟 Word 後自動送 Enter / Alt+W / Alt+O 進入投影全螢幕"
+        )
+        self.chk_word_auto_fullscreen.setChecked(self._settings['word_auto_fullscreen'])
+        self.chk_word_auto_fullscreen.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.chk_word_auto_fullscreen.toggled.connect(self._on_word_auto_fullscreen_toggled)
+        if sys.platform != 'win32':
+            self.chk_word_auto_fullscreen.setEnabled(False)
+
+        self.chk_pdf_auto_fullscreen = QCheckBox("PDF 自動全螢幕")
+        self.chk_pdf_auto_fullscreen.setToolTip(
+            "開啟 PDF 後自動全螢幕（Sumatra 用 -presentation；其他用 F11）；"
+            "Foxit 等已自動全螢幕嘅閱讀器可關閉"
+        )
+        self.chk_pdf_auto_fullscreen.setChecked(self._settings['pdf_auto_fullscreen'])
+        self.chk_pdf_auto_fullscreen.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.chk_pdf_auto_fullscreen.toggled.connect(self._on_pdf_auto_fullscreen_toggled)
+        if sys.platform != 'win32':
+            self.chk_pdf_auto_fullscreen.setEnabled(False)
+
         open_grid.addWidget(self.chk_open_overlay, 0, 0, 1, 2)
         open_grid.addWidget(self.lbl_overlay_secs, 1, 0)
         open_grid.addWidget(self.combo_overlay_duration, 1, 1, Qt.AlignmentFlag.AlignLeft)
         open_grid.addWidget(self.lbl_overlay_pos, 2, 0)
         open_grid.addWidget(self.combo_overlay_pos, 2, 1, Qt.AlignmentFlag.AlignLeft)
-        open_grid.addWidget(self.chk_display_duplicate, 3, 0, 1, 2)
+        open_grid.addWidget(self.lbl_overlay_bg, 3, 0)
+        open_grid.addWidget(self.overlay_bg_row, 3, 1)
+        open_grid.addWidget(self.lbl_overlay_text_color, 4, 0)
+        open_grid.addWidget(self.overlay_text_color_row, 4, 1)
+        open_grid.addWidget(self.chk_display_duplicate, 5, 0, 1, 2)
+        open_grid.addWidget(self.lbl_display_switch_mode, 6, 0)
+        open_grid.addWidget(self.combo_display_switch_mode, 6, 1, Qt.AlignmentFlag.AlignLeft)
+        open_grid.addWidget(self.chk_word_auto_fullscreen, 7, 0, 1, 2)
+        open_grid.addWidget(self.chk_pdf_auto_fullscreen, 8, 0, 1, 2)
 
         self.grp_remote = QGroupBox("Mobile 遙控")
         remote_grid = QGridLayout(self.grp_remote)
@@ -3279,10 +3488,79 @@ class MainWindow(QMainWindow, EnhancementMixin):
         tab_about_lay.addWidget(self.settings_credit)
         tab_about_lay.addStretch()
 
+        # ── 會眾 Drive Mapping（外置 gdrive_hymn_index.json）────────
+        tab_mapping = QWidget()
+        tab_mapping_lay = QVBoxLayout(tab_mapping)
+        tab_mapping_lay.setContentsMargins(4, 8, 4, 4)
+        tab_mapping_lay.setSpacing(10)
+
+        self.grp_gdrive_map = QGroupBox("會眾 Drive Mapping")
+        map_grid = QGridLayout(self.grp_gdrive_map)
+        map_grid.setContentsMargins(12, 14, 12, 12)
+        map_grid.setHorizontalSpacing(10)
+        map_grid.setVerticalSpacing(8)
+
+        self.gdrive_map_status_lbl = QLabel("—")
+        self.gdrive_map_status_lbl.setWordWrap(True)
+        map_grid.addWidget(self.gdrive_map_status_lbl, 0, 0, 1, 2)
+
+        self.lbl_gdrive_folder = QLabel("主資料夾 ID")
+        self.inp_gdrive_folder = QLineEdit(self._settings['gdrive_folder_id'])
+        self.inp_gdrive_folder.setPlaceholderText(GDRIVE_DEFAULT_FOLDER_ID)
+        self.inp_gdrive_folder.editingFinished.connect(self._on_gdrive_folder_ids_changed)
+        map_grid.addWidget(self.lbl_gdrive_folder, 1, 0)
+        map_grid.addWidget(self.inp_gdrive_folder, 1, 1)
+
+        self.lbl_gdrive_s1 = QLabel("S1 資料夾 ID")
+        self.inp_gdrive_s1 = QLineEdit(self._settings['gdrive_s1_folder_id'])
+        self.inp_gdrive_s1.setPlaceholderText(GDRIVE_SPLIT_BOOK_FOLDERS[0][1])
+        self.inp_gdrive_s1.editingFinished.connect(self._on_gdrive_folder_ids_changed)
+        map_grid.addWidget(self.lbl_gdrive_s1, 2, 0)
+        map_grid.addWidget(self.inp_gdrive_s1, 2, 1)
+
+        self.lbl_gdrive_s2 = QLabel("S2 資料夾 ID")
+        self.inp_gdrive_s2 = QLineEdit(self._settings['gdrive_s2_folder_id'])
+        self.inp_gdrive_s2.setPlaceholderText(GDRIVE_SPLIT_BOOK_FOLDERS[1][1])
+        self.inp_gdrive_s2.editingFinished.connect(self._on_gdrive_folder_ids_changed)
+        map_grid.addWidget(self.lbl_gdrive_s2, 3, 0)
+        map_grid.addWidget(self.inp_gdrive_s2, 3, 1)
+
+        map_btn_row = QHBoxLayout()
+        self.btn_gdrive_rebuild = QPushButton("從 Drive 重建")
+        self.btn_gdrive_rebuild.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_gdrive_rebuild.setToolTip("需要 gdown；會寫入 exe／專案旁 gdrive_hymn_index.json")
+        self.btn_gdrive_rebuild.clicked.connect(self._on_gdrive_rebuild_clicked)
+        self.btn_gdrive_edit = QPushButton("編輯對應表")
+        self.btn_gdrive_edit.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_gdrive_edit.clicked.connect(self._on_gdrive_edit_clicked)
+        self.btn_gdrive_import = QPushButton("匯入 JSON")
+        self.btn_gdrive_import.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_gdrive_import.clicked.connect(self._on_gdrive_import_clicked)
+        self.btn_gdrive_export = QPushButton("匯出 JSON")
+        self.btn_gdrive_export.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_gdrive_export.clicked.connect(self._on_gdrive_export_clicked)
+        map_btn_row.addWidget(self.btn_gdrive_rebuild)
+        map_btn_row.addWidget(self.btn_gdrive_edit)
+        map_btn_row.addWidget(self.btn_gdrive_import)
+        map_btn_row.addWidget(self.btn_gdrive_export)
+        map_btn_row.addStretch()
+        map_grid.addLayout(map_btn_row, 4, 0, 1, 2)
+
+        self.gdrive_map_hint_lbl = QLabel(
+            "優先讀取程式旁 gdrive_hymn_index.json；首次啟動會從內嵌副本複製。"
+            "改完後無須重新打包 exe。"
+        )
+        self.gdrive_map_hint_lbl.setWordWrap(True)
+        map_grid.addWidget(self.gdrive_map_hint_lbl, 5, 0, 1, 2)
+
+        tab_mapping_lay.addWidget(self.grp_gdrive_map)
+        tab_mapping_lay.addStretch()
+
         self.settings_tabs = QTabWidget()
         self.settings_tabs.addTab(tab_general, "一般")
         self.settings_tabs.addTab(tab_open, "開檔")
         self.settings_tabs.addTab(tab_mobile, "Mobile")
+        self.settings_tabs.addTab(tab_mapping, "對應")
         self.settings_tabs.addTab(tab_about, "關於")
         self._settings_mobile_tab_index = 2
         self.settings_tabs.currentChanged.connect(self._on_settings_tab_changed)
@@ -3406,15 +3684,102 @@ class MainWindow(QMainWindow, EnhancementMixin):
             _overlay_subtitle(item_name or os.path.basename(path)),
             self.combo_overlay_duration.currentData(),
             self.combo_overlay_pos.currentData(),
+            self._settings,
         )
 
+    def _overlay_appearance_widgets(self):
+        return (
+            self.lbl_overlay_bg, self.overlay_bg_row,
+            self.lbl_overlay_text_color, self.overlay_text_color_row,
+        )
+
+    def _overlay_appearance_values(self):
+        text_color = (
+            self.inp_overlay_text_color.text().strip()
+            if hasattr(self, 'inp_overlay_text_color') else ''
+        )
+        return {
+            'overlay_bg_color': _normalize_hex_color(
+                self.inp_overlay_bg_color.text(), DEFAULT_OVERLAY_BG_COLOR,
+            ),
+            'overlay_text_color': (
+                _normalize_hex_color(text_color, DEFAULT_OVERLAY_TEXT_COLOR)
+                if text_color else DEFAULT_OVERLAY_TEXT_COLOR
+            ),
+        }
+
+    def _update_overlay_color_previews(self):
+        if hasattr(self, 'lbl_overlay_bg_preview'):
+            self._update_qr_color_preview(
+                self.lbl_overlay_bg_preview,
+                self.inp_overlay_bg_color.text() if hasattr(self, 'inp_overlay_bg_color') else '',
+                DEFAULT_OVERLAY_BG_COLOR,
+            )
+        if hasattr(self, 'lbl_overlay_text_color_preview'):
+            self._update_qr_color_preview(
+                self.lbl_overlay_text_color_preview,
+                self.inp_overlay_text_color.text() if hasattr(self, 'inp_overlay_text_color') else '',
+                '#ffffff',
+            )
+
+    def _reset_overlay_text_color_auto(self):
+        if not hasattr(self, 'inp_overlay_text_color'):
+            return
+        self.inp_overlay_text_color.blockSignals(True)
+        self.inp_overlay_text_color.clear()
+        self.inp_overlay_text_color.blockSignals(False)
+        self._update_overlay_color_previews()
+        self._on_overlay_appearance_changed()
+
+    def _sync_book_name_overlay_settings(self):
+        panels = BookNameOverlay._visible_panels()
+        if not panels:
+            return
+        ref = panels[0]
+        BookNameOverlay.show_book(
+            ref._book_label.text(),
+            getattr(ref, '_watch_path', ''),
+            ref._item_label.text() if ref._item_label.isVisible() else '',
+            ref._corner_duration,
+            ref._mode,
+            self._settings,
+        )
+
+    def _on_overlay_appearance_changed(self, _value=''):
+        values = self._overlay_appearance_values()
+        self._update_overlay_color_previews()
+        self._persist_settings(**values)
+        self._sync_book_name_overlay_settings()
+
+    def _sync_open_overlay_checkboxes(self, checked):
+        for chk in (getattr(self, 'chk_open_overlay_hdr', None), self.chk_open_overlay):
+            if chk is None:
+                continue
+            chk.blockSignals(True)
+            chk.setChecked(checked)
+            chk.blockSignals(False)
+
+    def _sync_display_duplicate_checkboxes(self, checked):
+        for chk in (getattr(self, 'chk_display_duplicate_hdr', None), self.chk_display_duplicate):
+            if chk is None:
+                continue
+            chk.blockSignals(True)
+            chk.setChecked(checked)
+            chk.blockSignals(False)
+
     def _on_open_overlay_toggled(self, checked):
+        self._sync_open_overlay_checkboxes(checked)
         for w in (self.lbl_overlay_secs, self.combo_overlay_duration,
                   self.lbl_overlay_pos, self.combo_overlay_pos):
+            w.setEnabled(checked)
+        for w in self._overlay_appearance_widgets():
             w.setEnabled(checked)
         if not checked:
             BookNameOverlay.hide_overlay()
         self._persist_settings(open_overlay=checked)
+
+    def _on_open_overlay_hdr_toggled(self, checked):
+        self._on_open_overlay_toggled(checked)
 
     def _on_overlay_duration_changed(self, _idx):
         self._persist_settings(
@@ -3425,9 +3790,71 @@ class MainWindow(QMainWindow, EnhancementMixin):
         self._persist_settings(
             overlay_mode=self.combo_overlay_pos.currentData()
         )
+        self._sync_book_name_overlay_settings()
 
     def _on_display_duplicate_toggled(self, checked):
+        self._sync_display_duplicate_checkboxes(checked)
         self._persist_settings(display_duplicate=checked)
+
+    def _on_display_duplicate_hdr_toggled(self, checked):
+        self._on_display_duplicate_toggled(checked)
+
+    def _on_display_switch_mode_changed(self, _index=-1):
+        mode = self.combo_display_switch_mode.currentData()
+        if mode:
+            self._persist_settings(display_switch_mode=mode)
+
+    def _on_word_auto_fullscreen_toggled(self, checked):
+        self._persist_settings(word_auto_fullscreen=checked)
+
+    def _on_pdf_auto_fullscreen_toggled(self, checked):
+        self._persist_settings(pdf_auto_fullscreen=checked)
+
+    def _display_switch_method(self) -> str:
+        if hasattr(self, 'combo_display_switch_mode'):
+            mode = self.combo_display_switch_mode.currentData()
+            if mode in (DISPLAY_SWITCH_CCD, DISPLAY_SWITCH_LEGACY):
+                return mode
+        return str(self._settings.get('display_switch_mode') or DISPLAY_SWITCH_CCD)
+
+    def _begin_open_flow(self) -> int:
+        self._open_flow_generation = self._open_flow.begin()
+        return self._open_flow_generation
+
+    def _cancel_open_flow(self):
+        self._open_flow.cancel()
+
+    def _hide_overlay_on_esc(self):
+        BookNameOverlay.hide_overlay()
+
+    def _on_projection_ready(self, generation: int):
+        if not self._open_flow.should_switch_display(generation):
+            return
+        if sys.platform != 'win32' or not self.chk_display_duplicate.isChecked():
+            return
+        self.display_duplicate_requested.emit(generation)
+
+    def _maybe_start_projection_flow(
+        self,
+        path: str,
+        *,
+        kind: str,
+        auto_fullscreen: bool = True,
+        skip_pdf_presentation: bool = False,
+    ):
+        gen = self._begin_open_flow()
+        ready_cb = lambda g: self.projection_ready.emit(g)
+        if kind == 'word':
+            run_word_projection_flow(
+                path, self._open_flow, gen, ready_cb,
+                auto_fullscreen=auto_fullscreen,
+            )
+        elif kind == 'pdf':
+            run_pdf_projection_flow(
+                path, self._open_flow, gen, ready_cb,
+                auto_fullscreen=auto_fullscreen,
+                skip_presentation=skip_pdf_presentation,
+            )
 
     def _on_keyword_instant_toggled(self, checked):
         self._persist_settings(keyword_instant=checked)
@@ -3991,6 +4418,35 @@ class MainWindow(QMainWindow, EnhancementMixin):
         self._remote.state.set_viewer_show_debug(s['viewer_show_debug'])
         self._set_search_mode(s['search_mode'])
         self._on_open_overlay_toggled(s['open_overlay'])
+        self._sync_display_duplicate_checkboxes(s['display_duplicate'])
+        if hasattr(self, 'combo_display_switch_mode'):
+            switch_mode = s.get('display_switch_mode') or DISPLAY_SWITCH_CCD
+            idx = self.combo_display_switch_mode.findData(switch_mode)
+            self.combo_display_switch_mode.blockSignals(True)
+            self.combo_display_switch_mode.setCurrentIndex(idx if idx >= 0 else 0)
+            self.combo_display_switch_mode.blockSignals(False)
+        if hasattr(self, 'chk_word_auto_fullscreen'):
+            self.chk_word_auto_fullscreen.blockSignals(True)
+            self.chk_word_auto_fullscreen.setChecked(s.get('word_auto_fullscreen', True))
+            self.chk_word_auto_fullscreen.blockSignals(False)
+        if hasattr(self, 'chk_pdf_auto_fullscreen'):
+            self.chk_pdf_auto_fullscreen.blockSignals(True)
+            self.chk_pdf_auto_fullscreen.setChecked(s.get('pdf_auto_fullscreen', False))
+            self.chk_pdf_auto_fullscreen.blockSignals(False)
+        if hasattr(self, 'inp_overlay_bg_color'):
+            self.inp_overlay_bg_color.blockSignals(True)
+            self.inp_overlay_bg_color.setText(
+                _normalize_hex_color(s.get('overlay_bg_color'), DEFAULT_OVERLAY_BG_COLOR)
+            )
+            self.inp_overlay_bg_color.blockSignals(False)
+        if hasattr(self, 'inp_overlay_text_color'):
+            self.inp_overlay_text_color.blockSignals(True)
+            text_color = str(s.get('overlay_text_color') or '').strip()
+            self.inp_overlay_text_color.setText(
+                _normalize_hex_color(text_color, DEFAULT_OVERLAY_TEXT_COLOR) if text_color else ''
+            )
+            self.inp_overlay_text_color.blockSignals(False)
+        self._update_overlay_color_previews()
         if s['remote_api_enabled']:
             self.chk_remote_api.setChecked(True)
             self._on_remote_api_toggled(True)
@@ -4097,45 +4553,79 @@ class MainWindow(QMainWindow, EnhancementMixin):
     def _update_settings_scroll_height(self):
         pass
 
-    def _maybe_duplicate_displays(self):
+    def _switch_duplicate_with_overlay_fix(self, generation: int):
+        if not self._open_flow.should_switch_display(generation):
+            return
+        if sys.platform != 'win32' or not self.chk_display_duplicate.isChecked():
+            return
+        QTimer.singleShot(150, lambda g=generation: self._apply_display_mode('duplicate', g))
+
+    def _refresh_overlays_after_display(self):
+        try:
+            app = QApplication.instance()
+            if app:
+                app.processEvents()
+            BookNameOverlay.refresh_after_display_change()
+            DesktopQrOverlay.refresh_after_display_change()
+        except Exception as exc:
+            print(f'[WARN] overlay refresh after display change: {exc}')
+
+    def _apply_display_mode(self, mode='duplicate', generation: int | None = None):
+        if generation is not None and not self._open_flow.should_switch_display(generation):
+            return
         if sys.platform != 'win32':
             return
-        if self.chk_display_duplicate.isChecked():
-            self.display_duplicate_requested.emit()
-
-    def _switch_duplicate_with_overlay_fix(self):
-        if sys.platform != 'win32' or not self.chk_display_duplicate.isChecked():
-            return
-        # Brief pause after Alt+O so Word settles before the topology change.
-        QTimer.singleShot(450, self._apply_display_duplicate)
-
-    def _apply_display_duplicate(self):
-        if sys.platform != 'win32' or not self.chk_display_duplicate.isChecked():
-            return
         BookNameOverlay.prepare_for_display_change()
-        switch_windows_display_mode('duplicate')
-        QTimer.singleShot(1200, BookNameOverlay.refresh_after_display_change)
-        QTimer.singleShot(1200, DesktopQrOverlay.refresh_after_display_change)
+        method = self._display_switch_method()
+
+        def _worker():
+            try:
+                switch_windows_display_mode(mode, method=method)
+            except Exception as exc:
+                print(f'[WARN] display switch: {exc}')
+            self.overlay_refresh_requested.emit()
+
+        threading.Thread(target=_worker, daemon=True).start()
+
+    def _apply_display_duplicate(self, generation: int | None = None):
+        if sys.platform != 'win32' or not self.chk_display_duplicate.isChecked():
+            return
+        self._apply_display_mode('duplicate', generation)
 
     def _open_docx_with_flow(self, path, item_name='', *, show_overlay=True):
         if show_overlay:
             self._show_open_book_popup(path, item_name or os.path.basename(path))
-        open_docx(path, after_focus_keys=self._maybe_duplicate_displays)
+        open_docx(path)
+        self._maybe_start_projection_flow(
+            path,
+            kind='word',
+            auto_fullscreen=self._settings.get('word_auto_fullscreen', True),
+        )
 
     def _open_pdf_with_flow(self, path, item_name='', page=None, *, show_overlay=True):
         if show_overlay:
             self._show_open_book_popup(path, item_name or os.path.basename(path))
+        auto_fs = self._settings.get('pdf_auto_fullscreen', False)
+        use_presentation = False
         if page is not None:
-            open_pdf_at_page(path, page)
+            _, viewer = open_pdf_at_page(path, page, presentation=auto_fs)
+            use_presentation = auto_fs and viewer == 'Sumatra PDF'
         elif sys.platform == 'win32':
-            os.startfile(path)
+            if auto_fs:
+                _, viewer = open_pdf_presentation(path)
+                use_presentation = viewer == 'Sumatra PDF'
+            else:
+                os.startfile(path)
         elif sys.platform == 'darwin':
             subprocess.Popen(['open', path])
         else:
             subprocess.Popen(['xdg-open', path])
-        # PDF has no Alt+O step; switch after the viewer has had time to open.
-        if sys.platform == 'win32' and self.chk_display_duplicate.isChecked():
-            QTimer.singleShot(2600, self._switch_duplicate_with_overlay_fix)
+        self._maybe_start_projection_flow(
+            path,
+            kind='pdf',
+            auto_fullscreen=auto_fs,
+            skip_pdf_presentation=use_presentation,
+        )
 
     # ─────────────────────────────────────────────────────────────
     #  APPLY THEME — 統一套用深/淺色主題至所有元件
@@ -4177,6 +4667,8 @@ class MainWindow(QMainWindow, EnhancementMixin):
             f"background: transparent; spacing: 6px; padding: 0 2px; }}"
         )
         self.chk_click_to_open_hdr.setStyleSheet(hdr_chk_style)
+        self.chk_open_overlay_hdr.setStyleSheet(hdr_chk_style)
+        self.chk_display_duplicate_hdr.setStyleSheet(hdr_chk_style)
         self.chk_remote_accept_hdr.setStyleSheet(hdr_chk_style)
         self.chk_show_qr_hdr.setStyleSheet(hdr_chk_style)
         hdr_combo_style = (
@@ -4432,6 +4924,10 @@ class MainWindow(QMainWindow, EnhancementMixin):
         self.chk_click_to_open.setStyleSheet(checkbox_style)
         self.chk_open_overlay.setStyleSheet(checkbox_style)
         self.chk_display_duplicate.setStyleSheet(checkbox_style)
+        if hasattr(self, 'chk_word_auto_fullscreen'):
+            self.chk_word_auto_fullscreen.setStyleSheet(checkbox_style)
+        if hasattr(self, 'chk_pdf_auto_fullscreen'):
+            self.chk_pdf_auto_fullscreen.setStyleSheet(checkbox_style)
         for chk in (self.chk_remote_api, self.chk_remote_accept, self.chk_enable_tunnel,
                     self.chk_viewer_show_debug,
                     self.chk_show_preview,
@@ -4472,6 +4968,10 @@ class MainWindow(QMainWindow, EnhancementMixin):
         self.lbl_overlay_pos.setStyleSheet(
             f"font-size: {fs - 2}px; color: {t['muted']}; background: transparent;"
         )
+        for lbl in (self.lbl_overlay_bg, self.lbl_overlay_text_color):
+            lbl.setStyleSheet(
+                f"font-size: {fs - 2}px; color: {t['muted']}; background: transparent;"
+            )
 
         # sel_info
         self.sel_info.setStyleSheet(
@@ -4480,6 +4980,7 @@ class MainWindow(QMainWindow, EnhancementMixin):
 
         # Settings labels
         for lbl in (self.lbl_hymn_folder, self.lbl_theme, self.lbl_font, self.lbl_overlay_secs, self.lbl_overlay_pos, self.fs_lbl,
+                    self.lbl_overlay_bg, self.lbl_overlay_text_color,
                     self.lbl_remote_port, self.lbl_remote_token, self.lbl_remote_url,
                     self.lbl_viewer_url, self.lbl_local_url, self.lbl_public_tunnel_url,
                     self.lbl_qr_x, self.lbl_qr_y, self.lbl_qr_w, self.lbl_qr_h,
@@ -5695,6 +6196,103 @@ class MainWindow(QMainWindow, EnhancementMixin):
     def _on_viewer_show_debug_toggled(self, checked):
         self._remote.state.set_viewer_show_debug(checked)
         self._persist_settings(viewer_show_debug=checked)
+
+    def _refresh_gdrive_map_status(self):
+        lbl = getattr(self, 'gdrive_map_status_lbl', None)
+        if lbl is None:
+            return
+        try:
+            info = get_index_info()
+        except Exception as exc:
+            lbl.setText(f'無法讀取 index：{exc}')
+            return
+        src = '外置設定' if info.get('external') else '內嵌（唯讀 fallback）'
+        built = info.get('built_at') or '—'
+        lbl.setText(
+            f"來源：{src}\n路徑：{info.get('path')}\n"
+            f"筆數：{info.get('file_count', 0)}  ·  built_at：{built}"
+        )
+
+    def _on_gdrive_folder_ids_changed(self):
+        self._persist_settings(
+            gdrive_folder_id=self.inp_gdrive_folder.text().strip() or GDRIVE_DEFAULT_FOLDER_ID,
+            gdrive_s1_folder_id=self.inp_gdrive_s1.text().strip() or GDRIVE_SPLIT_BOOK_FOLDERS[0][1],
+            gdrive_s2_folder_id=self.inp_gdrive_s2.text().strip() or GDRIVE_SPLIT_BOOK_FOLDERS[1][1],
+        )
+
+    def _on_gdrive_rebuild_clicked(self):
+        from hymn_features.gdrive_map_dialog import GdriveRebuildWorker
+        if getattr(self, '_gdrive_rebuild_worker', None) and self._gdrive_rebuild_worker.isRunning():
+            self._show_toast('正在重建 mapping…', 'warn')
+            return
+        self._on_gdrive_folder_ids_changed()
+        self.btn_gdrive_rebuild.setEnabled(False)
+        self.gdrive_map_status_lbl.setText('正在從 Google Drive 列出檔案…')
+        worker = GdriveRebuildWorker(
+            self._settings['gdrive_folder_id'],
+            self._settings['gdrive_s1_folder_id'],
+            self._settings['gdrive_s2_folder_id'],
+            self,
+        )
+        self._gdrive_rebuild_worker = worker
+        worker.progress.connect(lambda m: self.gdrive_map_status_lbl.setText(m))
+        worker.finished_ok.connect(self._on_gdrive_rebuild_ok)
+        worker.finished_err.connect(self._on_gdrive_rebuild_err)
+        worker.start()
+
+    def _on_gdrive_rebuild_ok(self, payload):
+        from hymn_remote.gdrive_hymn_map import external_index_path, save_index_payload, invalidate_index_cache
+        try:
+            path = save_index_payload(payload, external_index_path())
+            invalidate_index_cache()
+            self._show_toast(f'Drive mapping 已重建（{payload.get("file_count", 0)} 筆）', 'ok')
+            self.gdrive_map_status_lbl.setText(f'已寫入：{path}')
+        except Exception as exc:
+            self._show_toast(f'儲存失敗：{exc}', 'err')
+        self.btn_gdrive_rebuild.setEnabled(True)
+        self._refresh_gdrive_map_status()
+
+    def _on_gdrive_rebuild_err(self, message):
+        self.btn_gdrive_rebuild.setEnabled(True)
+        self._show_toast(f'重建失敗：{message}', 'err')
+        self._refresh_gdrive_map_status()
+
+    def _on_gdrive_edit_clicked(self):
+        from hymn_features.gdrive_map_dialog import GdriveMapEditorDialog
+        dlg = GdriveMapEditorDialog(self)
+        if dlg.exec():
+            self._refresh_gdrive_map_status()
+            self._show_toast('Drive mapping 已更新', 'ok')
+
+    def _on_gdrive_import_clicked(self):
+        from hymn_features.gdrive_map_dialog import import_index_json
+        path, _ = QFileDialog.getOpenFileName(
+            self, '匯入 Drive Mapping JSON', app_dir(), 'JSON (*.json)',
+        )
+        if not path:
+            return
+        try:
+            out = import_index_json(Path(path))
+            self._show_toast('已匯入 Drive mapping', 'ok')
+            self.gdrive_map_status_lbl.setText(f'已匯入 → {out}')
+            self._refresh_gdrive_map_status()
+        except Exception as exc:
+            self._show_toast(f'匯入失敗：{exc}', 'err')
+
+    def _on_gdrive_export_clicked(self):
+        from hymn_features.gdrive_map_dialog import export_index_json
+        path, _ = QFileDialog.getSaveFileName(
+            self, '匯出 Drive Mapping JSON',
+            os.path.join(app_dir(), 'gdrive_hymn_index.json'),
+            'JSON (*.json)',
+        )
+        if not path:
+            return
+        try:
+            export_index_json(Path(path))
+            self._show_toast('已匯出 Drive mapping', 'ok')
+        except Exception as exc:
+            self._show_toast(f'匯出失敗：{exc}', 'err')
 
     def _on_remote_port_changed(self, val):
         self._remote.state.set_port(val)

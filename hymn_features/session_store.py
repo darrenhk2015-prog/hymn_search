@@ -5,7 +5,8 @@ MAX_SESSION_HISTORY = 50
 
 EXPORT_KEYS = (
     'theme', 'font_size', 'search_mode', 'open_overlay', 'overlay_duration',
-    'overlay_mode', 'display_duplicate', 'keyword_instant', 'book_auto_focus_hymn',
+    'overlay_mode', 'display_duplicate', 'display_switch_mode',
+    'word_auto_fullscreen', 'pdf_auto_fullscreen', 'keyword_instant', 'book_auto_focus_hymn',
     'click_to_open', 'remote_policy', 'remote_port', 'remote_token',
     'operator_mode', 'pinned_books', 'setlist',
     'setlist_index', 'session_history', 'session_cursor', 'show_preview',
@@ -247,7 +248,7 @@ def import_settings_subset(settings, data):
                 settings[key] = -1
         elif key in ('operator_mode', 'show_preview', 'auto_rescan', 'startup_tray', 'minimize_to_tray',
                      'keyword_instant', 'book_auto_focus_hymn', 'click_to_open', 'display_duplicate',
-                     'open_overlay'):
+                     'word_auto_fullscreen', 'pdf_auto_fullscreen', 'open_overlay'):
             settings[key] = bool(data[key])
         elif key == 'font_size':
             try:

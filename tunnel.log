@@ -164,3 +164,6 @@
 [2026-07-01 07:52:28] [INFO] tunnel url assigned | mode=service port=8765 url=https://live.churchofgodtm.com/hymn_search
 [2026-07-01 07:52:28] [INFO] tunnel ready | mode=service port=8765 url=https://live.churchofgodtm.com/hymn_search local_dns_ok=True
 [2026-07-01 07:53:55] [INFO] tunnel stop | mode=service port=8765 url=https://live.churchofgodtm.com/hymn_search
+[2026-07-12 10:19:32] [INFO] tunnel start | mode=service port=8765 url=https://live.churchofgodtm.com/hymn_search named_url=https://live.churchofgodtm.com/hymn_search service_installed=False service_running=False use_https=False
+[2026-07-12 10:19:32] [ERROR] cloudflared Windows 服務未安裝。請按「安裝 cloudflared 服務」或以管理員執行。 | mode=service port=8765 url=https://live.churchofgodtm.com/hymn_search
+[2026-07-12 10:20:14] [INFO] tunnel stop | mode=service port=8765 url=https://live.churchofgodtm.com/hymn_search

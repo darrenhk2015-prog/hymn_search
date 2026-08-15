@@ -90,7 +90,10 @@ if ($versionContent -match 'APP_VERSION\s*=\s*(\d+)') {
     --hidden-import hymn_remote.api `
     --hidden-import hymn_remote.web_hymn_map `
     --hidden-import hymn_remote.gdrive_hymn_map `
+    --hidden-import hymn_remote.gdrive_index_build `
     --hidden-import hymn_remote.viewer_hymn_map `
+    --hidden-import hymn_features.gdrive_map_dialog `
+    --hidden-import gdown `
     --hidden-import hymn_remote.server `
     --hidden-import hymn_remote.tunnel `
     --hidden-import uvicorn.logging `

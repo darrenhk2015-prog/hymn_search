@@ -1,5 +1,5 @@
 {
-  "version": 2,
+  "version": 4,
   "hymn_folder": "",
   "theme": "light",
   "font_size": 11,
@@ -7,17 +7,20 @@
   "open_overlay": true,
   "overlay_duration": 10,
   "overlay_mode": "center_then_corner",
+  "overlay_bg_color": "#000000",
+  "overlay_text_color": "#ffffff",
   "display_duplicate": true,
+  "display_switch_mode": "ccd",
   "keyword_instant": true,
   "book_auto_focus_hymn": true,
-  "click_to_open": true,
+  "click_to_open": false,
   "remote_api_enabled": true,
-  "remote_accept": true,
+  "remote_accept": false,
   "remote_port": 8765,
   "remote_use_https": false,
   "remote_policy": "confirm",
   "remote_token": "",
-  "enable_tunnel": true,
+  "enable_tunnel": false,
   "cloudflared_path": "",
   "tunnel_mode": "service",
   "cloudflared_token": "eyJhIjoiY2M5NGFhNzkzZWI5MDlmYTJiNGQwYjRkMzJiZDllYmMiLCJ0IjoiOWJlNjdlODYtZGNiMS00ZDc4LWJhOWItZTFkNjAwYmI3NzBmIiwicyI6Ik5URXdNRGhoTmpNdE56RmxOaTAwWVRCbUxXSmhNR010TW1GbU1XSm1OVFEwTnpFdyJ9",
@@ -47,6 +50,86 @@
   "setlist_index": 0,
   "session_history": [
     {
+      "book": "",
+      "num": "H23-06 在活人之地，祢是我的福分",
+      "label": " · H23-06 在活人之地，祢是我的福分 · P.7"
+    },
+    {
+      "book": "01 神家詩歌",
+      "num": "P005  006 與父相親.doc",
+      "label": "01 神家詩歌 · "
+    },
+    {
+      "book": "01 神家詩歌",
+      "num": "P012  010 主真美好.doc",
+      "label": "01 神家詩歌 · "
+    },
+    {
+      "book": "01 神家詩歌",
+      "num": "P105  111 稱讚前來.doc",
+      "label": "01 神家詩歌 · "
+    },
+    {
+      "book": "01 神家詩歌",
+      "num": "P083  082 祝福.doc",
+      "label": "01 神家詩歌 · "
+    },
+    {
+      "book": "01 神家詩歌",
+      "num": "P006  007 父愛  008  寶貴的阿爸.doc",
+      "label": "01 神家詩歌 · "
+    },
+    {
+      "book": "01 神家詩歌",
+      "num": "P014  012 耶穌是主.doc",
+      "label": "01 神家詩歌 · "
+    },
+    {
+      "book": "01 神家詩歌",
+      "num": "P004  005 天父愛我.doc",
+      "label": "01 神家詩歌 · "
+    },
+    {
+      "book": "S2神家詩歌合訂本2大字拍子版",
+      "num": "132 因信而活_P.232.pdf",
+      "label": "S2神家詩歌合訂本2大字拍子版 · "
+    },
+    {
+      "book": "",
+      "num": "7\t我已奪去父的心",
+      "label": " · 7\t我已奪去父的心 · P.20"
+    },
+    {
+      "book": "S2神家詩歌合訂本2大字拍子版",
+      "num": "103 羔羊的血_P.176.pdf",
+      "label": "S2神家詩歌合訂本2大字拍子版 · "
+    },
+    {
+      "book": "",
+      "num": "5\t我最真實的阿爸",
+      "label": " · 5\t我最真實的阿爸 · P.17"
+    },
+    {
+      "book": "",
+      "num": "3\t父子聖靈的愛河",
+      "label": " · 3\t父子聖靈的愛河 · P.24"
+    },
+    {
+      "book": "",
+      "num": "22\t良人的愛",
+      "label": " · 22\t良人的愛 · P.52"
+    },
+    {
+      "book": "01 神家詩歌",
+      "num": "P002  002 可敬可親紳 003 宇宙講故事.doc",
+      "label": "01 神家詩歌 · "
+    },
+    {
+      "book": "01 神家詩歌",
+      "num": "P003  004 哈哈歌.doc",
+      "label": "01 神家詩歌 · "
+    },
+    {
       "book": "神家詩歌合訂本2大字拍子版",
       "num": "106 血的至情_P.182.pdf",
       "label": "神家詩歌合訂本2大字拍子版 · "
@@ -68,22 +151,7 @@
     },
     {
       "book": "01 神家詩歌",
-      "num": "P003  004 哈哈歌.doc",
-      "label": "01 神家詩歌 · "
-    },
-    {
-      "book": "01 神家詩歌",
       "num": "P001  001 父的名.doc",
-      "label": "01 神家詩歌 · "
-    },
-    {
-      "book": "01 神家詩歌",
-      "num": "P005  006 與父相親.doc",
-      "label": "01 神家詩歌 · "
-    },
-    {
-      "book": "01 神家詩歌",
-      "num": "P006  007 父愛  008  寶貴的阿爸.doc",
       "label": "01 神家詩歌 · "
     },
     {
@@ -222,11 +290,6 @@
       "label": "08 神家詩歌 · "
     },
     {
-      "book": "01 神家詩歌",
-      "num": "P004  005 天父愛我.doc",
-      "label": "01 神家詩歌 · "
-    },
-    {
       "book": "13 神家詩歌",
       "num": "P52.真良人萬般的情愛.docx",
       "label": "13 神家詩歌 · "
@@ -235,66 +298,6 @@
       "book": "",
       "num": "79\t萬物復興的前奏",
       "label": " · 79\t萬物復興的前奏 · P.146"
-    },
-    {
-      "book": "",
-      "num": "44\t萬古之先的恩典",
-      "label": " · 44\t萬古之先的恩典 · P.93"
-    },
-    {
-      "book": "01 神家詩歌",
-      "num": "P056  053 信心前征.doc",
-      "label": "01 神家詩歌 · "
-    },
-    {
-      "book": "05 神家詩歌",
-      "num": "P02  耶和華尼西.doc",
-      "label": "05 神家詩歌 · P02  耶和華尼西.doc"
-    },
-    {
-      "book": "S1神家詩歌合訂本1大字拍子版",
-      "num": "2\t祢這份愛",
-      "label": "S1神家詩歌合訂本1大字拍子版 · 2\t祢這份愛 · P.21"
-    },
-    {
-      "book": "S1神家詩歌合訂本1大字拍子版",
-      "num": "1\t祢這份愛",
-      "label": "S1神家詩歌合訂本1大字拍子版 · 1\t祢這份愛 · P.18"
-    },
-    {
-      "book": "01 神家詩歌",
-      "num": "P001  001 父的名.doc",
-      "label": "01 神家詩歌 · P001  001 父的名.doc"
-    },
-    {
-      "book": "01 神家詩歌",
-      "num": "P002  002 可敬可親紳 003 宇宙講故事.doc",
-      "label": "01 神家詩歌 · P002  002 可敬可親紳 003 宇宙講故事.doc"
-    },
-    {
-      "book": "12 神家詩歌",
-      "num": "P44.永遠愛的傷痕.docx",
-      "label": "12 神家詩歌 · P44.永遠愛的傷痕.docx"
-    },
-    {
-      "book": "08 神家詩歌",
-      "num": "P02  天地情深.doc",
-      "label": "08 神家詩歌 · P02  天地情深.doc"
-    },
-    {
-      "book": "",
-      "num": "9\t獨行奇事的阿爸",
-      "label": " · 9\t獨行奇事的阿爸 · P.23"
-    },
-    {
-      "book": "11 神家詩歌",
-      "num": "P006   活在父子聖靈的愛圈.doc",
-      "label": "11 神家詩歌 · "
-    },
-    {
-      "book": "08 神家詩歌",
-      "num": "P04  最深親情！最高父愛！.doc",
-      "label": "08 神家詩歌 · P04  最深親情！最高父愛！.doc"
     }
   ],
   "session_cursor": 0,
@@ -302,15 +305,15 @@
   "auto_rescan": true,
   "startup_tray": false,
   "minimize_to_tray": false,
-  "last_opened": "神家詩歌合訂本2大字拍子版 · ",
-  "show_qr_code": true,
-  "qr_x": 1400,
+  "last_opened": " · H23-06 在活人之地，祢是我的福分 · P.7",
+  "show_qr_code": false,
+  "qr_x": 1401,
   "qr_y": 750,
   "qr_width": 180,
   "qr_height": 180,
   "qr_caption": "掃碼下載",
   "qr_bg_color": "#000000",
-  "qr_text_color": "",
+  "qr_text_color": "#ffffff",
   "qr_text_size": 12,
   "qr_bg_opacity": 20
 }
