@@ -1,32 +1,42 @@
 {
-  "version": 4,
+  "version": 5,
   "hymn_folder": "",
   "theme": "light",
-  "font_size": 11,
+  "font_size": 12,
+  "senior_mode": false,
+  "senior_snapshot": null,
   "search_mode": "book",
-  "open_overlay": true,
+  "open_overlay": false,
   "overlay_duration": 10,
   "overlay_mode": "center_then_corner",
   "overlay_bg_color": "#000000",
   "overlay_text_color": "#ffffff",
-  "display_duplicate": true,
+  "display_duplicate": false,
   "display_switch_mode": "ccd",
+  "word_auto_fullscreen": false,
+  "pdf_auto_fullscreen": false,
   "keyword_instant": true,
   "book_auto_focus_hymn": true,
+  "hymn_num_mode": "exact",
   "click_to_open": false,
   "remote_api_enabled": true,
-  "remote_accept": false,
-  "remote_port": 8765,
+  "remote_accept": true,
+  "remote_port": 8758,
   "remote_use_https": false,
-  "remote_policy": "confirm",
+  "remote_policy": "auto_single",
   "remote_token": "",
-  "enable_tunnel": false,
+  "enable_tunnel": true,
+  "enable_tunnel_fixed": false,
+  "enable_tunnel_quick": true,
   "cloudflared_path": "",
-  "tunnel_mode": "service",
+  "tunnel_mode": "quick",
   "cloudflared_token": "eyJhIjoiY2M5NGFhNzkzZWI5MDlmYTJiNGQwYjRkMzJiZDllYmMiLCJ0IjoiOWJlNjdlODYtZGNiMS00ZDc4LWJhOWItZTFkNjAwYmI3NzBmIiwicyI6Ik5URXdNRGhoTmpNdE56RmxOaTAwWVRCbUxXSmhNR010TW1GbU1XSm1OVFEwTnpFdyJ9",
   "named_tunnel_url": "https://live.churchofgodtm.com/hymn_search/",
   "remote_path_prefix": "/hymn_search",
-  "viewer_show_debug": false,
+  "viewer_show_debug": true,
+  "gdrive_folder_id": "18uMCSYNDgipvGzHwlhyMcxrBaAcjChSZ",
+  "gdrive_s1_folder_id": "1lfLpXlPE5CX-RaGcchEOOAzSnoG-_f4Z",
+  "gdrive_s2_folder_id": "1_KLEv2ERzail3ZQ-aNEr4Ygh6K-T8AwV",
   "operator_mode": true,
   "pinned_books": [],
   "setlist": [
@@ -49,6 +59,46 @@
   ],
   "setlist_index": 0,
   "session_history": [
+    {
+      "book": "01 神家詩歌",
+      "num": "P004  005 天父愛我.doc",
+      "label": "01 神家詩歌 · "
+    },
+    {
+      "book": "06 神家詩歌",
+      "num": "P03   賜各樣安慰的父神.doc",
+      "label": "06 神家詩歌 · "
+    },
+    {
+      "book": "01 神家詩歌",
+      "num": "P003  004 哈哈歌.doc",
+      "label": "01 神家詩歌 · "
+    },
+    {
+      "book": "02 神家詩歌",
+      "num": "P24  歡呼 ！ 永恆的春天.doc",
+      "label": "02 神家詩歌 · "
+    },
+    {
+      "book": "",
+      "num": "H22-47 我的良人白而且紅，超乎萬人之上",
+      "label": " · H22-47 我的良人白而且紅，超乎萬人之上 · P.48"
+    },
+    {
+      "book": "01 神家詩歌",
+      "num": "P062  061 在你面前.doc",
+      "label": "01 神家詩歌 · "
+    },
+    {
+      "book": "S2神家詩歌合訂本2大字拍子版",
+      "num": "152 同走永生的道路_P.266.pdf",
+      "label": "S2神家詩歌合訂本2大字拍子版 · "
+    },
+    {
+      "book": "05 神家詩歌",
+      "num": "P68  永恆的主宰.doc",
+      "label": "05 神家詩歌 · "
+    },
     {
       "book": "",
       "num": "H23-06 在活人之地，祢是我的福分",
@@ -85,11 +135,6 @@
       "label": "01 神家詩歌 · "
     },
     {
-      "book": "01 神家詩歌",
-      "num": "P004  005 天父愛我.doc",
-      "label": "01 神家詩歌 · "
-    },
-    {
       "book": "S2神家詩歌合訂本2大字拍子版",
       "num": "132 因信而活_P.232.pdf",
       "label": "S2神家詩歌合訂本2大字拍子版 · "
@@ -122,11 +167,6 @@
     {
       "book": "01 神家詩歌",
       "num": "P002  002 可敬可親紳 003 宇宙講故事.doc",
-      "label": "01 神家詩歌 · "
-    },
-    {
-      "book": "01 神家詩歌",
-      "num": "P003  004 哈哈歌.doc",
       "label": "01 神家詩歌 · "
     },
     {
@@ -268,36 +308,6 @@
       "book": "03 神家詩歌",
       "num": "P27  心被恩感.doc",
       "label": "03 神家詩歌 · "
-    },
-    {
-      "book": "03 神家詩歌",
-      "num": "P05  虛己與高升.doc",
-      "label": "03 神家詩歌 · "
-    },
-    {
-      "book": "16 神家詩歌",
-      "num": "08.七星、七燈臺的奧祕.docx",
-      "label": "16 神家詩歌 · "
-    },
-    {
-      "book": "13 神家詩歌",
-      "num": "P18.主的愛夢.doc",
-      "label": "13 神家詩歌 · "
-    },
-    {
-      "book": "08 神家詩歌",
-      "num": "P08  主的父竟是我的父.doc",
-      "label": "08 神家詩歌 · "
-    },
-    {
-      "book": "13 神家詩歌",
-      "num": "P52.真良人萬般的情愛.docx",
-      "label": "13 神家詩歌 · "
-    },
-    {
-      "book": "",
-      "num": "79\t萬物復興的前奏",
-      "label": " · 79\t萬物復興的前奏 · P.146"
     }
   ],
   "session_cursor": 0,
@@ -305,10 +315,14 @@
   "auto_rescan": true,
   "startup_tray": false,
   "minimize_to_tray": false,
-  "last_opened": " · H23-06 在活人之地，祢是我的福分 · P.7",
+  "last_opened": "01 神家詩歌 · ",
   "show_qr_code": false,
-  "qr_x": 1401,
-  "qr_y": 750,
+  "show_qr_lan": false,
+  "show_qr_fixed": false,
+  "show_qr_quick": false,
+  "show_qr_wan": false,
+  "qr_x": 1400,
+  "qr_y": 744,
   "qr_width": 180,
   "qr_height": 180,
   "qr_caption": "掃碼下載",

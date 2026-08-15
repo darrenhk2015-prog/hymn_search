@@ -59,7 +59,9 @@ def create_app(state: RemoteControlState, path_prefix: str = '') -> FastAPI:
     @app.get('/api/entries')
     def entries(book: str, q: str = '', x_api_token: str = Header(default='')):
         _check_token(x_api_token)
-        return list_entries_for_book(state.get_books(), book, q)
+        return list_entries_for_book(
+            state.get_books(), book, q, num_mode=state.get_hymn_num_mode(),
+        )
 
     @app.post('/api/open')
     def open_item(body: OpenRequest, request: Request, x_api_token: str = Header(default='')):

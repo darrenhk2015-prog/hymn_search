@@ -417,6 +417,7 @@ def diagnose_tunnel_probe(
     local_port: int = DEFAULT_PORT,
     timeout: float = 8.0,
     use_https: bool = False,
+    tunnel_mode: str = "service",
 ) -> str | None:
     """Return a specific failure hint, or None if the tunnel health endpoint looks OK."""
     host = _hostname_from_url(url)
@@ -430,17 +431,25 @@ def diagnose_tunnel_probe(
 
     body_l = body.lower()
     cf_code = "1033" if "1033" in body or "error code: 1033" in body_l else str(status or "")
+    is_quick = tunnel_mode == "quick" or "trycloudflare.com" in host.lower()
     if status in (530, 502, 504) or "1033" in body or "error code: 1033" in body_l:
         if not use_https:
             if not wait_for_local_server(local_port, timeout=2.0, use_https=False):
                 return (
-                    "本機 HTTP API 未啟動。請勾選「啟用 API」、取消「本機 API 用 HTTPS」，再 Start Session。"
+                    "本機 HTTP API 未啟動。請勾選「啟用 API」後再試。"
+                )
+            if is_quick:
+                return (
+                    f"本機 HTTP 正常，但快速通道回 error {cf_code}。"
+                    "請關閉後重新啟用「隨機網址」取得新連結；"
+                    "詳情見 exe 旁 cloudflared-tunnel.log。"
+                    "（快速通道無需設定 Zero Trust Public Hostname。）"
                 )
             mismatch = diagnose_cloudflared_origin_mismatch(local_port, use_https=False)
             if mismatch:
                 return mismatch
             return (
-                f"本機 HTTP 正常，但 Cloudflare 回 error {cf_code}。"
+                f"本機 HTTP 正常，但固定外網回 error {cf_code}。"
                 f"{_origin_setup_hint(local_port, tunnel_url_path_prefix(url) or '/hymn_search')}"
                 "儲存後以管理員執行：net stop cloudflared && net start cloudflared。"
             )
@@ -462,6 +471,11 @@ def diagnose_tunnel_probe(
         hint = detect_https_origin_misconfiguration(local_port, use_https=use_https)
         if hint:
             return f"Cloudflare 無法連接本機 API（error 1033）。{hint}"
+        if is_quick:
+            return (
+                f"快速通道無法連接本機 API（error {cf_code or '1033'}）。"
+                "請確認已啟用 API，然後重新啟用隨機網址。"
+            )
         return (
             f"Cloudflare 無法連接本機 API（error 1033）。"
             f"{_origin_setup_hint(local_port, tunnel_url_path_prefix(url) or '/hymn_search')}"
@@ -474,6 +488,11 @@ def diagnose_tunnel_probe(
     if status is None:
         host = _hostname_from_url(url)
         if host and not public_dns_resolves(host):
+            if is_quick:
+                return (
+                    f"DNS 無法解析 {host}。"
+                    "請換網路／用手機流量再試，或重新啟用「隨機網址」。"
+                )
             return (
                 f"DNS 無法解析 {host}（域名不存在）。"
                 "請在 Cloudflare → churchofgodtm.com → DNS 新增 CNAME："
@@ -500,7 +519,16 @@ def probe_tunnel_url(url: str, timeout: float = 8.0) -> bool:
     return False
 
 
-def _query_cloudflared_service() -> tuple[int, str]:
+_SERVICE_QUERY_CACHE: tuple[float, int, str] | None = None
+_SERVICE_QUERY_TTL_S = 20.0
+
+
+def _query_cloudflared_service(force: bool = False) -> tuple[int, str]:
+    global _SERVICE_QUERY_CACHE
+    if not force and _SERVICE_QUERY_CACHE is not None:
+        ts, code, output = _SERVICE_QUERY_CACHE
+        if time.time() - ts < _SERVICE_QUERY_TTL_S:
+            return code, output
     if not sys.platform.startswith("win"):
         return 1, ""
     flags = subprocess.CREATE_NO_WINDOW if sys.platform.startswith("win") else 0
@@ -513,19 +541,28 @@ def _query_cloudflared_service() -> tuple[int, str]:
             creationflags=flags,
         )
     except (OSError, subprocess.TimeoutExpired):
-        return 1, ""
-    return proc.returncode, f"{proc.stdout}\n{proc.stderr}"
+        result = (1, "")
+        _SERVICE_QUERY_CACHE = (time.time(), *result)
+        return result
+    result = (proc.returncode, f"{proc.stdout}\n{proc.stderr}")
+    _SERVICE_QUERY_CACHE = (time.time(), *result)
+    return result
 
 
-def is_cloudflared_service_installed() -> bool:
+def invalidate_cloudflared_service_cache() -> None:
+    global _SERVICE_QUERY_CACHE
+    _SERVICE_QUERY_CACHE = None
+
+
+def is_cloudflared_service_installed(force: bool = False) -> bool:
     """Return True if the cloudflared Windows service is registered."""
-    code, output = _query_cloudflared_service()
+    code, output = _query_cloudflared_service(force=force)
     return code == 0 and "STATE" in output
 
 
-def is_cloudflared_service_running() -> bool:
+def is_cloudflared_service_running(force: bool = False) -> bool:
     """Return True if the cloudflared Windows service is in RUNNING state."""
-    code, output = _query_cloudflared_service()
+    code, output = _query_cloudflared_service(force=force)
     if code != 0:
         return False
     return re.search(r"STATE\s+:\s+\d+\s+RUNNING", output) is not None
@@ -596,6 +633,7 @@ def install_cloudflared_service(token: str, cloudflared_path: str = "") -> tuple
 
     output = f"{proc.stdout}\n{proc.stderr}".strip()
     if proc.returncode == 0:
+        invalidate_cloudflared_service_cache()
         append_tunnel_log("INFO", "cloudflared Windows service installed", detail=output[:500])
         return True, output or "cloudflared service installed"
     if "access is denied" in output.lower() or "administrator" in output.lower():
@@ -890,7 +928,13 @@ class CloudflareTunnel:
             self._log_handle = None
 
     def _watch_log(self) -> None:
+        # Only scan new lines — previous sessions leave trycloudflare.com URLs in the log.
         last_pos = 0
+        if self._log_path and self._log_path.exists():
+            try:
+                last_pos = self._log_path.stat().st_size
+            except OSError:
+                last_pos = 0
         deadline = time.time() + 60
         while not self._stop.is_set() and self.is_running() and time.time() < deadline:
             if self._log_path and self._log_path.exists():
@@ -915,7 +959,9 @@ class CloudflareTunnel:
                     logger.debug("Tunnel log read: %s", exc)
             time.sleep(0.4)
 
-        if not self.public_url and not self._stop.is_set():
+        if self._stop.is_set():
+            return
+        if not self.public_url:
             self._emit_error("Tunnel URL not received — check tunnel.log and cloudflared-tunnel.log")
         elif self._proc and self._proc.poll() not in (None, 0):
             self._emit_error("Cloudflare tunnel exited before URL was ready")
@@ -925,7 +971,8 @@ class CloudflareTunnel:
         deadline = time.time() + 60
         while time.time() < deadline and not self._stop.is_set():
             if self.tunnel_mode != "service" and not self.is_running():
-                self._emit_error(self._startup_failure_message())
+                if not self._stop.is_set():
+                    self._emit_error(self._startup_failure_message())
                 return
             host = _hostname_from_url(url)
             if host and probe_tunnel_url(url):
@@ -944,7 +991,30 @@ class CloudflareTunnel:
                 return
             time.sleep(2)
 
-        hint = diagnose_tunnel_probe(url, self.local_port, use_https=self.use_https)
+        if self._stop.is_set():
+            return
+        # Quick tunnels have no Zero Trust Public Hostname — keep the hint mode-aware.
+        if self.tunnel_mode == "quick":
+            hint = diagnose_tunnel_probe(
+                url,
+                self.local_port,
+                use_https=self.use_https,
+                tunnel_mode="quick",
+            )
+            self._emit_error(
+                hint
+                or (
+                    "快速通道網址未能就緒（請稍候再試，或檢查 exe 旁 cloudflared-tunnel.log）。"
+                    "若本機已裝 cloudflared Windows 服務，可先停服務再試快速通道。"
+                )
+            )
+            return
+        hint = diagnose_tunnel_probe(
+            url,
+            self.local_port,
+            use_https=self.use_https,
+            tunnel_mode=self.tunnel_mode,
+        )
         origin_hint = detect_https_origin_misconfiguration(self.local_port, use_https=self.use_https)
         if origin_hint:
             self._log_event("ERROR", origin_hint, probe=hint or "")

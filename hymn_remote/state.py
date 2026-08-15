@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from typing import Callable, Optional
 
 from .operation_log import RemoteOperationLog
+from .resolver import HYMN_NUM_MODE_CONTAINS, HYMN_NUM_MODE_EXACT
 
 
 DEFAULT_PORT = 8765
@@ -44,7 +45,19 @@ class RemoteControlState:
             'book': '', 'num': '', 'label': '',
             'code': '', 'web_url': '', 'title': '', 'mapped': False, 'ts': 0.0,
         }
+        self.hymn_num_mode = HYMN_NUM_MODE_CONTAINS
         self.viewer_show_debug = False
+
+    def set_hymn_num_mode(self, mode):
+        mode = str(mode or HYMN_NUM_MODE_CONTAINS).strip().lower()
+        with self._lock:
+            self.hymn_num_mode = mode if mode in (
+                HYMN_NUM_MODE_CONTAINS, HYMN_NUM_MODE_EXACT,
+            ) else HYMN_NUM_MODE_CONTAINS
+
+    def get_hymn_num_mode(self):
+        with self._lock:
+            return self.hymn_num_mode
 
     def set_handlers(
         self,
@@ -171,7 +184,9 @@ class RemoteControlState:
         from .resolver import resolve_open_request, summarize_match
 
         books = self.get_books()
-        matches = resolve_open_request(books, book_ref, num_ref)
+        matches = resolve_open_request(
+            books, book_ref, num_ref, num_mode=self.get_hymn_num_mode(),
+        )
         if not matches:
             return {
                 'status': 'not_found',

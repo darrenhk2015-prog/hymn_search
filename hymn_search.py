@@ -97,6 +97,7 @@ from hymn_remote.gdrive_index_build import (
 )
 from hymn_remote.gdrive_hymn_map import ensure_external_index, get_index_info
 from hymn_remote.resolver import (
+    HYMN_NUM_MODE_CONTAINS, HYMN_NUM_MODE_EXACT, HYMN_NUM_MODES,
     resolve_books, resolve_targets, resolve_open_request,
     list_entries_for_book, summarize_match,
 )
@@ -239,11 +240,12 @@ QCheckBox::indicator:checked {{
 
 def build_book_list_style(theme, fs):
     t = THEMES[theme]
+    pad = 14 if fs >= 20 else 9
     return f"""
 QListWidget {{ background: transparent; border: none; outline: none; font-size: {fs}px; }}
 QListWidget::item {{
-    padding: 9px 10px; color: {t['text2']};
-    border-radius: 8px; margin: 1px 3px;
+    padding: {pad}px 12px; color: {t['text2']};
+    border-radius: 8px; margin: 2px 3px;
 }}
 QListWidget::item:hover {{ background: {t['panel2']}; color: {t['text']}; }}
 QListWidget::item:selected {{ background: {t['accent']}; color: {t['a_text']}; }}
@@ -252,15 +254,32 @@ QListWidget::item:selected {{ background: {t['accent']}; color: {t['a_text']}; }
 
 def build_file_list_style(theme, fs):
     t = THEMES[theme]
+    pad = 14 if fs >= 20 else 8
     return f"""
 QListWidget {{ background: transparent; border: none; outline: none; font-size: {fs}px; }}
 QListWidget::item {{
-    padding: 8px 10px; color: {t['text']};
-    border-radius: 8px; margin: 1px 3px;
+    padding: {pad}px 12px; color: {t['text']};
+    border-radius: 8px; margin: 2px 3px;
 }}
 QListWidget::item:hover {{ background: {t['panel2']}; }}
 QListWidget::item:selected {{ background: {t['a_sub']}; color: {t['accent']}; }}
 """
+
+
+# 簡易版 — 大字、簡化介面
+SENIOR_FONT_SIZE = 22
+FONT_SIZE_MIN = 10
+FONT_SIZE_MAX = 28
+SENIOR_SIDEBAR_W = 320
+SENIOR_INPUT_H = 56
+SENIOR_BTN_W = 120
+NORMAL_SIDEBAR_W = 240
+NORMAL_INPUT_H = 40
+NORMAL_FILTER_BTN_W = 84
+NORMAL_HEADER_H = 48
+SENIOR_HEADER_H = 56
+NORMAL_SIDEBAR_HDR_H = 46
+SENIOR_SIDEBAR_HDR_H = 56
 
 
 # ══════════════════════════════════════════════════════════════
@@ -845,12 +864,13 @@ DEFAULT_QR_DESKTOP_SIZE = 140
 DEFAULT_QR_X = 24
 DEFAULT_QR_Y = 24
 DEFAULT_QR_WIDTH = 220
-DEFAULT_QR_HEIGHT = 268
+DEFAULT_QR_HEIGHT = 300
 DEFAULT_QR_CAPTION = '掃碼觀看'
 DEFAULT_QR_BG_COLOR = '#ffffff'
 DEFAULT_QR_TEXT_COLOR = ''
-DEFAULT_QR_TEXT_SIZE = 12
+DEFAULT_QR_TEXT_SIZE = 11
 DEFAULT_QR_BG_OPACITY = 88
+DEFAULT_QR_STACK_GAP = 12
 
 SETTINGS_VERSION = 5
 
@@ -861,6 +881,8 @@ def default_settings():
         'hymn_folder': '',
         'theme': 'dark',
         'font_size': 13,
+        'senior_mode': False,
+        'senior_snapshot': None,
         'search_mode': 'book',
         'open_overlay': True,
         'overlay_duration': DEFAULT_OVERLAY_SECS,
@@ -873,6 +895,7 @@ def default_settings():
         'pdf_auto_fullscreen': False,
         'keyword_instant': True,
         'book_auto_focus_hymn': True,
+        'hymn_num_mode': HYMN_NUM_MODE_CONTAINS,
         'click_to_open': False,
         'remote_api_enabled': False,
         'remote_accept': False,
@@ -881,6 +904,8 @@ def default_settings():
         'remote_policy': OPEN_POLICY_AUTO,
         'remote_token': '',
         'enable_tunnel': False,
+        'enable_tunnel_fixed': False,
+        'enable_tunnel_quick': False,
         'cloudflared_path': '',
         'tunnel_mode': 'service',
         'cloudflared_token': (
@@ -906,6 +931,10 @@ def default_settings():
         'minimize_to_tray': False,
         'last_opened': '',
         'show_qr_code': False,
+        'show_qr_lan': True,
+        'show_qr_fixed': True,
+        'show_qr_quick': True,
+        'show_qr_wan': True,
         'qr_x': DEFAULT_QR_X,
         'qr_y': DEFAULT_QR_Y,
         'qr_width': DEFAULT_QR_WIDTH,
@@ -928,10 +957,27 @@ def normalize_settings(raw):
                 merged[key] = raw[key]
     if merged['theme'] not in THEMES:
         merged['theme'] = 'dark'
+    merged['senior_mode'] = bool(merged.get('senior_mode'))
+    snap = merged.get('senior_snapshot')
+    if isinstance(snap, dict):
+        clean = {}
+        if snap.get('theme') in THEMES:
+            clean['theme'] = snap['theme']
+        try:
+            clean['font_size'] = max(FONT_SIZE_MIN, min(FONT_SIZE_MAX, int(snap['font_size'])))
+        except (TypeError, ValueError, KeyError):
+            pass
+        if 'click_to_open' in snap:
+            clean['click_to_open'] = bool(snap['click_to_open'])
+        if snap.get('search_mode') in ('book', 'global', 'keyword', 'schedule'):
+            clean['search_mode'] = snap['search_mode']
+        merged['senior_snapshot'] = clean or None
+    else:
+        merged['senior_snapshot'] = None
     try:
-        merged['font_size'] = max(10, min(18, int(merged['font_size'])))
+        merged['font_size'] = max(FONT_SIZE_MIN, min(FONT_SIZE_MAX, int(merged['font_size'])))
     except (TypeError, ValueError):
-        merged['font_size'] = 13
+        merged['font_size'] = SENIOR_FONT_SIZE if merged['senior_mode'] else 13
     if merged['search_mode'] not in ('book', 'global', 'keyword', 'schedule'):
         merged['search_mode'] = 'book'
     merged['open_overlay'] = bool(merged['open_overlay'])
@@ -959,6 +1005,8 @@ def normalize_settings(raw):
     merged['pdf_auto_fullscreen'] = bool(merged.get('pdf_auto_fullscreen', False))
     merged['keyword_instant'] = bool(merged['keyword_instant'])
     merged['book_auto_focus_hymn'] = bool(merged['book_auto_focus_hymn'])
+    mode = str(merged.get('hymn_num_mode') or HYMN_NUM_MODE_CONTAINS).strip().lower()
+    merged['hymn_num_mode'] = mode if mode in HYMN_NUM_MODES else HYMN_NUM_MODE_CONTAINS
     merged['click_to_open'] = bool(merged['click_to_open'])
     merged['remote_api_enabled'] = bool(merged['remote_api_enabled'])
     merged['remote_accept'] = bool(merged['remote_accept'])
@@ -970,12 +1018,34 @@ def normalize_settings(raw):
         merged['remote_policy'] = OPEN_POLICY_AUTO
     merged['remote_token'] = str(merged['remote_token'] or '')
     merged['remote_use_https'] = False
-    merged['enable_tunnel'] = bool(merged.get('enable_tunnel'))
     merged['cloudflared_path'] = str(merged.get('cloudflared_path') or '')
     if merged.get('tunnel_mode') == 'named':
         merged['tunnel_mode'] = 'service'
     if merged.get('tunnel_mode') not in ('quick', 'service'):
         merged['tunnel_mode'] = 'service'
+    raw_dict = raw if isinstance(raw, dict) else {}
+    if 'enable_tunnel_fixed' not in raw_dict and 'enable_tunnel_quick' not in raw_dict:
+        # Migrate legacy single enable_tunnel + tunnel_mode.
+        et = bool(merged.get('enable_tunnel'))
+        if et and merged.get('tunnel_mode') == 'quick':
+            merged['enable_tunnel_fixed'] = False
+            merged['enable_tunnel_quick'] = True
+        elif et:
+            merged['enable_tunnel_fixed'] = True
+            merged['enable_tunnel_quick'] = False
+        else:
+            merged['enable_tunnel_fixed'] = False
+            merged['enable_tunnel_quick'] = False
+    else:
+        merged['enable_tunnel_fixed'] = bool(merged.get('enable_tunnel_fixed'))
+        merged['enable_tunnel_quick'] = bool(merged.get('enable_tunnel_quick'))
+    merged['enable_tunnel'] = bool(
+        merged['enable_tunnel_fixed'] or merged['enable_tunnel_quick']
+    )
+    if merged['enable_tunnel_fixed']:
+        merged['tunnel_mode'] = 'service'
+    elif merged['enable_tunnel_quick']:
+        merged['tunnel_mode'] = 'quick'
     merged['cloudflared_token'] = str(merged.get('cloudflared_token') or '')
     merged['named_tunnel_url'] = str(merged.get('named_tunnel_url') or '').strip()
     if merged['named_tunnel_url'].startswith('http://') and '.trycloudflare.com' not in merged['named_tunnel_url']:
@@ -1028,6 +1098,26 @@ def normalize_settings(raw):
     merged['minimize_to_tray'] = bool(merged.get('minimize_to_tray'))
     merged['last_opened'] = str(merged.get('last_opened') or '')
     merged['show_qr_code'] = bool(merged.get('show_qr_code'))
+    if isinstance(raw, dict) and 'show_qr_lan' not in raw and 'show_qr_code' in raw:
+        merged['show_qr_lan'] = bool(raw.get('show_qr_code'))
+    else:
+        merged['show_qr_lan'] = bool(merged.get('show_qr_lan', True))
+    if isinstance(raw, dict) and 'show_qr_fixed' not in raw and 'show_qr_quick' not in raw:
+        wan_flag = None
+        if 'show_qr_wan' in raw:
+            wan_flag = bool(raw.get('show_qr_wan'))
+        elif 'show_qr_code' in raw:
+            wan_flag = bool(raw.get('show_qr_code'))
+        if wan_flag is None:
+            wan_flag = True
+        merged['show_qr_fixed'] = wan_flag
+        merged['show_qr_quick'] = wan_flag
+    else:
+        merged['show_qr_fixed'] = bool(merged.get('show_qr_fixed', True))
+        merged['show_qr_quick'] = bool(merged.get('show_qr_quick', True))
+    merged['show_qr_wan'] = bool(
+        merged.get('show_qr_fixed') or merged.get('show_qr_quick')
+    )
     try:
         merged['qr_x'] = max(0, min(3840, int(merged.get('qr_x', DEFAULT_QR_X))))
     except (TypeError, ValueError):
@@ -1741,11 +1831,20 @@ def _qcolor_with_opacity(hex_color, opacity_pct):
     return c
 
 
-def _desktop_qr_render_size(card_w, card_h, has_caption, text_size=DEFAULT_QR_TEXT_SIZE):
-    """QR 像素邊長（緊湊內距、QR 佔比更大）。"""
+def _desktop_qr_caption_height(caption, text_size=DEFAULT_QR_TEXT_SIZE):
+    text = str(caption or '').strip()
+    if not text:
+        return 0
+    lines = max(1, text.count('\n') + 1)
+    line_h = max(14, int(text_size) + 4)
+    return lines * line_h + 6
+
+
+def _desktop_qr_render_size(card_w, card_h, caption='', text_size=DEFAULT_QR_TEXT_SIZE):
+    """QR 像素邊長（緊湊內距；caption 可含多行網址）。"""
     pad_x, pad_top, pad_bottom, spacing = 3, 3, 2, 2
-    caption_h = max(18, int(text_size) + 10) if has_caption else 0
-    if not has_caption:
+    caption_h = _desktop_qr_caption_height(caption, text_size)
+    if caption_h <= 0:
         spacing = 0
     inner_w = max(56, int(card_w) - 2 * pad_x)
     inner_h = max(
@@ -1896,7 +1995,7 @@ class _DesktopQrPanel(QWidget):
             self._caption_label.setFixedWidth(max(80, self._card_w - 2 * self._PAD_X))
 
         qr_size = _desktop_qr_render_size(
-            self._card_w, self._card_h, bool(caption_text), self._text_size,
+            self._card_w, self._card_h, caption_text, self._text_size,
         )
         scaled = pixmap.scaled(
             qr_size, qr_size,
@@ -1938,10 +2037,16 @@ class _DesktopQrPanel(QWidget):
 
 
 class DesktopQrOverlay:
-    """管理各螢幕桌面 QR Code 浮層（延伸畫面每屏各顯示；同步複製時僅主螢幕）。"""
+    """管理各螢幕桌面 QR Code 浮層（可同時顯示內網／外網；每屏各一組）。"""
 
-    _panels = []
-    _cached = None
+    _roles = {}
+
+    @classmethod
+    def _state(cls, role):
+        role = str(role or 'default')
+        if role not in cls._roles:
+            cls._roles[role] = {'panels': [], 'cached': None}
+        return cls._roles[role]
 
     @classmethod
     def _target_screens(cls, duplicate_only=False):
@@ -1952,18 +2057,19 @@ class DesktopQrOverlay:
         return screens
 
     @classmethod
-    def _sync_panels(cls, duplicate_only=False):
+    def _sync_panels(cls, role, duplicate_only=False):
+        st = cls._state(role)
         screens = cls._target_screens(duplicate_only)
         screen_set = set(screens)
-        for panel in list(cls._panels):
+        for panel in list(st['panels']):
             if panel._screen not in screen_set:
                 panel.hide_qr()
                 panel.deleteLater()
-                cls._panels.remove(panel)
-        by_screen = {p._screen: p for p in cls._panels}
+                st['panels'].remove(panel)
+        by_screen = {p._screen: p for p in st['panels']}
         for screen in screens:
             if screen not in by_screen:
-                cls._panels.append(_DesktopQrPanel(screen))
+                st['panels'].append(_DesktopQrPanel(screen))
 
     @classmethod
     def _apply_to_panel(cls, panel, cached):
@@ -1981,9 +2087,10 @@ class DesktopQrOverlay:
         )
 
     @classmethod
-    def show_qr(cls, pixmap, caption, style, x, y, width, height):
+    def show_qr(cls, pixmap, caption, style, x, y, width, height, role='default'):
         style = style or {}
-        cls._cached = {
+        st = cls._state(role)
+        st['cached'] = {
             'pixmap': pixmap,
             'caption': caption,
             'bg_color': style.get('bg_color', DEFAULT_QR_BG_COLOR),
@@ -1995,51 +2102,54 @@ class DesktopQrOverlay:
             'width': width,
             'height': height,
         }
-        cls._sync_panels(duplicate_only=False)
-        for panel in cls._panels:
-            cls._apply_to_panel(panel, cls._cached)
+        cls._sync_panels(role, duplicate_only=False)
+        for panel in st['panels']:
+            cls._apply_to_panel(panel, st['cached'])
 
     @classmethod
-    def reposition(cls, x, y, width=None, height=None):
-        if cls._cached:
-            cls._cached['x'] = x
-            cls._cached['y'] = y
+    def reposition(cls, x, y, width=None, height=None, role='default'):
+        st = cls._state(role)
+        if st['cached']:
+            st['cached']['x'] = x
+            st['cached']['y'] = y
             if width is not None:
-                cls._cached['width'] = width
+                st['cached']['width'] = width
             if height is not None:
-                cls._cached['height'] = height
-        if cls._cached and width is not None and height is not None and cls._panels:
-            cached = cls._cached
-            cached['x'] = x
-            cached['y'] = y
-            cached['width'] = width
-            cached['height'] = height
-            for panel in cls._panels:
+                st['cached']['height'] = height
+        if st['cached'] and width is not None and height is not None and st['panels']:
+            cached = st['cached']
+            for panel in st['panels']:
                 if panel.isVisible():
                     cls._apply_to_panel(panel, cached)
             return
-        for panel in cls._panels:
+        for panel in st['panels']:
             if panel.isVisible():
                 panel._position(x, y)
 
     @classmethod
-    def hide(cls):
-        cls._cached = None
-        for panel in cls._panels:
+    def hide(cls, role=None):
+        if role is None:
+            for r in list(cls._roles):
+                cls.hide(r)
+            return
+        st = cls._state(role)
+        st['cached'] = None
+        for panel in st['panels']:
             panel.hide_qr()
 
     @classmethod
     def refresh_after_display_change(cls):
-        cached = cls._cached
-        if not cached:
-            return
-        for panel in list(cls._panels):
-            panel.hide_qr()
-            panel.deleteLater()
-        cls._panels = []
-        cls._sync_panels(duplicate_only=True)
-        for panel in cls._panels:
-            cls._apply_to_panel(panel, cached)
+        for role, st in list(cls._roles.items()):
+            cached = st.get('cached')
+            if not cached:
+                continue
+            for panel in list(st['panels']):
+                panel.hide_qr()
+                panel.deleteLater()
+            st['panels'] = []
+            cls._sync_panels(role, duplicate_only=True)
+            for panel in st['panels']:
+                cls._apply_to_panel(panel, cached)
 
 
 def open_docx(path):
@@ -2064,6 +2174,7 @@ class DropdownList(QListWidget):
     def __init__(self, theme='dark'):
         super().__init__(None)
         self._theme = theme
+        self._font_size = 13
         self._books = []
         self._entries = []
         self.setWindowFlags(
@@ -2077,21 +2188,25 @@ class DropdownList(QListWidget):
 
     def _refresh_style(self):
         t = THEMES[self._theme]
+        fs = self._font_size
+        pad = 12 if fs >= 20 else 8
         self.setStyleSheet(f"""
             QListWidget {{
                 background: {t['panel']}; border: 1.5px solid {t['accent']};
-                border-radius: 10px; outline: none; font-size: 13px; padding: 4px;
+                border-radius: 10px; outline: none; font-size: {fs}px; padding: 4px;
             }}
             QListWidget::item {{
-                padding: 8px 12px; color: {t['text']};
+                padding: {pad}px 12px; color: {t['text']};
                 border-radius: 6px; margin: 1px 2px;
             }}
             QListWidget::item:hover  {{ background: {t['panel2']}; }}
             QListWidget::item:selected {{ background: {t['accent']}; color: {t['a_text']}; }}
         """)
 
-    def set_theme(self, theme):
+    def set_theme(self, theme, font_size=None):
         self._theme = theme
+        if font_size is not None:
+            self._font_size = max(10, int(font_size))
         self._refresh_style()
 
     def _on_click(self, item):
@@ -2157,10 +2272,10 @@ class MainWindow(QMainWindow, EnhancementMixin):
     remote_open_payload = pyqtSignal(dict)
     remote_populate_ui = pyqtSignal(str, str, list)
     remote_pending_request = pyqtSignal(object)
-    tunnel_url_signal = pyqtSignal(str)
-    tunnel_ready_signal = pyqtSignal(str)
-    tunnel_error_signal = pyqtSignal(str)
-    tunnel_expired_signal = pyqtSignal(str)
+    tunnel_url_signal = pyqtSignal(str, str)  # role, url
+    tunnel_ready_signal = pyqtSignal(str, str)
+    tunnel_error_signal = pyqtSignal(str, str)
+    tunnel_expired_signal = pyqtSignal(str, str)
     service_install_signal = pyqtSignal(bool, str)
     _main_invoke = pyqtSignal(object)
 
@@ -2174,20 +2289,26 @@ class MainWindow(QMainWindow, EnhancementMixin):
         self.search_mode  = self._settings['search_mode']
         self.theme_name   = self._settings['theme']
         self.font_size    = self._settings['font_size']
+        self.senior_mode  = bool(self._settings.get('senior_mode'))
         self._search_worker = None
         self._index_worker = None
         self.content_index = None
         self._app         = QApplication.instance()
         self._remote      = RemoteServer()
         self._remote_pending_id = None
-        self._tunnel = None
-        self.enable_tunnel = self._settings['enable_tunnel']
+        self._tunnel_fixed = None
+        self._tunnel_quick = None
+        self._tunnel = None  # compat alias → last active tunnel
+        self.enable_tunnel_fixed = bool(self._settings.get('enable_tunnel_fixed'))
+        self.enable_tunnel_quick = bool(self._settings.get('enable_tunnel_quick'))
+        self.enable_tunnel = self.enable_tunnel_fixed or self.enable_tunnel_quick
         self.cloudflared_path = self._settings['cloudflared_path']
         self.tunnel_mode = self._settings['tunnel_mode']
         self.cloudflared_token = self._settings['cloudflared_token']
         self.named_tunnel_url = self._settings['named_tunnel_url']
         self.remote_path_prefix = self._settings['remote_path_prefix']
         self.remote_use_https = self._settings['remote_use_https']
+        self._tunnel_status = {'fixed': '—', 'quick': '—'}
         self._open_flow = OpenFlowController()
         self._open_flow_generation = 0
         self._open_flow.set_on_esc_cancelled(self.open_flow_esc_cancelled.emit)
@@ -2394,6 +2515,17 @@ class MainWindow(QMainWindow, EnhancementMixin):
 
         h.addSpacing(12)
 
+        self.btn_senior = QPushButton("簡易版")
+        self.btn_senior.setCheckable(True)
+        self.btn_senior.setChecked(self.senior_mode)
+        self.btn_senior.setFixedHeight(30)
+        self.btn_senior.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_senior.setToolTip("一鍵切換大字簡化介面")
+        self.btn_senior.toggled.connect(self._on_senior_mode_toggled)
+        h.addWidget(self.btn_senior)
+
+        h.addSpacing(8)
+
         self.header_opts = QWidget()
         opts = QHBoxLayout(self.header_opts)
         opts.setContentsMargins(0, 0, 0, 0)
@@ -2419,36 +2551,18 @@ class MainWindow(QMainWindow, EnhancementMixin):
             self.chk_display_duplicate_hdr.setToolTip("僅支援 Windows")
         opts.addWidget(self.chk_display_duplicate_hdr)
 
-        self.chk_remote_accept_hdr = QCheckBox("接受請求")
-        self.chk_remote_accept_hdr.setChecked(self._settings['remote_accept'])
-        self.chk_remote_accept_hdr.setEnabled(False)
-        self.chk_remote_accept_hdr.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.chk_remote_accept_hdr.toggled.connect(self._on_remote_accept_hdr_toggled)
-        opts.addWidget(self.chk_remote_accept_hdr)
-
-        self.combo_remote_policy_hdr = QComboBox()
-        self.combo_remote_policy_hdr.addItem("唯一結果自動開", OPEN_POLICY_AUTO)
-        self.combo_remote_policy_hdr.addItem("待操作員確認", OPEN_POLICY_CONFIRM)
-        self.combo_remote_policy_hdr.addItem("只填 UI 不自動開", OPEN_POLICY_UI)
-        self.combo_remote_policy_hdr.setCurrentIndex(
-            _remote_policy_index(self._settings['remote_policy'])
-        )
-        self.combo_remote_policy_hdr.setFixedHeight(30)
-        self.combo_remote_policy_hdr.setMinimumWidth(148)
-        self.combo_remote_policy_hdr.setEnabled(False)
-        self.combo_remote_policy_hdr.currentIndexChanged.connect(self._on_remote_policy_changed)
-        opts.addWidget(self.combo_remote_policy_hdr)
-
         self.chk_click_to_open_hdr = QCheckBox("一點即開")
         self.chk_click_to_open_hdr.setChecked(self._settings['click_to_open'])
         self.chk_click_to_open_hdr.setCursor(Qt.CursorShape.PointingHandCursor)
         self.chk_click_to_open_hdr.toggled.connect(self._on_click_to_open_hdr_toggled)
         opts.addWidget(self.chk_click_to_open_hdr)
 
-        self.chk_show_qr_hdr = QCheckBox("Show QR Code")
+        self.chk_show_qr_hdr = QCheckBox("顯示 QR")
         self.chk_show_qr_hdr.setChecked(self._settings['show_qr_code'])
         self.chk_show_qr_hdr.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.chk_show_qr_hdr.setToolTip("在桌面顯示會眾頁 QR Code（位置見設定）")
+        self.chk_show_qr_hdr.setToolTip(
+            "在桌面同時顯示內網／固定外網／隨機外網 QR（各含連結；細節見設定 → Mobile）"
+        )
         self.chk_show_qr_hdr.toggled.connect(self._on_show_qr_code_toggled)
         opts.addWidget(self.chk_show_qr_hdr)
         h.addWidget(self.header_opts)
@@ -2512,7 +2626,7 @@ class MainWindow(QMainWindow, EnhancementMixin):
     # ─────────────────────────────────────────────────────────────
     def _build_sidebar(self):
         self.sidebar_frame = QFrame()
-        self.sidebar_frame.setFixedWidth(240)
+        self.sidebar_frame.setFixedWidth(SENIOR_SIDEBAR_W if self.senior_mode else NORMAL_SIDEBAR_W)
         lay = QVBoxLayout(self.sidebar_frame)
         lay.setContentsMargins(0, 0, 0, 0)
         lay.setSpacing(0)
@@ -2599,7 +2713,9 @@ class MainWindow(QMainWindow, EnhancementMixin):
         lay.setSpacing(12)
 
         # ── 模式切換：書本 / 全局 / 關鍵字 ─────────────────────
-        mode_row = QHBoxLayout()
+        self.mode_row_widget = QWidget()
+        mode_row = QHBoxLayout(self.mode_row_widget)
+        mode_row.setContentsMargins(0, 0, 0, 0)
         mode_row.setSpacing(8)
         self.btn_book     = QPushButton("📖  書本模式 (F1)")
         self.btn_global   = QPushButton("🌐  全局模式 (F2)")
@@ -2618,7 +2734,7 @@ class MainWindow(QMainWindow, EnhancementMixin):
         mode_row.addWidget(self.btn_keyword)
         mode_row.addWidget(self.btn_schedule)
         mode_row.addStretch()
-        lay.addLayout(mode_row)
+        lay.addWidget(self.mode_row_widget)
 
         # ── 書本模式：書冊 + 詩歌號/名 + Filter/Open 按鈕（上下兩行）──
         self.book_row = QWidget()
@@ -2917,15 +3033,23 @@ class MainWindow(QMainWindow, EnhancementMixin):
         self.lbl_font.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
         font_row = QHBoxLayout()
         font_row.setSpacing(8)
-        self.font_slider = QSlider(Qt.Orientation.Horizontal)
-        self.font_slider.setRange(10, 18)
-        self.font_slider.setValue(self.font_size)
-        self.font_slider.valueChanged.connect(self._on_font_changed)
+        self.btn_font_minus_settings = QPushButton("−")
+        self.btn_font_minus_settings.setFixedSize(36, 32)
+        self.btn_font_minus_settings.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_font_minus_settings.setToolTip("縮小字體")
+        self.btn_font_minus_settings.clicked.connect(lambda: self._nudge_font(-1))
         self.fs_lbl = QLabel(f"{self.font_size}px")
-        self.fs_lbl.setFixedWidth(40)
-        self.fs_lbl.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
-        font_row.addWidget(self.font_slider, 1)
+        self.fs_lbl.setFixedWidth(48)
+        self.fs_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.btn_font_plus_settings = QPushButton("+")
+        self.btn_font_plus_settings.setFixedSize(36, 32)
+        self.btn_font_plus_settings.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_font_plus_settings.setToolTip("放大字體")
+        self.btn_font_plus_settings.clicked.connect(lambda: self._nudge_font(1))
+        font_row.addWidget(self.btn_font_minus_settings)
         font_row.addWidget(self.fs_lbl)
+        font_row.addWidget(self.btn_font_plus_settings)
+        font_row.addStretch(1)
 
         appearance_grid.addWidget(self.lbl_theme, 0, 0)
         appearance_grid.addWidget(self.theme_combo, 0, 1, Qt.AlignmentFlag.AlignLeft)
@@ -2938,35 +3062,54 @@ class MainWindow(QMainWindow, EnhancementMixin):
         self.chk_book_auto_focus_hymn.toggled.connect(self._on_book_auto_focus_hymn_toggled)
         appearance_grid.addWidget(self.chk_book_auto_focus_hymn, 2, 0, 1, 2)
 
+        self.lbl_hymn_num_mode = QLabel("數字模式")
+        self.lbl_hymn_num_mode.setMinimumWidth(label_min_w)
+        self.lbl_hymn_num_mode.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
+        self.combo_hymn_num_mode = QComboBox()
+        self.combo_hymn_num_mode.addItem("模糊（含部分數字）", HYMN_NUM_MODE_CONTAINS)
+        self.combo_hymn_num_mode.addItem("精確編號（4≠14）", HYMN_NUM_MODE_EXACT)
+        idx = self.combo_hymn_num_mode.findData(
+            self._settings.get('hymn_num_mode', HYMN_NUM_MODE_CONTAINS)
+        )
+        self.combo_hymn_num_mode.setCurrentIndex(idx if idx >= 0 else 0)
+        self.combo_hymn_num_mode.setMinimumWidth(200)
+        self.combo_hymn_num_mode.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.combo_hymn_num_mode.setToolTip(
+            "搜尋詩歌號時：模糊會把 4 也命中 14／24；精確只命中第 4 首（含 004、04）"
+        )
+        self.combo_hymn_num_mode.currentIndexChanged.connect(self._on_hymn_num_mode_changed)
+        appearance_grid.addWidget(self.lbl_hymn_num_mode, 3, 0)
+        appearance_grid.addWidget(self.combo_hymn_num_mode, 3, 1, Qt.AlignmentFlag.AlignLeft)
+
         self.chk_click_to_open = QCheckBox("一點即開檔案（單擊列表即開啟）")
         self.chk_click_to_open.setChecked(self._settings['click_to_open'])
         self.chk_click_to_open.setCursor(Qt.CursorShape.PointingHandCursor)
         self.chk_click_to_open.toggled.connect(self._on_click_to_open_settings_toggled)
-        appearance_grid.addWidget(self.chk_click_to_open, 3, 0, 1, 2)
+        appearance_grid.addWidget(self.chk_click_to_open, 4, 0, 1, 2)
 
         self.chk_show_preview = QCheckBox("顯示檔案預覽")
         self.chk_show_preview.setChecked(self._settings.get('show_preview', True))
         self.chk_show_preview.setCursor(Qt.CursorShape.PointingHandCursor)
         self.chk_show_preview.toggled.connect(self._on_show_preview_toggled)
-        appearance_grid.addWidget(self.chk_show_preview, 4, 0, 1, 2)
+        appearance_grid.addWidget(self.chk_show_preview, 5, 0, 1, 2)
 
         self.chk_auto_rescan = QCheckBox("資料夾變更時自動重新掃描")
         self.chk_auto_rescan.setChecked(self._settings.get('auto_rescan', True))
         self.chk_auto_rescan.setCursor(Qt.CursorShape.PointingHandCursor)
         self.chk_auto_rescan.toggled.connect(self._on_auto_rescan_toggled)
-        appearance_grid.addWidget(self.chk_auto_rescan, 5, 0, 1, 2)
+        appearance_grid.addWidget(self.chk_auto_rescan, 6, 0, 1, 2)
 
         self.chk_startup_tray = QCheckBox("啟動時最小化到系統匣")
         self.chk_startup_tray.setChecked(self._settings.get('startup_tray', False))
         self.chk_startup_tray.setCursor(Qt.CursorShape.PointingHandCursor)
         self.chk_startup_tray.toggled.connect(self._on_startup_tray_toggled)
-        appearance_grid.addWidget(self.chk_startup_tray, 6, 0, 1, 2)
+        appearance_grid.addWidget(self.chk_startup_tray, 7, 0, 1, 2)
 
         self.chk_minimize_tray = QCheckBox("關閉視窗時最小化到系統匣")
         self.chk_minimize_tray.setChecked(self._settings.get('minimize_to_tray', False))
         self.chk_minimize_tray.setCursor(Qt.CursorShape.PointingHandCursor)
         self.chk_minimize_tray.toggled.connect(self._on_minimize_tray_toggled)
-        appearance_grid.addWidget(self.chk_minimize_tray, 7, 0, 1, 2)
+        appearance_grid.addWidget(self.chk_minimize_tray, 8, 0, 1, 2)
 
         self.grp_open = QGroupBox("開啟 Word / PDF 時")
         open_grid = QGridLayout(self.grp_open)
@@ -3120,12 +3263,9 @@ class MainWindow(QMainWindow, EnhancementMixin):
         open_grid.addWidget(self.chk_pdf_auto_fullscreen, 8, 0, 1, 2)
 
         self.grp_remote = QGroupBox("Mobile 遙控")
-        remote_grid = QGridLayout(self.grp_remote)
-        remote_grid.setContentsMargins(*grid_margins)
-        remote_grid.setHorizontalSpacing(14)
-        remote_grid.setVerticalSpacing(12)
-        remote_grid.setColumnStretch(1, 1)
-        remote_grid.setColumnMinimumWidth(0, label_min_w)
+        remote_outer = QVBoxLayout(self.grp_remote)
+        remote_outer.setContentsMargins(*grid_margins)
+        remote_outer.setSpacing(12)
 
         self.chk_remote_api = QCheckBox("啟用 API")
         self.chk_remote_api.setChecked(self._settings['remote_api_enabled'])
@@ -3137,6 +3277,22 @@ class MainWindow(QMainWindow, EnhancementMixin):
         self.chk_remote_accept.setEnabled(False)
         self.chk_remote_accept.setCursor(Qt.CursorShape.PointingHandCursor)
         self.chk_remote_accept.toggled.connect(self._on_remote_accept_settings_toggled)
+
+        self.lbl_remote_policy = QLabel("開檔政策")
+        self.lbl_remote_policy.setMinimumWidth(label_min_w)
+        self.lbl_remote_policy.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
+        self.combo_remote_policy = QComboBox()
+        self.combo_remote_policy.addItem("唯一結果自動開", OPEN_POLICY_AUTO)
+        self.combo_remote_policy.addItem("待操作員確認", OPEN_POLICY_CONFIRM)
+        self.combo_remote_policy.addItem("只填 UI 不自動開", OPEN_POLICY_UI)
+        self.combo_remote_policy.setCurrentIndex(
+            _remote_policy_index(self._settings['remote_policy'])
+        )
+        self.combo_remote_policy.setMinimumWidth(180)
+        self.combo_remote_policy.setEnabled(False)
+        self.combo_remote_policy.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.combo_remote_policy.setToolTip("手機遙控開檔時的處理方式（須先啟用 API）")
+        self.combo_remote_policy.currentIndexChanged.connect(self._on_remote_policy_changed)
 
         self.lbl_remote_port = QLabel("Port")
         self.lbl_remote_port.setMinimumWidth(label_min_w)
@@ -3152,24 +3308,25 @@ class MainWindow(QMainWindow, EnhancementMixin):
         self.inp_remote_token.setPlaceholderText("留空 = 不驗證")
         self.inp_remote_token.textChanged.connect(self._on_remote_token_changed)
 
-        self.chk_enable_tunnel = QCheckBox("外網（Cloudflare）")
-        self.chk_enable_tunnel.setChecked(self.enable_tunnel)
-        self.chk_enable_tunnel.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.chk_enable_tunnel.setToolTip(
-            "未勾選：僅同 WiFi 本機 IP（QR Code 指向區網網址）。"
-            "勾選後才啟用公開 HTTPS 網址（須 cloudflared 服務或快速通道）。"
+        self.chk_enable_tunnel_fixed = QCheckBox("固定網址（共用 Windows 服務）")
+        self.chk_enable_tunnel_fixed.setChecked(self.enable_tunnel_fixed)
+        self.chk_enable_tunnel_fixed.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.chk_enable_tunnel_fixed.setToolTip(
+            "使用已安裝的 cloudflared 服務與固定公開 HTTPS 網址；可與隨機通道同時啟用。"
         )
-        self.chk_enable_tunnel.toggled.connect(self._on_tunnel_toggled)
+        self.chk_enable_tunnel_fixed.toggled.connect(self._on_tunnel_fixed_toggled)
 
-        self.tunnel_mode_combo = QComboBox()
-        self.tunnel_mode_combo.addItem("共用 Windows 服務（live 固定網址）", "service")
-        self.tunnel_mode_combo.addItem("快速通道（隨機網址，測試用）", "quick")
-        mode_index = self.tunnel_mode_combo.findData(self.tunnel_mode)
-        if mode_index < 0:
-            mode_index = 0
-            self.tunnel_mode = 'service'
-        self.tunnel_mode_combo.setCurrentIndex(mode_index)
-        self.tunnel_mode_combo.currentIndexChanged.connect(self._on_tunnel_mode_changed)
+        self.chk_enable_tunnel_quick = QCheckBox("隨機網址（快速通道／測試）")
+        self.chk_enable_tunnel_quick.setChecked(self.enable_tunnel_quick)
+        self.chk_enable_tunnel_quick.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.chk_enable_tunnel_quick.setToolTip(
+            "臨時 trycloudflare.com 網址；可與固定網址同時啟用（兩組外網 QR）。"
+        )
+        self.chk_enable_tunnel_quick.toggled.connect(self._on_tunnel_quick_toggled)
+
+        # Compat aliases used by theme / restore code paths.
+        self.chk_enable_tunnel = self.chk_enable_tunnel_fixed
+        self.tunnel_mode_combo = None
 
         self.lbl_public_tunnel_url = QLabel("公開網址")
         self.lbl_public_tunnel_url.setMinimumWidth(label_min_w)
@@ -3229,51 +3386,47 @@ class MainWindow(QMainWindow, EnhancementMixin):
         self.tunnel_help_lbl = QLabel("")
         self.tunnel_help_lbl.setWordWrap(True)
 
-        self.tunnel_status_lbl = QLabel("外網：—")
-        self.tunnel_status_lbl.setWordWrap(True)
+        self.tunnel_status_fixed_lbl = QLabel("固定：—")
+        self.tunnel_status_fixed_lbl.setWordWrap(True)
+        self.tunnel_status_quick_lbl = QLabel("隨機：—")
+        self.tunnel_status_quick_lbl.setWordWrap(True)
+        self.tunnel_status_lbl = self.tunnel_status_fixed_lbl
 
-        self.lbl_local_url = QLabel("本機（WiFi）")
+        self.lbl_local_url = QLabel("連結")
         self.lbl_local_url.setMinimumWidth(label_min_w)
         self.local_url_lbl = QLabel("—")
         self.local_url_lbl.setWordWrap(True)
-        self.local_url_lbl.setToolTip("同 WiFi 手機用此網址；未啟用外網時 QR Code 亦指向此處")
+        self.local_url_lbl.setTextInteractionFlags(
+            Qt.TextInteractionFlag.TextSelectableByMouse
+        )
+        self.local_url_lbl.setToolTip("同 WiFi 手機用此網址")
 
-        self.lbl_remote_url = QLabel("外網遙控")
+        self.lbl_remote_url = QLabel("固定遙控")
         self.lbl_remote_url.setMinimumWidth(label_min_w)
         self.remote_url_lbl = QLabel("—")
         self.remote_url_lbl.setWordWrap(True)
-        self.remote_url_lbl.setToolTip("操作員遙控頁（/admin）；須啟用外網")
+        self.remote_url_lbl.setTextInteractionFlags(
+            Qt.TextInteractionFlag.TextSelectableByMouse
+        )
+        self.remote_url_lbl.setToolTip("操作員遙控頁（/admin）；固定外網")
 
-        self.lbl_viewer_url = QLabel("外網會眾")
+        self.lbl_viewer_url = QLabel("固定會眾")
         self.lbl_viewer_url.setMinimumWidth(label_min_w)
         self.viewer_url_lbl = QLabel("—")
         self.viewer_url_lbl.setWordWrap(True)
-        self.viewer_url_lbl.setToolTip("公開 HTTPS 會眾頁；須啟用外網時 QR 才指向此處")
+        self.viewer_url_lbl.setTextInteractionFlags(
+            Qt.TextInteractionFlag.TextSelectableByMouse
+        )
+        self.viewer_url_lbl.setToolTip("固定公開 HTTPS 會眾頁")
 
-        remote_grid.addWidget(self.chk_remote_api, 0, 0, 1, 2)
-        remote_grid.addWidget(self.chk_remote_accept, 1, 0, 1, 2)
-        remote_grid.addWidget(self.lbl_remote_port, 2, 0)
-        remote_grid.addWidget(self.spin_remote_port, 2, 1, Qt.AlignmentFlag.AlignLeft)
-        remote_grid.addWidget(self.lbl_remote_token, 3, 0)
-        remote_grid.addWidget(self.inp_remote_token, 3, 1)
-        remote_grid.addWidget(self.chk_enable_tunnel, 4, 0, 1, 2)
-        remote_grid.addWidget(self.tunnel_mode_combo, 5, 0, 1, 2)
-        remote_grid.addWidget(self.lbl_public_tunnel_url, 6, 0)
-        remote_grid.addWidget(self.inp_named_tunnel_url, 6, 1)
-        remote_grid.addWidget(self.inp_cloudflared_token, 7, 0, 1, 2)
-        remote_grid.addWidget(self.btn_install_cloudflared, 8, 0, 1, 2)
-        remote_grid.addWidget(self.lbl_tunnel_cmd_hint, 9, 0, 1, 2)
-        remote_grid.addWidget(self._tunnel_install_row, 10, 0, 1, 2)
-        remote_grid.addWidget(self._tunnel_uninstall_row, 11, 0, 1, 2)
-        remote_grid.addWidget(self._tunnel_restart_row, 12, 0, 1, 2)
-        remote_grid.addWidget(self.tunnel_help_lbl, 13, 0, 1, 2)
-        remote_grid.addWidget(self.tunnel_status_lbl, 14, 0, 1, 2)
-        remote_grid.addWidget(self.lbl_local_url, 15, 0)
-        remote_grid.addWidget(self.local_url_lbl, 15, 1)
-        remote_grid.addWidget(self.lbl_viewer_url, 16, 0)
-        remote_grid.addWidget(self.viewer_url_lbl, 16, 1)
-        remote_grid.addWidget(self.lbl_remote_url, 17, 0)
-        remote_grid.addWidget(self.remote_url_lbl, 17, 1)
+        self.lbl_quick_url = QLabel("隨機會眾")
+        self.lbl_quick_url.setMinimumWidth(label_min_w)
+        self.quick_url_lbl = QLabel("—")
+        self.quick_url_lbl.setWordWrap(True)
+        self.quick_url_lbl.setTextInteractionFlags(
+            Qt.TextInteractionFlag.TextSelectableByMouse
+        )
+        self.quick_url_lbl.setToolTip("快速通道臨時 HTTPS 會眾頁")
 
         self.chk_viewer_show_debug = QCheckBox("會眾觀看顯示除錯列")
         self.chk_viewer_show_debug.setChecked(self._settings['viewer_show_debug'])
@@ -3282,7 +3435,62 @@ class MainWindow(QMainWindow, EnhancementMixin):
             "開啟後，手機 /view 頁面底部會顯示 mapping 除錯資訊"
         )
         self.chk_viewer_show_debug.toggled.connect(self._on_viewer_show_debug_toggled)
-        remote_grid.addWidget(self.chk_viewer_show_debug, 18, 0, 1, 2)
+
+        self.chk_show_qr_lan = QCheckBox("顯示內網 QR（含連結）")
+        self.chk_show_qr_lan.setChecked(self._settings.get('show_qr_lan', True))
+        self.chk_show_qr_lan.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.chk_show_qr_lan.toggled.connect(self._on_show_qr_role_toggled)
+
+        self.chk_show_qr_fixed = QCheckBox("顯示固定外網 QR（含連結）")
+        self.chk_show_qr_fixed.setChecked(self._settings.get('show_qr_fixed', True))
+        self.chk_show_qr_fixed.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.chk_show_qr_fixed.toggled.connect(self._on_show_qr_role_toggled)
+
+        self.chk_show_qr_quick = QCheckBox("顯示隨機外網 QR（含連結）")
+        self.chk_show_qr_quick.setChecked(self._settings.get('show_qr_quick', True))
+        self.chk_show_qr_quick.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.chk_show_qr_quick.toggled.connect(self._on_show_qr_role_toggled)
+        self.chk_show_qr_wan = self.chk_show_qr_fixed
+
+        self.remote_qr_lan_lbl = QLabel("啟用 API 後顯示")
+        self.remote_qr_lan_lbl.setObjectName('remoteQrLanLabel')
+        self.remote_qr_lan_lbl.setFixedSize(120, 120)
+        self.remote_qr_lan_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.remote_qr_lan_lbl.setWordWrap(True)
+        self.remote_qr_lan_link = QLabel("—")
+        self.remote_qr_lan_link.setWordWrap(True)
+        self.remote_qr_lan_link.setTextInteractionFlags(
+            Qt.TextInteractionFlag.TextSelectableByMouse
+        )
+        self.remote_qr_lan_link.setAlignment(Qt.AlignmentFlag.AlignHCenter)
+
+        self.remote_qr_fixed_lbl = QLabel("啟用固定外網後顯示")
+        self.remote_qr_fixed_lbl.setObjectName('remoteQrFixedLabel')
+        self.remote_qr_fixed_lbl.setFixedSize(120, 120)
+        self.remote_qr_fixed_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.remote_qr_fixed_lbl.setWordWrap(True)
+        self.remote_qr_fixed_link = QLabel("—")
+        self.remote_qr_fixed_link.setWordWrap(True)
+        self.remote_qr_fixed_link.setTextInteractionFlags(
+            Qt.TextInteractionFlag.TextSelectableByMouse
+        )
+        self.remote_qr_fixed_link.setAlignment(Qt.AlignmentFlag.AlignHCenter)
+
+        self.remote_qr_quick_lbl = QLabel("啟用隨機外網後顯示")
+        self.remote_qr_quick_lbl.setObjectName('remoteQrQuickLabel')
+        self.remote_qr_quick_lbl.setFixedSize(120, 120)
+        self.remote_qr_quick_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.remote_qr_quick_lbl.setWordWrap(True)
+        self.remote_qr_quick_link = QLabel("—")
+        self.remote_qr_quick_link.setWordWrap(True)
+        self.remote_qr_quick_link.setTextInteractionFlags(
+            Qt.TextInteractionFlag.TextSelectableByMouse
+        )
+        self.remote_qr_quick_link.setAlignment(Qt.AlignmentFlag.AlignHCenter)
+
+        self.remote_qr_wan_lbl = self.remote_qr_fixed_lbl
+        self.remote_qr_wan_link = self.remote_qr_fixed_link
+        self.remote_qr_lbl = self.remote_qr_lan_lbl
 
         self.lbl_qr_x = QLabel("QR X")
         self.lbl_qr_x.setMinimumWidth(label_min_w)
@@ -3321,25 +3529,16 @@ class MainWindow(QMainWindow, EnhancementMixin):
         self.spin_qr_h.setRange(120, 800)
         self.spin_qr_h.setValue(self._settings['qr_height'])
         self.spin_qr_h.setMinimumWidth(88)
-        self.spin_qr_h.setToolTip("桌面 QR 卡片高度（像素，含下方文字）")
+        self.spin_qr_h.setToolTip("桌面 QR 卡片高度（含下方連結文字；過矮會自動加高）")
         self.spin_qr_h.valueChanged.connect(self._on_qr_layout_changed)
 
-        remote_grid.addWidget(self.lbl_qr_x, 19, 0)
-        remote_grid.addWidget(self.spin_qr_x, 19, 1, Qt.AlignmentFlag.AlignLeft)
-        remote_grid.addWidget(self.lbl_qr_y, 20, 0)
-        remote_grid.addWidget(self.spin_qr_y, 20, 1, Qt.AlignmentFlag.AlignLeft)
-        remote_grid.addWidget(self.lbl_qr_w, 21, 0)
-        remote_grid.addWidget(self.spin_qr_w, 21, 1, Qt.AlignmentFlag.AlignLeft)
-        remote_grid.addWidget(self.lbl_qr_h, 22, 0)
-        remote_grid.addWidget(self.spin_qr_h, 22, 1, Qt.AlignmentFlag.AlignLeft)
-
-        self.lbl_qr_caption = QLabel("QR 文字")
+        self.lbl_qr_caption = QLabel("QR 標題")
         self.lbl_qr_caption.setMinimumWidth(label_min_w)
         self.lbl_qr_caption.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
         self.inp_qr_caption = QLineEdit()
         self.inp_qr_caption.setText(self._settings['qr_caption'])
         self.inp_qr_caption.setPlaceholderText(DEFAULT_QR_CAPTION)
-        self.inp_qr_caption.setToolTip("桌面 QR Code 下方顯示文字")
+        self.inp_qr_caption.setToolTip("顯示於 QR 上方；下方會自動附「內網／外網」與完整連結")
         self.inp_qr_caption.textChanged.connect(self._on_qr_appearance_changed)
 
         self.lbl_qr_bg = QLabel("QR 背景")
@@ -3414,24 +3613,128 @@ class MainWindow(QMainWindow, EnhancementMixin):
         )
         self.spin_qr_bg_opacity.valueChanged.connect(self._on_qr_appearance_changed)
 
-        remote_grid.addWidget(self.lbl_qr_caption, 23, 0)
-        remote_grid.addWidget(self.inp_qr_caption, 23, 1)
-        remote_grid.addWidget(self.lbl_qr_bg, 24, 0)
-        remote_grid.addWidget(self.qr_bg_row, 24, 1)
-        remote_grid.addWidget(self.lbl_qr_text_color, 25, 0)
-        remote_grid.addWidget(self.qr_text_color_row, 25, 1)
-        remote_grid.addWidget(self.lbl_qr_text_size, 26, 0)
-        remote_grid.addWidget(self.spin_qr_text_size, 26, 1, Qt.AlignmentFlag.AlignLeft)
-        remote_grid.addWidget(self.lbl_qr_bg_opacity, 27, 0)
-        remote_grid.addWidget(self.spin_qr_bg_opacity, 27, 1, Qt.AlignmentFlag.AlignLeft)
+        # ── 分區：本機 API ──
+        grp_api = QGroupBox("本機 API")
+        api_grid = QGridLayout(grp_api)
+        api_grid.setHorizontalSpacing(14)
+        api_grid.setVerticalSpacing(10)
+        api_grid.setColumnStretch(1, 1)
+        api_grid.addWidget(self.chk_remote_api, 0, 0, 1, 2)
+        api_grid.addWidget(self.chk_remote_accept, 1, 0, 1, 2)
+        api_grid.addWidget(self.lbl_remote_policy, 2, 0)
+        api_grid.addWidget(self.combo_remote_policy, 2, 1, Qt.AlignmentFlag.AlignLeft)
+        api_grid.addWidget(self.lbl_remote_port, 3, 0)
+        api_grid.addWidget(self.spin_remote_port, 3, 1, Qt.AlignmentFlag.AlignLeft)
+        api_grid.addWidget(self.lbl_remote_token, 4, 0)
+        api_grid.addWidget(self.inp_remote_token, 4, 1)
+        api_grid.addWidget(self.chk_viewer_show_debug, 5, 0, 1, 2)
+
+        # ── 分區：內網 ──
+        grp_lan = QGroupBox("內網（同 WiFi）")
+        lan_grid = QGridLayout(grp_lan)
+        lan_grid.setHorizontalSpacing(14)
+        lan_grid.setVerticalSpacing(8)
+        lan_grid.setColumnStretch(1, 1)
+        lan_grid.addWidget(self.lbl_local_url, 0, 0)
+        lan_grid.addWidget(self.local_url_lbl, 0, 1)
+        lan_grid.addWidget(self.chk_show_qr_lan, 1, 0, 1, 2)
+        lan_qr_box = QVBoxLayout()
+        lan_qr_box.setSpacing(4)
+        lan_qr_box.addWidget(self.remote_qr_lan_lbl, 0, Qt.AlignmentFlag.AlignHCenter)
+        lan_qr_box.addWidget(self.remote_qr_lan_link)
+        lan_grid.addLayout(lan_qr_box, 2, 0, 1, 2)
+
+        # ── 分區：外網固定 ──
+        grp_wan_fixed = QGroupBox("外網 · 固定網址")
+        wan_fixed_lay = QVBoxLayout(grp_wan_fixed)
+        wan_fixed_lay.setSpacing(8)
+        wan_fixed_lay.addWidget(self.chk_enable_tunnel_fixed)
+        wan_service = QWidget()
+        self._wan_service_box = wan_service
+        wan_svc = QGridLayout(wan_service)
+        wan_svc.setContentsMargins(0, 0, 0, 0)
+        wan_svc.setHorizontalSpacing(14)
+        wan_svc.setVerticalSpacing(8)
+        wan_svc.setColumnStretch(1, 1)
+        wan_svc.addWidget(self.lbl_public_tunnel_url, 0, 0)
+        wan_svc.addWidget(self.inp_named_tunnel_url, 0, 1)
+        wan_svc.addWidget(self.inp_cloudflared_token, 1, 0, 1, 2)
+        wan_svc.addWidget(self.btn_install_cloudflared, 2, 0, 1, 2)
+        wan_svc.addWidget(self.lbl_tunnel_cmd_hint, 3, 0, 1, 2)
+        wan_svc.addWidget(self._tunnel_install_row, 4, 0, 1, 2)
+        wan_svc.addWidget(self._tunnel_uninstall_row, 5, 0, 1, 2)
+        wan_svc.addWidget(self._tunnel_restart_row, 6, 0, 1, 2)
+        wan_fixed_lay.addWidget(wan_service)
+        wan_fixed_lay.addWidget(self.tunnel_help_lbl)
+        wan_fixed_lay.addWidget(self.tunnel_status_fixed_lbl)
+        wan_urls = QGridLayout()
+        wan_urls.setHorizontalSpacing(14)
+        wan_urls.setVerticalSpacing(6)
+        wan_urls.setColumnStretch(1, 1)
+        wan_urls.addWidget(self.lbl_viewer_url, 0, 0)
+        wan_urls.addWidget(self.viewer_url_lbl, 0, 1)
+        wan_urls.addWidget(self.lbl_remote_url, 1, 0)
+        wan_urls.addWidget(self.remote_url_lbl, 1, 1)
+        wan_fixed_lay.addLayout(wan_urls)
+        wan_fixed_lay.addWidget(self.chk_show_qr_fixed)
+        fixed_qr_box = QVBoxLayout()
+        fixed_qr_box.setSpacing(4)
+        fixed_qr_box.addWidget(self.remote_qr_fixed_lbl, 0, Qt.AlignmentFlag.AlignHCenter)
+        fixed_qr_box.addWidget(self.remote_qr_fixed_link)
+        wan_fixed_lay.addLayout(fixed_qr_box)
+
+        # ── 分區：外網隨機 ──
+        grp_wan_quick = QGroupBox("外網 · 隨機網址")
+        wan_quick_lay = QVBoxLayout(grp_wan_quick)
+        wan_quick_lay.setSpacing(8)
+        wan_quick_lay.addWidget(self.chk_enable_tunnel_quick)
+        wan_quick_lay.addWidget(self.tunnel_status_quick_lbl)
+        quick_urls = QGridLayout()
+        quick_urls.setHorizontalSpacing(14)
+        quick_urls.setVerticalSpacing(6)
+        quick_urls.setColumnStretch(1, 1)
+        quick_urls.addWidget(self.lbl_quick_url, 0, 0)
+        quick_urls.addWidget(self.quick_url_lbl, 0, 1)
+        wan_quick_lay.addLayout(quick_urls)
+        wan_quick_lay.addWidget(self.chk_show_qr_quick)
+        quick_qr_box = QVBoxLayout()
+        quick_qr_box.setSpacing(4)
+        quick_qr_box.addWidget(self.remote_qr_quick_lbl, 0, Qt.AlignmentFlag.AlignHCenter)
+        quick_qr_box.addWidget(self.remote_qr_quick_link)
+        wan_quick_lay.addLayout(quick_qr_box)
+
+        # ── 分區：桌面 QR 樣式（內網／外網共用）──
+        grp_qr = QGroupBox("桌面 QR 樣式（內網／固定／隨機共用）")
+        qr_grid = QGridLayout(grp_qr)
+        qr_grid.setHorizontalSpacing(14)
+        qr_grid.setVerticalSpacing(10)
+        qr_grid.setColumnStretch(1, 1)
+        qr_grid.addWidget(self.lbl_qr_x, 0, 0)
+        qr_grid.addWidget(self.spin_qr_x, 0, 1, Qt.AlignmentFlag.AlignLeft)
+        qr_grid.addWidget(self.lbl_qr_y, 1, 0)
+        qr_grid.addWidget(self.spin_qr_y, 1, 1, Qt.AlignmentFlag.AlignLeft)
+        qr_grid.addWidget(self.lbl_qr_w, 2, 0)
+        qr_grid.addWidget(self.spin_qr_w, 2, 1, Qt.AlignmentFlag.AlignLeft)
+        qr_grid.addWidget(self.lbl_qr_h, 3, 0)
+        qr_grid.addWidget(self.spin_qr_h, 3, 1, Qt.AlignmentFlag.AlignLeft)
+        qr_grid.addWidget(self.lbl_qr_caption, 4, 0)
+        qr_grid.addWidget(self.inp_qr_caption, 4, 1)
+        qr_grid.addWidget(self.lbl_qr_bg, 5, 0)
+        qr_grid.addWidget(self.qr_bg_row, 5, 1)
+        qr_grid.addWidget(self.lbl_qr_text_color, 6, 0)
+        qr_grid.addWidget(self.qr_text_color_row, 6, 1)
+        qr_grid.addWidget(self.lbl_qr_text_size, 7, 0)
+        qr_grid.addWidget(self.spin_qr_text_size, 7, 1, Qt.AlignmentFlag.AlignLeft)
+        qr_grid.addWidget(self.lbl_qr_bg_opacity, 8, 0)
+        qr_grid.addWidget(self.spin_qr_bg_opacity, 8, 1, Qt.AlignmentFlag.AlignLeft)
+
+        remote_outer.addWidget(grp_api)
+        remote_outer.addWidget(grp_lan)
+        remote_outer.addWidget(grp_wan_fixed)
+        remote_outer.addWidget(grp_wan_quick)
+        remote_outer.addWidget(grp_qr)
         self._update_qr_color_previews()
         self._sync_tunnel_options_visibility()
-
-        self.remote_qr_lbl = QLabel("啟用 Mobile API 後顯示 QR")
-        self.remote_qr_lbl.setObjectName('remoteQrLabel')
-        self.remote_qr_lbl.setFixedSize(140, 140)
-        self.remote_qr_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.remote_qr_lbl.setWordWrap(True)
 
         self.remote_log_list = QListWidget()
         self.remote_log_list.setMaximumHeight(80)
@@ -3455,7 +3758,6 @@ class MainWindow(QMainWindow, EnhancementMixin):
         tab_mobile_lay.setContentsMargins(0, 8, 0, 0)
         tab_mobile_lay.setSpacing(10)
         tab_mobile_lay.addWidget(self.grp_remote)
-        tab_mobile_lay.addWidget(self.remote_qr_lbl, 0, Qt.AlignmentFlag.AlignHCenter)
         tab_mobile_lay.addWidget(self.remote_log_list)
         tab_mobile_lay.addStretch()
 
@@ -3862,6 +4164,24 @@ class MainWindow(QMainWindow, EnhancementMixin):
     def _on_book_auto_focus_hymn_toggled(self, checked):
         self._persist_settings(book_auto_focus_hymn=checked)
 
+    def _hymn_num_mode(self):
+        mode = self._settings.get('hymn_num_mode', HYMN_NUM_MODE_CONTAINS)
+        return mode if mode in HYMN_NUM_MODES else HYMN_NUM_MODE_CONTAINS
+
+    def _on_hymn_num_mode_changed(self, _index=None):
+        if self._loading_settings:
+            return
+        mode = self.combo_hymn_num_mode.currentData()
+        if mode not in HYMN_NUM_MODES:
+            mode = HYMN_NUM_MODE_CONTAINS
+        self._persist_settings(hymn_num_mode=mode)
+        if getattr(self, '_remote', None):
+            self._remote.state.set_hymn_num_mode(mode)
+        if self.search_mode == 'book' and self.current_book:
+            self._show_book_files(self.current_book, self.inp_num.text().strip().lower())
+        elif self.search_mode == 'schedule':
+            self._refresh_schedule_search()
+
     def _sync_click_to_open_checkboxes(self, checked):
         for chk in (self.chk_click_to_open_hdr, self.chk_click_to_open):
             chk.blockSignals(True)
@@ -3968,6 +4288,17 @@ class MainWindow(QMainWindow, EnhancementMixin):
         self._persist_settings(show_qr_code=checked)
         self._sync_desktop_qr_overlay()
 
+    def _on_show_qr_role_toggled(self, _checked=False):
+        self._persist_settings(
+            show_qr_lan=self.chk_show_qr_lan.isChecked(),
+            show_qr_fixed=self.chk_show_qr_fixed.isChecked(),
+            show_qr_quick=self.chk_show_qr_quick.isChecked(),
+            show_qr_wan=(
+                self.chk_show_qr_fixed.isChecked() or self.chk_show_qr_quick.isChecked()
+            ),
+        )
+        self._sync_desktop_qr_overlay()
+
     def _on_qr_layout_changed(self, _value):
         x = self.spin_qr_x.value()
         y = self.spin_qr_y.value()
@@ -3985,6 +4316,32 @@ class MainWindow(QMainWindow, EnhancementMixin):
         self._persist_settings(**values)
         self._sync_desktop_qr_overlay()
 
+    def _qr_caption_with_link(self, kind_label, url):
+        title = str(self._settings.get('qr_caption', DEFAULT_QR_CAPTION) or '').strip()
+        parts = []
+        if title:
+            parts.append(title)
+        parts.append(str(kind_label or '').strip() or 'QR')
+        if url:
+            parts.append(str(url).strip())
+        return '\n'.join(p for p in parts if p)
+
+    def _show_one_desktop_qr(self, role, url, kind_label, x, y, card_w, card_h, style):
+        caption = self._qr_caption_with_link(kind_label, url)
+        # Keep QR readable when caption includes multi-line URL.
+        need_h = (
+            56
+            + _desktop_qr_caption_height(caption, style['text_size'])
+            + 10
+        )
+        use_h = max(int(card_h), need_h)
+        qr_size = _desktop_qr_render_size(card_w, use_h, caption, style['text_size'])
+        pix = self._qr_pixmap_from_url(url, size=qr_size, border=1)
+        DesktopQrOverlay.show_qr(
+            pix, caption, style, int(x), int(y), int(card_w), int(use_h), role=role,
+        )
+        return use_h
+
     def _sync_desktop_qr_overlay(self):
         if not self._settings.get('show_qr_code'):
             DesktopQrOverlay.hide()
@@ -3992,28 +4349,49 @@ class MainWindow(QMainWindow, EnhancementMixin):
         if not getattr(self._remote, 'running', False):
             DesktopQrOverlay.hide()
             return
-        url = self._remote_share_url()
-        if not url:
-            DesktopQrOverlay.hide()
-            return
         try:
             style = _desktop_qr_style_from_settings(self._settings)
-            caption = str(self._settings.get('qr_caption', DEFAULT_QR_CAPTION))
             card_w = int(self._settings.get('qr_width', DEFAULT_QR_WIDTH))
             card_h = int(self._settings.get('qr_height', DEFAULT_QR_HEIGHT))
-            qr_size = _desktop_qr_render_size(
-                card_w, card_h, bool(caption.strip()), style['text_size'],
+            x0 = int(self._settings.get('qr_x', DEFAULT_QR_X))
+            y0 = int(self._settings.get('qr_y', DEFAULT_QR_Y))
+            gap = DEFAULT_QR_STACK_GAP
+            y_next = y0
+            any_shown = False
+
+            def _maybe_show(role, enabled, url, kind):
+                nonlocal y_next, any_shown
+                if enabled and url:
+                    h = self._show_one_desktop_qr(
+                        role, url, kind, x0, y_next, card_w, card_h, style,
+                    )
+                    y_next += int(h) + gap
+                    any_shown = True
+                else:
+                    DesktopQrOverlay.hide(role)
+
+            _maybe_show(
+                'lan',
+                self._settings.get('show_qr_lan', True),
+                self._remote_lan_viewer_url(),
+                '內網',
             )
-            pix = self._qr_pixmap_from_url(url, size=qr_size, border=1)
-            DesktopQrOverlay.show_qr(
-                pix,
-                caption,
-                style,
-                int(self._settings.get('qr_x', DEFAULT_QR_X)),
-                int(self._settings.get('qr_y', DEFAULT_QR_Y)),
-                card_w,
-                card_h,
+            _maybe_show(
+                'fixed',
+                self._settings.get('show_qr_fixed', True),
+                self._remote_fixed_viewer_url(),
+                '外網（固定）',
             )
+            _maybe_show(
+                'quick',
+                self._settings.get('show_qr_quick', True),
+                self._remote_quick_viewer_url(),
+                '外網（隨機）',
+            )
+            # Hide legacy single-wan role if present.
+            DesktopQrOverlay.hide('wan')
+            if not any_shown:
+                DesktopQrOverlay.hide()
         except Exception:
             DesktopQrOverlay.hide()
 
@@ -4188,7 +4566,9 @@ class MainWindow(QMainWindow, EnhancementMixin):
             self.sched_entry_dropdown.hide()
             return
         q = self.inp_sched_num.text().strip()
-        entries = list_entries_for_book(self.books, book_ref, q)
+        entries = list_entries_for_book(
+            self.books, book_ref, q, num_mode=self._hymn_num_mode(),
+        )
         if not entries:
             self.sched_entry_dropdown.hide()
             return
@@ -4236,7 +4616,9 @@ class MainWindow(QMainWindow, EnhancementMixin):
                 self.sched_search_list.addItem(item)
             self.sched_search_count.setText(f'{min(len(entries), 120)} 項')
             return
-        matches = resolve_open_request(self.books, book_ref, num_ref)
+        matches = resolve_open_request(
+            self.books, book_ref, num_ref, num_mode=self._hymn_num_mode(),
+        )
         self._populate_schedule_search_list(matches)
 
     def _on_sched_search_selection_changed(self, current=None, previous=None):
@@ -4416,6 +4798,15 @@ class MainWindow(QMainWindow, EnhancementMixin):
         self._remote.state.set_token(s['remote_token'])
         self._remote.state.set_port(s['remote_port'])
         self._remote.state.set_viewer_show_debug(s['viewer_show_debug'])
+        if hasattr(self._remote.state, 'set_hymn_num_mode'):
+            self._remote.state.set_hymn_num_mode(s.get('hymn_num_mode', HYMN_NUM_MODE_CONTAINS))
+        if hasattr(self, 'combo_hymn_num_mode'):
+            idx = self.combo_hymn_num_mode.findData(
+                s.get('hymn_num_mode', HYMN_NUM_MODE_CONTAINS)
+            )
+            self.combo_hymn_num_mode.blockSignals(True)
+            self.combo_hymn_num_mode.setCurrentIndex(idx if idx >= 0 else 0)
+            self.combo_hymn_num_mode.blockSignals(False)
         self._set_search_mode(s['search_mode'])
         self._on_open_overlay_toggled(s['open_overlay'])
         self._sync_display_duplicate_checkboxes(s['display_duplicate'])
@@ -4460,10 +4851,20 @@ class MainWindow(QMainWindow, EnhancementMixin):
             (self.chk_minimize_tray, 'minimize_to_tray'),
             (self.chk_viewer_show_debug, 'viewer_show_debug'),
             (self.chk_show_qr_hdr, 'show_qr_code'),
+            (self.chk_show_qr_lan, 'show_qr_lan'),
+            (self.chk_show_qr_fixed, 'show_qr_fixed'),
+            (self.chk_show_qr_quick, 'show_qr_quick'),
+            (self.chk_enable_tunnel_fixed, 'enable_tunnel_fixed'),
+            (self.chk_enable_tunnel_quick, 'enable_tunnel_quick'),
         ):
+            if chk is None:
+                continue
             chk.blockSignals(True)
             chk.setChecked(bool(s.get(key)))
             chk.blockSignals(False)
+        self.enable_tunnel_fixed = bool(s.get('enable_tunnel_fixed'))
+        self.enable_tunnel_quick = bool(s.get('enable_tunnel_quick'))
+        self.enable_tunnel = self.enable_tunnel_fixed or self.enable_tunnel_quick
         for spin, key in (
             (self.spin_qr_x, 'qr_x'),
             (self.spin_qr_y, 'qr_y'),
@@ -4504,6 +4905,152 @@ class MainWindow(QMainWindow, EnhancementMixin):
             self._sync_viewer_now_playing(label=s['last_opened'])
         self._loading_settings = False
         self._sync_desktop_qr_overlay()
+        if self.senior_mode:
+            self._apply_senior_ui(True, persist=False)
+            self._sync_font_size_labels()
+            self._apply_theme()
+        else:
+            self._apply_senior_ui(False, persist=False)
+            self._sync_font_size_labels()
+
+    def _on_senior_mode_toggled(self, checked):
+        if self._loading_settings:
+            return
+        if bool(checked) == bool(self.senior_mode):
+            return
+        if checked:
+            self._enter_senior_mode()
+        else:
+            self._exit_senior_mode()
+
+    def _enter_senior_mode(self):
+        snap = {
+            'theme': self.theme_name if self.theme_name in THEMES else 'dark',
+            'font_size': max(FONT_SIZE_MIN, min(FONT_SIZE_MAX, int(self.font_size))),
+            'click_to_open': bool(self._settings.get('click_to_open')),
+            'search_mode': self.search_mode if self.search_mode in (
+                'book', 'global', 'keyword', 'schedule',
+            ) else 'book',
+        }
+        self.senior_mode = True
+        self._settings['senior_snapshot'] = snap
+        if self.btn_settings.isChecked():
+            self.btn_settings.setChecked(False)
+        self.theme_name = 'light'
+        self.theme_combo.blockSignals(True)
+        self.theme_combo.setCurrentText('light')
+        self.theme_combo.blockSignals(False)
+        self._sync_click_to_open_checkboxes(True)
+        self._set_search_mode('book')
+        # 進入簡易版時若字偏小，升到預設大字；已夠大則保留
+        enter_fs = max(SENIOR_FONT_SIZE, int(self.font_size))
+        enter_fs = max(FONT_SIZE_MIN, min(FONT_SIZE_MAX, enter_fs))
+        self._apply_senior_ui(True, persist=False)
+        self._set_font_size(enter_fs, persist=False)
+        self._apply_theme()
+        self._persist_settings(
+            senior_mode=True,
+            senior_snapshot=snap,
+            theme='light',
+            font_size=enter_fs,
+            click_to_open=True,
+            search_mode='book',
+        )
+        self.btn_senior.blockSignals(True)
+        self.btn_senior.setChecked(True)
+        self.btn_senior.blockSignals(False)
+        self._show_toast('已切換至簡易版', 'ok')
+
+    def _exit_senior_mode(self):
+        snap = self._settings.get('senior_snapshot') or {}
+        theme = snap.get('theme') if snap.get('theme') in THEMES else 'dark'
+        try:
+            font_size = max(FONT_SIZE_MIN, min(FONT_SIZE_MAX, int(snap.get('font_size', 13))))
+        except (TypeError, ValueError):
+            font_size = 13
+        click_to_open = bool(snap.get('click_to_open', False))
+        search_mode = snap.get('search_mode')
+        if search_mode not in ('book', 'global', 'keyword', 'schedule'):
+            search_mode = 'book'
+        self.senior_mode = False
+        self.theme_name = theme
+        self.theme_combo.blockSignals(True)
+        self.theme_combo.setCurrentText(theme)
+        self.theme_combo.blockSignals(False)
+        self._sync_click_to_open_checkboxes(click_to_open)
+        self._apply_senior_ui(False, persist=False)
+        self._set_search_mode(search_mode)
+        self._set_font_size(font_size, persist=False)
+        self._apply_theme()
+        self._persist_settings(
+            senior_mode=False,
+            senior_snapshot=None,
+            theme=theme,
+            font_size=font_size,
+            click_to_open=click_to_open,
+            search_mode=search_mode,
+        )
+        self.btn_senior.blockSignals(True)
+        self.btn_senior.setChecked(False)
+        self.btn_senior.blockSignals(False)
+        self._show_toast('已返回標準版', 'ok')
+
+    def _apply_senior_ui(self, enabled, persist=True):
+        """Show/hide complex chrome and enlarge book-mode controls."""
+        enabled = bool(enabled)
+        self.senior_mode = enabled
+        input_h = SENIOR_INPUT_H if enabled else NORMAL_INPUT_H
+        filter_w = SENIOR_BTN_W if enabled else NORMAL_FILTER_BTN_W
+        side_w = SENIOR_SIDEBAR_W if enabled else NORMAL_SIDEBAR_W
+        hdr_h = SENIOR_HEADER_H if enabled else NORMAL_HEADER_H
+        sb_hdr_h = SENIOR_SIDEBAR_HDR_H if enabled else NORMAL_SIDEBAR_HDR_H
+
+        self.header_frame.setFixedHeight(hdr_h)
+        self.sidebar_frame.setFixedWidth(side_w)
+        self.sidebar_hdr.setFixedHeight(sb_hdr_h)
+
+        self.mode_row_widget.setVisible(not enabled)
+        self.header_opts.setVisible(not enabled)
+        self.btn_reopen_last.setVisible(not enabled)
+        self.legend_widget.setVisible(not enabled)
+        self.btn_sess_prev.setVisible(not enabled)
+        self.btn_sess_next.setVisible(not enabled)
+        if hasattr(self, 'preview_lbl'):
+            self.preview_lbl.setVisible(not enabled and bool(self._settings.get('show_preview', True)))
+        # 簡易版仍可開設定（調字級等）；進入時先收起 overlay
+        if enabled and hasattr(self, 'settings_overlay'):
+            self.settings_overlay.setVisible(False)
+            self.btn_settings.blockSignals(True)
+            self.btn_settings.setChecked(False)
+            self.btn_settings.setText("⚙  設定")
+            self.btn_settings.blockSignals(False)
+
+        self.inp_book.setFixedHeight(input_h)
+        self.inp_num.setFixedHeight(input_h)
+        self.btn_filter.setFixedHeight(input_h)
+        self.btn_filter.setFixedWidth(filter_w)
+        self.btn_senior.setFixedHeight(40 if enabled else 30)
+        self.btn_senior.setText("標準版" if enabled else "簡易版")
+
+        if enabled:
+            self.inp_book.setPlaceholderText("輸入書冊名稱…")
+            self.inp_num.setPlaceholderText("輸入詩歌號或歌名…")
+            self.hint_lbl.setText("左邊選書冊，輸入詩歌號後按「開啟」；也可直接點列表開啟")
+            self.file_hdr.setText("詩歌列表")
+            self.hdr_title.setText("詩歌冊搜索 · 簡易版")
+            if self.search_mode != 'book':
+                self._set_search_mode('book')
+        else:
+            self.inp_book.setPlaceholderText("請按 Ctrl+Enter 開始輸入書冊名稱...")
+            self.inp_num.setPlaceholderText("詩歌號/名")
+            self.hdr_title.setText("詩歌冊搜索")
+            if self.search_mode == 'book':
+                self.file_hdr.setText("檔案 / 書籤")
+                self.hint_lbl.setText("選一個左邊書冊，右邊會列出該書的所有檔案")
+
+        self._update_search_action_buttons()
+        if persist and not self._loading_settings:
+            self._persist_settings(senior_mode=enabled)
 
     def _on_settings_toggled(self, checked):
         if not hasattr(self, 'settings_overlay'):
@@ -4514,12 +5061,20 @@ class MainWindow(QMainWindow, EnhancementMixin):
             self._sync_settings_overlay_geometry()
             self.settings_overlay.raise_()
             QTimer.singleShot(0, self._refresh_settings_layout)
-            QTimer.singleShot(0, self._update_qr_code)
+            # Defer QR; opening settings should not block on QR/desktop sync.
+            QTimer.singleShot(50, lambda: self._update_qr_code(sync_desktop=False))
 
     def _on_settings_tab_changed(self, index):
         if index == getattr(self, '_settings_mobile_tab_index', 2):
-            QTimer.singleShot(0, self._update_qr_code)
-            QTimer.singleShot(0, self._sync_tunnel_options_visibility)
+            QTimer.singleShot(0, self._refresh_mobile_settings_tab)
+
+    def _refresh_mobile_settings_tab(self):
+        """Light refresh when opening Mobile tab (avoid double QR + sc query lag)."""
+        self._sync_tunnel_options_visibility(update_qr=False)
+        self._update_remote_url_labels()
+        self._refresh_remote_log_view()
+        # One QR pass for settings previews only; desktop overlay already synced elsewhere.
+        self._update_qr_code(sync_desktop=False)
 
     def _browse_hymn_folder(self):
         start = self.inp_hymn_folder.text().strip() or self.hymn_folder
@@ -4655,11 +5210,12 @@ class MainWindow(QMainWindow, EnhancementMixin):
             f"background: {t['panel']}; border-bottom: 1px solid {t['border']};"
         )
         self.hdr_title.setStyleSheet(
-            f"font-size: 17px; font-weight: bold; color: {t['text']}; "
+            f"font-size: {22 if getattr(self, 'senior_mode', False) else 17}px; "
+            f"font-weight: bold; color: {t['text']}; "
             f"padding-right: 5px; background: transparent;"
         )
         self.hdr_app_ver.setStyleSheet(
-            f"font-size: 11px; color: {t['muted']}; "
+            f"font-size: {13 if getattr(self, 'senior_mode', False) else 11}px; color: {t['muted']}; "
             f"padding-top: 5px; padding-right: 8px; background: transparent;"
         )
         hdr_chk_style = (
@@ -4669,19 +5225,7 @@ class MainWindow(QMainWindow, EnhancementMixin):
         self.chk_click_to_open_hdr.setStyleSheet(hdr_chk_style)
         self.chk_open_overlay_hdr.setStyleSheet(hdr_chk_style)
         self.chk_display_duplicate_hdr.setStyleSheet(hdr_chk_style)
-        self.chk_remote_accept_hdr.setStyleSheet(hdr_chk_style)
         self.chk_show_qr_hdr.setStyleSheet(hdr_chk_style)
-        hdr_combo_style = (
-            f"QComboBox {{ background: {t['in_bg']}; border: 1.5px solid {t['in_bd']}; "
-            f"border-radius: 8px; padding: 4px 8px; color: {t['text']}; "
-            f"font-size: {max(10, fs - 3)}px; }}"
-            f"QComboBox:disabled {{ color: {t['muted']}; }}"
-            f"QComboBox::drop-down {{ border: none; width: 18px; }}"
-            f"QComboBox QAbstractItemView {{ background: {t['panel']}; color: {t['text']}; "
-            f"border: 1px solid {t['border']}; selection-background-color: {t['accent']}; "
-            f"selection-color: {t['a_text']}; }}"
-        )
-        self.combo_remote_policy_hdr.setStyleSheet(hdr_combo_style)
 
         # ── Footer ───────────────────────────────────────────────
         footer_style = (
@@ -4704,11 +5248,13 @@ class MainWindow(QMainWindow, EnhancementMixin):
             f"border: none; border-bottom: 1px solid {t['border']}; }}"
         )
         self.sb_title.setStyleSheet(
-            f"font-size: 13px; font-weight: bold; color: {t['text']}; "
+            f"font-size: {16 if getattr(self, 'senior_mode', False) else 13}px; "
+            f"font-weight: bold; color: {t['text']}; "
             f"background: transparent; border: none; padding: 0;"
         )
         self.book_count_lbl.setStyleSheet(
-            f"font-size: 11px; color: {t['text2']}; background: {t['panel2']}; "
+            f"font-size: {13 if getattr(self, 'senior_mode', False) else 11}px; "
+            f"color: {t['text2']}; background: {t['panel2']}; "
             f"padding: 2px 9px; border-radius: 10px; border: none;"
         )
         self.legend_widget.setStyleSheet(
@@ -4759,6 +5305,44 @@ class MainWindow(QMainWindow, EnhancementMixin):
             }}
         """
         self.btn_reopen_last.setStyleSheet(hdr_btn_style)
+        senior_btn_style = f"""
+            QPushButton {{
+                border-radius: 14px; padding: 4px 14px;
+                font-size: {fs if getattr(self, 'senior_mode', False) else max(10, fs - 1)}px;
+                font-weight: 700;
+                border: 1.5px solid {t['accent']};
+                color: {t['a_text'] if getattr(self, 'senior_mode', False) else t['accent']};
+                background: {t['accent'] if getattr(self, 'senior_mode', False) else 'transparent'};
+            }}
+            QPushButton:hover {{
+                background: {t['accent_h']}; border-color: {t['accent_h']}; color: {t['a_text']};
+            }}
+            QPushButton:checked {{
+                background: {t['accent']}; border-color: {t['accent']}; color: {t['a_text']};
+            }}
+        """
+        if hasattr(self, 'btn_senior'):
+            self.btn_senior.setStyleSheet(senior_btn_style)
+        font_step_style = f"""
+            QPushButton {{
+                border-radius: 8px; padding: 0;
+                font-size: {max(12, fs - 1)}px; font-weight: 700;
+                border: 1.5px solid {t['in_bd']};
+                color: {t['text']}; background: {t['in_bg']};
+            }}
+            QPushButton:hover:enabled {{
+                border-color: {t['accent_h']}; color: {t['accent_h']};
+            }}
+            QPushButton:disabled {{
+                color: {t['muted']}; border-color: {t['border']};
+            }}
+        """
+        for btn in (
+            getattr(self, 'btn_font_minus_settings', None),
+            getattr(self, 'btn_font_plus_settings', None),
+        ):
+            if btn is not None:
+                btn.setStyleSheet(font_step_style)
         self.btn_settings.setStyleSheet(f"""
             QToolButton#hdrSettingsBtn {{
                 border: none; border-radius: 0; padding: 4px 8px;
@@ -4829,11 +5413,32 @@ class MainWindow(QMainWindow, EnhancementMixin):
             f"font-size: {max(9, fs - 3)}px; color: {t['muted']}; "
             f"padding: 4px 8px 2px; background: transparent;"
         )
-        self.remote_qr_lbl.setStyleSheet(
-            f"QLabel#remoteQrLabel {{ background: #ffffff; color: {t['muted']}; "
+        qr_preview_ss = (
+            f"background: #ffffff; color: {t['muted']}; "
             f"border: 1px solid {t['border']}; border-radius: 8px; "
-            f"font-size: {max(9, fs - 3)}px; padding: 4px; }}"
+            f"font-size: {max(9, fs - 3)}px; padding: 4px;"
         )
+        for lbl in (
+            getattr(self, 'remote_qr_lan_lbl', None),
+            getattr(self, 'remote_qr_fixed_lbl', None),
+            getattr(self, 'remote_qr_quick_lbl', None),
+            getattr(self, 'remote_qr_wan_lbl', None),
+            getattr(self, 'remote_qr_lbl', None),
+        ):
+            if lbl is None:
+                continue
+            name = lbl.objectName() or 'remoteQrLabel'
+            lbl.setStyleSheet(f"QLabel#{name} {{ {qr_preview_ss} }}")
+        for link in (
+            getattr(self, 'remote_qr_lan_link', None),
+            getattr(self, 'remote_qr_fixed_link', None),
+            getattr(self, 'remote_qr_quick_link', None),
+            getattr(self, 'remote_qr_wan_link', None),
+        ):
+            if link is not None:
+                link.setStyleSheet(
+                    f"font-size: {max(9, fs - 3)}px; color: {t['text2']}; background: transparent;"
+                )
         self.remote_log_list.setStyleSheet(
             f"QListWidget {{ background: {t['in_bg']}; color: {t['text2']}; "
             f"border: 1px solid {t['border']}; border-radius: 6px; "
@@ -4928,13 +5533,18 @@ class MainWindow(QMainWindow, EnhancementMixin):
             self.chk_word_auto_fullscreen.setStyleSheet(checkbox_style)
         if hasattr(self, 'chk_pdf_auto_fullscreen'):
             self.chk_pdf_auto_fullscreen.setStyleSheet(checkbox_style)
-        for chk in (self.chk_remote_api, self.chk_remote_accept, self.chk_enable_tunnel,
-                    self.chk_viewer_show_debug,
-                    self.chk_show_preview,
-                    self.chk_auto_rescan, self.chk_startup_tray, self.chk_minimize_tray):
+        for chk in (
+            self.chk_remote_api, self.chk_remote_accept,
+            self.chk_enable_tunnel_fixed, self.chk_enable_tunnel_quick,
+            self.chk_show_qr_lan, self.chk_show_qr_fixed, self.chk_show_qr_quick,
+            self.chk_viewer_show_debug,
+            self.chk_show_preview,
+            self.chk_auto_rescan, self.chk_startup_tray, self.chk_minimize_tray,
+        ):
             chk.setStyleSheet(checkbox_style)
-        for lbl in (self.lbl_remote_port,
+        for lbl in (self.lbl_remote_policy, self.lbl_remote_port,
                     self.lbl_remote_token, self.lbl_remote_url, self.lbl_viewer_url,
+                    self.lbl_quick_url, self.lbl_local_url,
                     self.lbl_public_tunnel_url):
             lbl.setStyleSheet(
                 f"font-size: {fs - 2}px; color: {t['muted']}; background: transparent;"
@@ -4945,9 +5555,23 @@ class MainWindow(QMainWindow, EnhancementMixin):
         self.viewer_url_lbl.setStyleSheet(
             f"font-size: {fs - 2}px; color: {t['ok']}; background: transparent;"
         )
-        self.tunnel_status_lbl.setStyleSheet(
-            f"font-size: {fs - 2}px; color: {t['text2']}; background: transparent;"
-        )
+        if hasattr(self, 'quick_url_lbl'):
+            self.quick_url_lbl.setStyleSheet(
+                f"font-size: {fs - 2}px; color: {t['ok']}; background: transparent;"
+            )
+        if hasattr(self, 'local_url_lbl'):
+            self.local_url_lbl.setStyleSheet(
+                f"font-size: {fs - 2}px; color: {t['accent_h']}; background: transparent;"
+            )
+        for status_lbl in (
+            getattr(self, 'tunnel_status_fixed_lbl', None),
+            getattr(self, 'tunnel_status_quick_lbl', None),
+            getattr(self, 'tunnel_status_lbl', None),
+        ):
+            if status_lbl is not None:
+                status_lbl.setStyleSheet(
+                    f"font-size: {fs - 2}px; color: {t['text2']}; background: transparent;"
+                )
         self.tunnel_help_lbl.setStyleSheet(
             f"font-size: {fs - 3}px; color: {t['muted']}; background: transparent;"
         )
@@ -4979,10 +5603,12 @@ class MainWindow(QMainWindow, EnhancementMixin):
         )
 
         # Settings labels
-        for lbl in (self.lbl_hymn_folder, self.lbl_theme, self.lbl_font, self.lbl_overlay_secs, self.lbl_overlay_pos, self.fs_lbl,
+        for lbl in (self.lbl_hymn_folder, self.lbl_theme, self.lbl_font, self.lbl_hymn_num_mode,
+                    self.lbl_overlay_secs, self.lbl_overlay_pos, self.fs_lbl,
                     self.lbl_overlay_bg, self.lbl_overlay_text_color,
-                    self.lbl_remote_port, self.lbl_remote_token, self.lbl_remote_url,
-                    self.lbl_viewer_url, self.lbl_local_url, self.lbl_public_tunnel_url,
+                    self.lbl_remote_policy, self.lbl_remote_port, self.lbl_remote_token, self.lbl_remote_url,
+                    self.lbl_viewer_url, self.lbl_local_url, self.lbl_quick_url,
+                    self.lbl_public_tunnel_url,
                     self.lbl_qr_x, self.lbl_qr_y, self.lbl_qr_w, self.lbl_qr_h,
                     self.lbl_qr_caption, self.lbl_qr_bg, self.lbl_qr_text_color,
                     self.lbl_qr_text_size, self.lbl_qr_bg_opacity):
@@ -5014,11 +5640,12 @@ class MainWindow(QMainWindow, EnhancementMixin):
         )
 
         # Dropdown
-        self.dropdown.set_theme(self.theme_name)
+        self.dropdown.set_theme(self.theme_name, self.font_size)
         if hasattr(self, 'sched_entry_dropdown'):
-            self.sched_entry_dropdown.set_theme(self.theme_name)
+            self.sched_entry_dropdown.set_theme(self.theme_name, self.font_size)
 
         self._update_qr_code()
+        self._update_search_action_buttons()
 
     def _scan_all(self):
         t = THEMES[self.theme_name]
@@ -5187,7 +5814,7 @@ class MainWindow(QMainWindow, EnhancementMixin):
             self.file_list.addItem(i)
 
         if q:
-            targets = resolve_targets(book, q)
+            targets = resolve_targets(book, q, num_mode=self._hymn_num_mode())
             if not targets:
                 ni = QListWidgetItem("  ⚠  沒有符合條件的檔案或書籤")
                 ni.setForeground(QColor(t['muted']))
@@ -5554,7 +6181,9 @@ class MainWindow(QMainWindow, EnhancementMixin):
             self._record_open(payload=payload)
 
     def _open_hymn_ref(self, book_ref, num_ref='', record=True, *, show_overlay=True, show_toast=True):
-        matches = resolve_open_request(self.books, book_ref, num_ref)
+        matches = resolve_open_request(
+            self.books, book_ref, num_ref, num_mode=self._hymn_num_mode(),
+        )
         if not matches:
             if show_toast:
                 self._show_toast(f'找不到：{book_ref} / {num_ref}', 'warn')
@@ -5608,7 +6237,10 @@ class MainWindow(QMainWindow, EnhancementMixin):
         action_style = getattr(self, '_action_btn_style', '')
         if self.search_mode == 'book':
             is_open = single
-            self.btn_filter.setText('Open' if is_open else 'Filter')
+            if getattr(self, 'senior_mode', False):
+                self.btn_filter.setText('開啟' if is_open else '搜尋')
+            else:
+                self.btn_filter.setText('Open' if is_open else 'Filter')
             self.btn_filter.setStyleSheet(open_style if is_open else action_style)
         elif self.search_mode == 'global':
             is_open = single
@@ -5704,6 +6336,8 @@ class MainWindow(QMainWindow, EnhancementMixin):
             self.sched_entry_dropdown.hide()
 
     def _set_search_mode(self, mode):
+        if getattr(self, 'senior_mode', False) and mode != 'book':
+            mode = 'book'
         if mode != 'keyword':
             self._stop_search_worker()
             self._keyword_debounce.stop()
@@ -5780,20 +6414,48 @@ class MainWindow(QMainWindow, EnhancementMixin):
                 item.setForeground(QColor(t['err']))
         self._persist_settings(theme=name)
 
-    def _on_font_changed(self, val):
+    def _nudge_font(self, delta):
+        try:
+            cur = int(self.font_size)
+        except (TypeError, ValueError):
+            cur = 13
+        self._set_font_size(cur + int(delta))
+
+    def _sync_font_size_labels(self):
+        text = f"{self.font_size}px"
+        if hasattr(self, 'fs_lbl'):
+            self.fs_lbl.setText(text)
+        lo, hi = FONT_SIZE_MIN, FONT_SIZE_MAX
+        at_min = self.font_size <= lo
+        at_max = self.font_size >= hi
+        if hasattr(self, 'btn_font_minus_settings'):
+            self.btn_font_minus_settings.setEnabled(not at_min)
+        if hasattr(self, 'btn_font_plus_settings'):
+            self.btn_font_plus_settings.setEnabled(not at_max)
+
+    def _set_font_size(self, val, persist=True):
+        try:
+            val = int(val)
+        except (TypeError, ValueError):
+            val = 13
+        val = max(FONT_SIZE_MIN, min(FONT_SIZE_MAX, val))
         self.font_size = val
-        self.fs_lbl.setText(f"{val}px")
+        self._sync_font_size_labels()
         self._apply_theme()
         if self.search_mode == 'global':
             self._show_global_results(self.inp_global.text())
         elif self.search_mode == 'keyword':
-            pass  # keep current keyword results
+            pass
         elif self.search_mode == 'schedule':
             self._refresh_schedule_list()
             self._refresh_schedule_search()
         elif self.current_book:
             self._show_book_files(self.current_book, self.inp_num.text().strip().lower())
-        self._persist_settings(font_size=val)
+        if persist and not self._loading_settings:
+            self._persist_settings(font_size=val)
+
+    def _on_font_changed(self, val):
+        self._set_font_size(val)
 
     # ─────────────────────────────────────────────────────────────
     #  TOAST — 顯示底部操作結果提示
@@ -5823,105 +6485,228 @@ class MainWindow(QMainWindow, EnhancementMixin):
             return ''
         return self._remote.url().rstrip('/')
 
-    def _remote_wan_base_url(self):
-        if not self.enable_tunnel or not self._remote.running:
+    def _remote_fixed_base_url(self):
+        if not getattr(self, 'enable_tunnel_fixed', False) or not self._remote.running:
             return ''
-        if getattr(self, '_tunnel', None) and self._tunnel.is_ready and self._tunnel.public_url:
-            return normalize_tunnel_url(self._tunnel.public_url).rstrip('/')
-        if self.named_tunnel_url.strip() and self.tunnel_mode in ('named', 'service'):
+        tun = getattr(self, '_tunnel_fixed', None)
+        if tun and tun.is_ready and tun.public_url:
+            return normalize_tunnel_url(tun.public_url).rstrip('/')
+        if self.named_tunnel_url.strip():
             return normalize_tunnel_url(self.named_tunnel_url).rstrip('/')
         return ''
 
+    def _remote_quick_base_url(self):
+        if not getattr(self, 'enable_tunnel_quick', False) or not self._remote.running:
+            return ''
+        tun = getattr(self, '_tunnel_quick', None)
+        if tun and tun.is_ready and tun.public_url:
+            return normalize_tunnel_url(tun.public_url).rstrip('/')
+        return ''
+
+    def _remote_wan_base_url(self):
+        """相容：優先固定，其次隨機。"""
+        return self._remote_fixed_base_url() or self._remote_quick_base_url()
+
+    def _remote_lan_viewer_url(self):
+        """內網會眾／遙控入口（同 WiFi）。"""
+        if not getattr(self._remote, 'running', False):
+            return ''
+        return self._remote_local_base_url() or ''
+
+    def _remote_fixed_viewer_url(self):
+        base = self._remote_fixed_base_url()
+        return tunnel_viewer_url(base) if base else ''
+
+    def _remote_quick_viewer_url(self):
+        base = self._remote_quick_base_url()
+        return tunnel_viewer_url(base) if base else ''
+
+    def _remote_wan_viewer_url(self):
+        """相容：優先固定，其次隨機。"""
+        return self._remote_fixed_viewer_url() or self._remote_quick_viewer_url()
+
     def _remote_share_url(self):
-        """QR Code：預設本機 WiFi；啟用外網後改用公開 HTTPS。"""
-        if self.enable_tunnel:
-            wan = self._remote_wan_base_url()
-            if wan:
-                return tunnel_viewer_url(wan)
-        return self._remote_local_base_url()
+        """相容舊邏輯：優先外網，否則內網。"""
+        wan = self._remote_wan_viewer_url()
+        if wan:
+            return wan
+        return self._remote_lan_viewer_url()
 
     def _remote_public_base_url(self):
-        """Backward-compatible alias for QR / mixin."""
+        """ Backward-compatible alias for QR / mixin."""
         return self._remote_share_url()
 
     def _remote_viewer_url(self):
-        base = self._remote_wan_base_url()
-        return tunnel_viewer_url(base) if base else '—'
+        return self._remote_fixed_viewer_url() or '—'
 
     def _remote_admin_url(self):
-        base = self._remote_wan_base_url()
+        base = self._remote_fixed_base_url()
         return f"{base}/admin" if base else '—'
 
     def _update_remote_url_labels(self):
         if self._remote.running:
-            local = self._remote_local_base_url()
-            self.local_url_lbl.setText(local or '—')
-            wan_on = bool(getattr(self, 'enable_tunnel', False))
-            if wan_on:
+            self.local_url_lbl.setText(self._remote_lan_viewer_url() or '—')
+            if getattr(self, 'enable_tunnel_fixed', False):
                 self.viewer_url_lbl.setText(self._remote_viewer_url())
                 self.remote_url_lbl.setText(self._remote_admin_url())
             else:
                 self.viewer_url_lbl.setText('—')
                 self.remote_url_lbl.setText('—')
+            if hasattr(self, 'quick_url_lbl'):
+                if getattr(self, 'enable_tunnel_quick', False):
+                    self.quick_url_lbl.setText(self._remote_quick_viewer_url() or '—')
+                else:
+                    self.quick_url_lbl.setText('—')
         else:
             self.local_url_lbl.setText('—')
             self.remote_url_lbl.setText('—')
             self.viewer_url_lbl.setText('—')
+            if hasattr(self, 'quick_url_lbl'):
+                self.quick_url_lbl.setText('—')
+        for lbl_name, url_fn in (
+            ('remote_qr_lan_link', self._remote_lan_viewer_url),
+            ('remote_qr_fixed_link', self._remote_fixed_viewer_url),
+            ('remote_qr_quick_link', self._remote_quick_viewer_url),
+            ('remote_qr_wan_link', self._remote_wan_viewer_url),
+        ):
+            lbl = getattr(self, lbl_name, None)
+            if lbl is None:
+                continue
+            url = url_fn() if self._remote.running else ''
+            lbl.setText(url or '—')
+            lbl.setToolTip(url or '')
+
+    def _set_tunnel_status(self, role, text):
+        self._tunnel_status[role] = text
+        if role == 'fixed':
+            lbl = getattr(self, 'tunnel_status_fixed_lbl', None)
+            prefix = '固定'
+        else:
+            lbl = getattr(self, 'tunnel_status_quick_lbl', None)
+            prefix = '隨機'
+        if lbl is not None:
+            lbl.setText(f'{prefix}：{text}')
 
     def _start_cloudflare_tunnel(self):
-        if not self.enable_tunnel or not self._remote.running:
+        """Start whichever of fixed / quick are enabled."""
+        if not self._remote.running:
             return
-        if self.tunnel_mode == 'named' and is_cloudflared_service_installed():
-            self._show_toast(
-                '本機已有 cloudflared 服務，請改選「共用 Windows 服務」以免開兩個 tunnel',
-                'warn',
-            )
-            self.tunnel_mode = 'service'
-            if hasattr(self, 'tunnel_mode_combo'):
-                idx = self.tunnel_mode_combo.findData('service')
-                if idx >= 0:
-                    self.tunnel_mode_combo.blockSignals(True)
-                    self.tunnel_mode_combo.setCurrentIndex(idx)
-                    self.tunnel_mode_combo.blockSignals(False)
-            self._persist_settings(tunnel_mode='service')
-        if self.tunnel_mode in ('named', 'service') and not self.named_tunnel_url.strip():
-            self.tunnel_status_lbl.setText('外網：請設定公開網址')
-            self._show_toast('啟用外網時需填寫公開網址', 'warn')
+        if self.enable_tunnel_fixed:
+            self._start_fixed_tunnel()
+        else:
+            self._stop_fixed_tunnel()
+        if self.enable_tunnel_quick:
+            self._start_quick_tunnel()
+        else:
+            self._stop_quick_tunnel()
+
+    def _start_fixed_tunnel(self):
+        if not self.enable_tunnel_fixed or not self._remote.running:
             return
-        self.tunnel_status_lbl.setText('外網：正在啟動通道...')
-        self._stop_cloudflare_tunnel()
+        if not self.named_tunnel_url.strip():
+            self._set_tunnel_status('fixed', '請設定公開網址')
+            self._show_toast('啟用固定外網時需填寫公開網址', 'warn')
+            return
+        self._stop_fixed_tunnel()
+        self._set_tunnel_status('fixed', '正在連線…')
         port = self._remote.state.port
-        self._tunnel = CloudflareTunnel(
+        self._tunnel_fixed = CloudflareTunnel(
             local_port=port,
             cloudflared_path=self.cloudflared_path,
-            tunnel_mode=self.tunnel_mode,
+            tunnel_mode='service',
             cloudflared_token=self.cloudflared_token,
             named_tunnel_url=self.named_tunnel_url,
             use_https=False,
-            on_url=lambda url: self.tunnel_url_signal.emit(url),
-            on_ready=lambda url: self.tunnel_ready_signal.emit(url),
-            on_error=lambda msg: self.tunnel_error_signal.emit(msg),
-            on_expired=lambda msg: self.tunnel_expired_signal.emit(msg),
+            on_url=lambda url: self.tunnel_url_signal.emit('fixed', url),
+            on_ready=lambda url: self.tunnel_ready_signal.emit('fixed', url),
+            on_error=lambda msg: self.tunnel_error_signal.emit('fixed', msg),
+            on_expired=lambda msg: self.tunnel_expired_signal.emit('fixed', msg),
         )
-        threading.Thread(target=self._tunnel.start, daemon=True).start()
+        self._tunnel = self._tunnel_fixed
+        threading.Thread(target=self._tunnel_fixed.start, daemon=True).start()
+
+    def _start_quick_tunnel(self):
+        if not self.enable_tunnel_quick or not self._remote.running:
+            return
+        self._stop_quick_tunnel()
+        self._set_tunnel_status('quick', '正在啟動通道…')
+        port = self._remote.state.port
+        self._tunnel_quick = CloudflareTunnel(
+            local_port=port,
+            cloudflared_path=self.cloudflared_path,
+            tunnel_mode='quick',
+            cloudflared_token=self.cloudflared_token,
+            named_tunnel_url='',
+            use_https=False,
+            on_url=lambda url: self.tunnel_url_signal.emit('quick', url),
+            on_ready=lambda url: self.tunnel_ready_signal.emit('quick', url),
+            on_error=lambda msg: self.tunnel_error_signal.emit('quick', msg),
+            on_expired=lambda msg: self.tunnel_expired_signal.emit('quick', msg),
+        )
+        self._tunnel = self._tunnel_quick
+        threading.Thread(target=self._tunnel_quick.start, daemon=True).start()
+
+    def _stop_fixed_tunnel(self):
+        was = self._tunnel_fixed
+        if self._tunnel_fixed:
+            self._tunnel_fixed.stop()
+            self._tunnel_fixed = None
+        if self._tunnel is was:
+            self._tunnel = self._tunnel_quick
+        self._set_tunnel_status('fixed', '—')
+
+    def _stop_quick_tunnel(self):
+        was = self._tunnel_quick
+        if self._tunnel_quick:
+            self._tunnel_quick.stop()
+            self._tunnel_quick = None
+        if self._tunnel is was:
+            self._tunnel = self._tunnel_fixed
+        self._set_tunnel_status('quick', '—')
 
     def _stop_cloudflare_tunnel(self):
-        if self._tunnel:
-            self._tunnel.stop()
-            self._tunnel = None
-        if hasattr(self, 'tunnel_status_lbl'):
-            self.tunnel_status_lbl.setText('外網：—')
+        self._stop_fixed_tunnel()
+        self._stop_quick_tunnel()
+        self._tunnel = None
 
-    def _on_tunnel_toggled(self, checked):
-        self.enable_tunnel = checked
-        self._persist_settings(enable_tunnel=checked)
+    def _persist_tunnel_enables(self):
+        self.enable_tunnel = self.enable_tunnel_fixed or self.enable_tunnel_quick
+        if self.enable_tunnel_fixed:
+            self.tunnel_mode = 'service'
+        elif self.enable_tunnel_quick:
+            self.tunnel_mode = 'quick'
+        self._persist_settings(
+            enable_tunnel=self.enable_tunnel,
+            enable_tunnel_fixed=self.enable_tunnel_fixed,
+            enable_tunnel_quick=self.enable_tunnel_quick,
+            tunnel_mode=self.tunnel_mode,
+        )
+
+    def _on_tunnel_fixed_toggled(self, checked):
+        self.enable_tunnel_fixed = bool(checked)
+        self._persist_tunnel_enables()
         self._sync_tunnel_options_visibility()
         if checked and self._remote.running:
-            self._start_cloudflare_tunnel()
+            self._start_fixed_tunnel()
         elif not checked:
-            self._stop_cloudflare_tunnel()
+            self._stop_fixed_tunnel()
             self._update_remote_url_labels()
             self._update_qr_code()
+
+    def _on_tunnel_quick_toggled(self, checked):
+        self.enable_tunnel_quick = bool(checked)
+        self._persist_tunnel_enables()
+        self._sync_tunnel_options_visibility()
+        if checked and self._remote.running:
+            self._start_quick_tunnel()
+        elif not checked:
+            self._stop_quick_tunnel()
+            self._update_remote_url_labels()
+            self._update_qr_code()
+
+    def _on_tunnel_toggled(self, checked):
+        # Compat: master toggle maps to fixed when used.
+        self._on_tunnel_fixed_toggled(checked)
 
     def _make_tunnel_cmd_row(self, title):
         row = QWidget()
@@ -5965,90 +6750,85 @@ class MainWindow(QMainWindow, EnhancementMixin):
         )
         self.inp_tunnel_restart_cmd.setText(cloudflared_service_restart_command())
 
-    def _sync_tunnel_options_visibility(self):
-        if not hasattr(self, 'chk_enable_tunnel'):
+    def _sync_tunnel_options_visibility(self, update_qr=True):
+        if not hasattr(self, 'chk_enable_tunnel_fixed'):
             return
-        on = self.chk_enable_tunnel.isChecked()
-        mode = self.tunnel_mode_combo.currentData() if on else None
+        fixed_on = self.chk_enable_tunnel_fixed.isChecked()
+        quick_on = self.chk_enable_tunnel_quick.isChecked()
         service_installed = is_cloudflared_service_installed()
-        show_service = on and mode == 'service'
-        show_install = show_service and not service_installed
+        show_install = fixed_on and not service_installed
 
+        if hasattr(self, '_wan_service_box'):
+            self._wan_service_box.setVisible(fixed_on)
         for w in (
-            self.tunnel_mode_combo,
             self.tunnel_help_lbl,
-            self.tunnel_status_lbl,
-        ):
-            w.setVisible(on)
-        self.lbl_public_tunnel_url.setVisible(show_service)
-        self.inp_named_tunnel_url.setVisible(show_service)
-        self.inp_cloudflared_token.setVisible(show_install)
-        self.btn_install_cloudflared.setVisible(show_install)
-        for w in (
+            self.tunnel_status_fixed_lbl,
+            self.lbl_public_tunnel_url,
+            self.inp_named_tunnel_url,
             self.lbl_viewer_url, self.viewer_url_lbl,
             self.lbl_remote_url, self.remote_url_lbl,
+            self.chk_show_qr_fixed,
+            self.remote_qr_fixed_lbl,
+            self.remote_qr_fixed_link,
         ):
-            w.setVisible(on)
-        show_cmds = show_service
+            w.setVisible(fixed_on)
+        self.inp_cloudflared_token.setVisible(show_install)
+        self.btn_install_cloudflared.setVisible(show_install)
         for w in (
             self.lbl_tunnel_cmd_hint,
             self._tunnel_install_row,
             self._tunnel_uninstall_row,
             self._tunnel_restart_row,
         ):
-            w.setVisible(show_cmds)
-        if show_cmds:
+            w.setVisible(fixed_on)
+        if fixed_on:
             self._update_tunnel_debug_commands()
-        if on:
-            self._refresh_tunnel_service_ui()
-        self._update_remote_url_labels()
-        self._update_qr_code()
+            self._refresh_tunnel_service_ui(service_installed=service_installed)
 
-    def _refresh_tunnel_service_ui(self):
+        for w in (
+            self.tunnel_status_quick_lbl,
+            self.lbl_quick_url, self.quick_url_lbl,
+            self.chk_show_qr_quick,
+            self.remote_qr_quick_lbl,
+            self.remote_qr_quick_link,
+        ):
+            w.setVisible(quick_on)
+
+        self._update_remote_url_labels()
+        if update_qr:
+            self._update_qr_code(sync_desktop=False)
+
+    def _refresh_tunnel_service_ui(self, service_installed=None):
         if not hasattr(self, 'tunnel_help_lbl'):
             return
         port = self.spin_remote_port.value() if hasattr(self, 'spin_remote_port') else DEFAULT_PORT
-        service_installed = is_cloudflared_service_installed()
-        mode = getattr(self, 'tunnel_mode', 'service')
+        if service_installed is None:
+            service_installed = is_cloudflared_service_installed()
         dns_note = (
             'DNS：Cloudflare 須有 live → <tunnel-id>.cfargotunnel.com 的 CNAME，'
             '否則公開網址無法解析。'
         )
-        origin_note = (
-            f'Origin（Cloudflare 後台）：http://127.0.0.1:{port} '
-            '（勿用 localhost；Windows 上 localhost 會走 IPv6）。'
-        )
         if service_installed:
             wan_off_note = (
-                ' 未勾選「外網」時 App 只顯示本機 IP；'
+                ' 未勾選「固定網址」時 App 不會主動驗證公開網址；'
                 '若公開網址仍可連，代表 cloudflared Windows 服務仍在背景運行。'
             )
             self.tunnel_help_lbl.setText(
                 f'{shared_tunnel_setup_hint(port)} {dns_note}{wan_off_note}'
             )
             self.btn_install_cloudflared.setEnabled(False)
-            self.btn_install_cloudflared.setToolTip(
-                '本機已有 cloudflared 服務。'
-            )
+            self.btn_install_cloudflared.setToolTip('本機已有 cloudflared 服務。')
         else:
             self.btn_install_cloudflared.setEnabled(True)
-            self.btn_install_cloudflared.setToolTip(
-                '僅在未有 cloudflared 服務時使用。'
+            self.btn_install_cloudflared.setToolTip('僅在未有 cloudflared 服務時使用。')
+            self.tunnel_help_lbl.setText(
+                f'{shared_tunnel_setup_hint(port)} {dns_note}'
             )
-            if mode == 'service':
-                self.tunnel_help_lbl.setText(
-                    f'{shared_tunnel_setup_hint(port)} {dns_note}'
-                )
-            else:
-                self.tunnel_help_lbl.setText(
-                    f'快速通道產生隨機 trycloudflare.com 網址，適合測試。{origin_note}'
-                )
         self._update_tunnel_debug_commands()
 
     def _on_tunnel_mode_changed(self, _index):
-        self.tunnel_mode = self.tunnel_mode_combo.currentData()
-        self._persist_settings(tunnel_mode=self.tunnel_mode)
-        self._sync_tunnel_options_visibility()
+        # Legacy no-op: modes are independent checkboxes now.
+        return
 
     def _on_named_tunnel_url_changed(self, text):
         self.named_tunnel_url = text.strip()
@@ -6057,6 +6837,8 @@ class MainWindow(QMainWindow, EnhancementMixin):
             named_tunnel_url=self.named_tunnel_url,
             remote_path_prefix=self.remote_path_prefix,
         )
+        if self.enable_tunnel_fixed and self._remote.running:
+            self._start_fixed_tunnel()
 
     def _on_cloudflared_token_changed(self, text):
         self.cloudflared_token = text
@@ -6065,7 +6847,7 @@ class MainWindow(QMainWindow, EnhancementMixin):
 
     def _install_cloudflared_service(self):
         if is_cloudflared_service_installed():
-            self._show_toast('本機已有 cloudflared 服務，請改用「共用 Windows 服務」', 'warn')
+            self._show_toast('本機已有 cloudflared 服務', 'warn')
             self._refresh_tunnel_service_ui()
             return
         token = self.inp_cloudflared_token.text().strip()
@@ -6086,31 +6868,42 @@ class MainWindow(QMainWindow, EnhancementMixin):
         self._refresh_tunnel_service_ui()
         if ok:
             self._show_toast(f'cloudflared 服務：{message}', 'ok')
+            if self.enable_tunnel_fixed and self._remote.running:
+                self._start_fixed_tunnel()
         else:
             self._show_toast(f'cloudflared 服務安裝失敗：{message}', 'err')
 
-    def _on_tunnel_url(self, url):
-        self.tunnel_status_lbl.setText(f'外網：{url}\n（等待 Cloudflare...）')
+    def _tunnel_for_role(self, role):
+        if role == 'fixed':
+            return getattr(self, '_tunnel_fixed', None)
+        if role == 'quick':
+            return getattr(self, '_tunnel_quick', None)
+        return getattr(self, '_tunnel', None)
 
-    def _on_tunnel_ready(self, url):
-        if self._tunnel and not self._tunnel.local_dns_ok:
-            self.tunnel_status_lbl.setText(
-                f'外網：{url}\n'
-                '✓ 通道已啟用\n'
-                '⚠ 本機 DNS 無法解析 — 請用 1.1.1.1 或行動網路'
+    def _on_tunnel_url(self, role, url):
+        self._set_tunnel_status(role, f'{url}\n（等待 Cloudflare...）')
+
+    def _on_tunnel_ready(self, role, url):
+        tun = self._tunnel_for_role(role)
+        if tun and not tun.local_dns_ok:
+            self._set_tunnel_status(
+                role,
+                f'{url}\n✓ 通道已啟用（手機／外網可用）\n'
+                '⚠ 本機 DNS 解唔到此網址 — 唔影響掃碼；'
+                '若要喺呢部電腦瀏覽器開，可改 DNS 1.1.1.1 或用手機流量',
             )
         else:
-            self.tunnel_status_lbl.setText(f'外網：{url}\n✓ 通道已啟用')
+            self._set_tunnel_status(role, f'{url}\n✓ 通道已啟用')
         self._update_remote_url_labels()
         self._update_qr_code()
 
-    def _on_tunnel_expired(self, message):
-        self.tunnel_status_lbl.setText(f'外網：⚠ {message}')
+    def _on_tunnel_expired(self, role, message):
+        self._set_tunnel_status(role, f'⚠ {message}')
         self._update_remote_url_labels()
         self._update_qr_code()
 
-    def _on_tunnel_error(self, message):
-        self.tunnel_status_lbl.setText(f'外網：{message}\n（詳情見 exe 旁 tunnel.log）')
+    def _on_tunnel_error(self, role, message):
+        self._set_tunnel_status(role, f'{message}\n（詳情見 exe 旁 tunnel.log）')
 
     def _on_remote_api_toggled(self, checked):
         self._remote.state.set_api_enabled(checked)
@@ -6158,33 +6951,28 @@ class MainWindow(QMainWindow, EnhancementMixin):
     def _sync_remote_accept_enabled(self):
         enabled = self.chk_remote_api.isChecked() and self._remote.running
         self.chk_remote_accept.setEnabled(enabled)
-        self.chk_remote_accept_hdr.setEnabled(enabled)
-        self.combo_remote_policy_hdr.setEnabled(enabled)
+        if hasattr(self, 'combo_remote_policy'):
+            self.combo_remote_policy.setEnabled(enabled)
         if not enabled:
             self._remote.state.set_accepting(False)
             self._sync_remote_accept_checkboxes(checked=False)
 
     def _sync_remote_accept_checkboxes(self, checked):
-        for chk in (self.chk_remote_accept_hdr, self.chk_remote_accept):
-            chk.blockSignals(True)
-            chk.setChecked(checked)
-            chk.blockSignals(False)
+        self.chk_remote_accept.blockSignals(True)
+        self.chk_remote_accept.setChecked(checked)
+        self.chk_remote_accept.blockSignals(False)
 
     def _on_remote_accept_toggled(self, checked):
         self._remote.state.set_accepting(checked)
         self._update_remote_status_label()
         self._persist_settings(remote_accept=checked)
 
-    def _on_remote_accept_hdr_toggled(self, checked):
-        self._sync_remote_accept_checkboxes(checked)
-        self._on_remote_accept_toggled(checked)
-
     def _on_remote_accept_settings_toggled(self, checked):
         self._sync_remote_accept_checkboxes(checked)
         self._on_remote_accept_toggled(checked)
 
     def _on_remote_policy_changed(self, _idx):
-        policy = self.combo_remote_policy_hdr.currentData()
+        policy = self.combo_remote_policy.currentData()
         self._remote.state.set_policy(policy)
         self._persist_settings(remote_policy=policy)
 

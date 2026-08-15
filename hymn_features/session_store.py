@@ -4,14 +4,17 @@ import json
 MAX_SESSION_HISTORY = 50
 
 EXPORT_KEYS = (
-    'theme', 'font_size', 'search_mode', 'open_overlay', 'overlay_duration',
+    'theme', 'font_size', 'senior_mode', 'senior_snapshot', 'search_mode', 'open_overlay', 'overlay_duration',
     'overlay_mode', 'display_duplicate', 'display_switch_mode',
     'word_auto_fullscreen', 'pdf_auto_fullscreen', 'keyword_instant', 'book_auto_focus_hymn',
+    'hymn_num_mode',
     'click_to_open', 'remote_policy', 'remote_port', 'remote_token',
     'operator_mode', 'pinned_books', 'setlist',
     'setlist_index', 'session_history', 'session_cursor', 'show_preview',
     'auto_rescan', 'startup_tray', 'minimize_to_tray', 'last_opened',
-    'show_qr_code', 'qr_x', 'qr_y', 'qr_width', 'qr_height', 'qr_caption', 'qr_bg_color',
+    'show_qr_code', 'show_qr_lan', 'show_qr_fixed', 'show_qr_quick', 'show_qr_wan',
+    'enable_tunnel', 'enable_tunnel_fixed', 'enable_tunnel_quick', 'tunnel_mode',
+    'qr_x', 'qr_y', 'qr_width', 'qr_height', 'qr_caption', 'qr_bg_color',
     'qr_text_color', 'qr_text_size', 'qr_bg_opacity',
 )
 
@@ -246,13 +249,23 @@ def import_settings_subset(settings, data):
                 settings[key] = int(data[key])
             except (TypeError, ValueError):
                 settings[key] = -1
-        elif key in ('operator_mode', 'show_preview', 'auto_rescan', 'startup_tray', 'minimize_to_tray',
+        elif key in ('operator_mode', 'senior_mode', 'show_preview', 'auto_rescan', 'startup_tray', 'minimize_to_tray',
                      'keyword_instant', 'book_auto_focus_hymn', 'click_to_open', 'display_duplicate',
                      'word_auto_fullscreen', 'pdf_auto_fullscreen', 'open_overlay'):
             settings[key] = bool(data[key])
+        elif key == 'senior_snapshot':
+            snap = data[key]
+            if isinstance(snap, dict):
+                settings[key] = snap
+            else:
+                settings[key] = None
+        elif key == 'hymn_num_mode':
+            mode = str(data[key] or '').strip().lower()
+            if mode in ('contains', 'exact'):
+                settings[key] = mode
         elif key == 'font_size':
             try:
-                settings[key] = max(10, min(18, int(data[key])))
+                settings[key] = max(10, min(28, int(data[key])))
             except (TypeError, ValueError):
                 pass
         elif key == 'remote_port':

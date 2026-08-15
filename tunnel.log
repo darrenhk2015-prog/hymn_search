@@ -167,3 +167,103 @@
 [2026-07-12 10:19:32] [INFO] tunnel start | mode=service port=8765 url=https://live.churchofgodtm.com/hymn_search named_url=https://live.churchofgodtm.com/hymn_search service_installed=False service_running=False use_https=False
 [2026-07-12 10:19:32] [ERROR] cloudflared Windows 服務未安裝。請按「安裝 cloudflared 服務」或以管理員執行。 | mode=service port=8765 url=https://live.churchofgodtm.com/hymn_search
 [2026-07-12 10:20:14] [INFO] tunnel stop | mode=service port=8765 url=https://live.churchofgodtm.com/hymn_search
+[2026-08-15 11:22:51] [INFO] tunnel start | mode=service port=8758 url=https://live.churchofgodtm.com/hymn_search named_url=https://live.churchofgodtm.com/hymn_search service_installed=False service_running=False use_https=False
+[2026-08-15 11:22:51] [ERROR] cloudflared Windows 服務未安裝。請按「安裝 cloudflared 服務」或以管理員執行。 | mode=service port=8758 url=https://live.churchofgodtm.com/hymn_search
+[2026-08-15 11:23:20] [INFO] tunnel stop | mode=service port=8758 url=https://live.churchofgodtm.com/hymn_search
+[2026-08-15 11:23:21] [INFO] tunnel start | mode=quick port=8758 url=https://live.churchofgodtm.com/hymn_search named_url=https://live.churchofgodtm.com/hymn_search service_installed=False service_running=False use_https=False
+[2026-08-15 11:23:21] [INFO] cloudflared subprocess session | mode=quick port=8758 stderr_log=C:\python\hymn_search\cloudflared-tunnel.log
+[2026-08-15 11:23:26] [INFO] tunnel url assigned | mode=quick port=8758 url=https://homeless-claims-baking-maui.trycloudflare.com
+[2026-08-15 11:23:31] [INFO] tunnel ready | mode=quick port=8758 url=https://homeless-claims-baking-maui.trycloudflare.com local_dns_ok=True
+[2026-08-15 11:24:13] [INFO] tunnel stop | mode=quick port=8758 url=https://live.churchofgodtm.com/hymn_search
+[2026-08-15 11:24:35] [INFO] tunnel start | mode=quick port=8758 url=https://live.churchofgodtm.com/hymn_search named_url=https://live.churchofgodtm.com/hymn_search service_installed=False service_running=False use_https=False
+[2026-08-15 11:24:35] [INFO] cloudflared subprocess session | mode=quick port=8758 stderr_log=C:\python\hymn_search\cloudflared-tunnel.log
+[2026-08-15 11:24:35] [INFO] tunnel url assigned | mode=quick port=8758 url=https://homeless-claims-baking-maui.trycloudflare.com
+[2026-08-15 11:24:47] [INFO] tunnel stop | mode=quick port=8758 url=https://live.churchofgodtm.com/hymn_search
+[2026-08-15 11:24:47] [ERROR] 本機 HTTP 正常，但 Cloudflare 回 error 530。Cloudflare Zero Trust → Networks → Tunnels → Public Hostname：/hymn_search → http://127.0.0.1:8758（必須用 http，勿用 https 或 localhost）。儲存後以管理員執行：net stop cloudflared && net start cloudflared。 | mode=quick port=8758 url=https://live.churchofgodtm.com/hymn_search
+[2026-08-15 11:24:51] [INFO] tunnel start | mode=quick port=8758 url=https://live.churchofgodtm.com/hymn_search named_url=https://live.churchofgodtm.com/hymn_search service_installed=False service_running=False use_https=False
+[2026-08-15 11:24:51] [INFO] cloudflared subprocess session | mode=quick port=8758 stderr_log=C:\python\hymn_search\cloudflared-tunnel.log
+[2026-08-15 11:24:51] [INFO] tunnel url assigned | mode=quick port=8758 url=https://homeless-claims-baking-maui.trycloudflare.com
+[2026-08-15 11:25:53] [ERROR] 本機 HTTP 正常，但 Cloudflare 回 error 1033。Cloudflare Zero Trust → Networks → Tunnels → Public Hostname：/hymn_search → http://127.0.0.1:8758（必須用 http，勿用 https 或 localhost）。儲存後以管理員執行：net stop cloudflared && net start cloudflared。 | mode=quick port=8758 url=https://homeless-claims-baking-maui.trycloudflare.com
+[2026-08-15 11:27:31] [INFO] tunnel stop | mode=quick port=8758 url=https://live.churchofgodtm.com/hymn_search
+[2026-08-15 11:27:36] [INFO] tunnel start | mode=service port=8758 url=https://live.churchofgodtm.com/hymn_search named_url=https://live.churchofgodtm.com/hymn_search service_installed=False service_running=False use_https=False
+[2026-08-15 11:27:36] [ERROR] cloudflared Windows 服務未安裝。請按「安裝 cloudflared 服務」或以管理員執行。 | mode=service port=8758 url=https://live.churchofgodtm.com/hymn_search
+[2026-08-15 11:27:42] [INFO] tunnel stop | mode=service port=8758 url=https://live.churchofgodtm.com/hymn_search
+[2026-08-15 11:27:42] [INFO] tunnel start | mode=quick port=8758 url=https://live.churchofgodtm.com/hymn_search named_url=https://live.churchofgodtm.com/hymn_search service_installed=False service_running=False use_https=False
+[2026-08-15 11:27:42] [INFO] cloudflared subprocess session | mode=quick port=8758 stderr_log=C:\python\hymn_search\cloudflared-tunnel.log
+[2026-08-15 11:27:44] [INFO] tunnel stop | mode=quick port=8758 url=https://live.churchofgodtm.com/hymn_search
+[2026-08-15 11:27:44] [INFO] tunnel start | mode=service port=8758 url=https://live.churchofgodtm.com/hymn_search named_url=https://live.churchofgodtm.com/hymn_search service_installed=False service_running=False use_https=False
+[2026-08-15 11:27:44] [ERROR] cloudflared Windows 服務未安裝。請按「安裝 cloudflared 服務」或以管理員執行。 | mode=service port=8758 url=https://live.churchofgodtm.com/hymn_search
+[2026-08-15 11:27:49] [INFO] tunnel stop | mode=service port=8758 url=https://live.churchofgodtm.com/hymn_search
+[2026-08-15 11:27:49] [INFO] tunnel start | mode=quick port=8758 url=https://live.churchofgodtm.com/hymn_search named_url=https://live.churchofgodtm.com/hymn_search service_installed=False service_running=False use_https=False
+[2026-08-15 11:27:49] [INFO] cloudflared subprocess session | mode=quick port=8758 stderr_log=C:\python\hymn_search\cloudflared-tunnel.log
+[2026-08-15 11:27:53] [INFO] tunnel url assigned | mode=quick port=8758 url=https://database-newton-flights-grab.trycloudflare.com
+[2026-08-15 11:28:00] [INFO] tunnel ready | mode=quick port=8758 url=https://database-newton-flights-grab.trycloudflare.com local_dns_ok=True
+[2026-08-15 11:28:02] [INFO] tunnel stop | mode=quick port=8758 url=https://live.churchofgodtm.com/hymn_search
+[2026-08-15 11:28:02] [INFO] tunnel start | mode=service port=8758 url=https://live.churchofgodtm.com/hymn_search named_url=https://live.churchofgodtm.com/hymn_search service_installed=False service_running=False use_https=False
+[2026-08-15 11:28:02] [ERROR] cloudflared Windows 服務未安裝。請按「安裝 cloudflared 服務」或以管理員執行。 | mode=service port=8758 url=https://live.churchofgodtm.com/hymn_search
+[2026-08-15 11:28:02] [INFO] tunnel stop | mode=service port=8758 url=https://live.churchofgodtm.com/hymn_search
+[2026-08-15 11:28:02] [INFO] tunnel start | mode=quick port=8758 url=https://live.churchofgodtm.com/hymn_search named_url=https://live.churchofgodtm.com/hymn_search service_installed=False service_running=False use_https=False
+[2026-08-15 11:28:02] [INFO] cloudflared subprocess session | mode=quick port=8758 stderr_log=C:\python\hymn_search\cloudflared-tunnel.log
+[2026-08-15 11:28:05] [INFO] tunnel url assigned | mode=quick port=8758 url=https://homework-response-standard-temperatures.trycloudflare.com
+[2026-08-15 11:28:11] [INFO] tunnel ready | mode=quick port=8758 url=https://homework-response-standard-temperatures.trycloudflare.com local_dns_ok=False
+[2026-08-15 11:28:54] [INFO] tunnel stop | mode=quick port=8758 url=https://live.churchofgodtm.com/hymn_search
+[2026-08-15 11:28:55] [INFO] tunnel start | mode=service port=8758 url=https://live.churchofgodtm.com/hymn_search named_url=https://live.churchofgodtm.com/hymn_search service_installed=False service_running=False use_https=False
+[2026-08-15 11:28:55] [ERROR] cloudflared Windows 服務未安裝。請按「安裝 cloudflared 服務」或以管理員執行。 | mode=service port=8758 url=https://live.churchofgodtm.com/hymn_search
+[2026-08-15 11:29:01] [INFO] tunnel stop | mode=service port=8758 url=https://live.churchofgodtm.com/hymn_search
+[2026-08-15 11:45:06] [INFO] tunnel start | mode=service port=8758 url=https://live.churchofgodtm.com/hymn_search named_url=https://live.churchofgodtm.com/hymn_search service_installed=False service_running=False use_https=False
+[2026-08-15 11:45:06] [ERROR] cloudflared Windows 服務未安裝。請按「安裝 cloudflared 服務」或以管理員執行。 | mode=service port=8758 url=https://live.churchofgodtm.com/hymn_search
+[2026-08-15 11:45:16] [INFO] tunnel stop | mode=service port=8758 url=https://live.churchofgodtm.com/hymn_search
+[2026-08-15 11:45:16] [INFO] tunnel start | mode=quick port=8758 url=https://live.churchofgodtm.com/hymn_search named_url=https://live.churchofgodtm.com/hymn_search service_installed=False service_running=False use_https=False
+[2026-08-15 11:45:16] [INFO] cloudflared subprocess session | mode=quick port=8758 stderr_log=C:\python\hymn_search\cloudflared-tunnel.log
+[2026-08-15 11:45:16] [INFO] tunnel stop | mode=quick port=8758 url=https://live.churchofgodtm.com/hymn_search
+[2026-08-15 11:45:16] [INFO] tunnel start | mode=service port=8758 url=https://live.churchofgodtm.com/hymn_search named_url=https://live.churchofgodtm.com/hymn_search service_installed=False service_running=False use_https=False
+[2026-08-15 11:45:16] [ERROR] cloudflared Windows 服務未安裝。請按「安裝 cloudflared 服務」或以管理員執行。 | mode=service port=8758 url=https://live.churchofgodtm.com/hymn_search
+[2026-08-15 11:45:17] [INFO] tunnel stop | mode=service port=8758 url=https://live.churchofgodtm.com/hymn_search
+[2026-08-15 11:45:17] [INFO] tunnel start | mode=quick port=8758 url=https://live.churchofgodtm.com/hymn_search named_url=https://live.churchofgodtm.com/hymn_search service_installed=False service_running=False use_https=False
+[2026-08-15 11:45:17] [INFO] cloudflared subprocess session | mode=quick port=8758 stderr_log=C:\python\hymn_search\cloudflared-tunnel.log
+[2026-08-15 11:45:17] [INFO] tunnel stop | mode=quick port=8758 url=https://live.churchofgodtm.com/hymn_search
+[2026-08-15 11:45:18] [INFO] tunnel start | mode=service port=8758 url=https://live.churchofgodtm.com/hymn_search named_url=https://live.churchofgodtm.com/hymn_search service_installed=False service_running=False use_https=False
+[2026-08-15 11:45:18] [ERROR] cloudflared Windows 服務未安裝。請按「安裝 cloudflared 服務」或以管理員執行。 | mode=service port=8758 url=https://live.churchofgodtm.com/hymn_search
+[2026-08-15 11:45:20] [INFO] tunnel stop | mode=service port=8758 url=https://live.churchofgodtm.com/hymn_search
+[2026-08-15 11:45:20] [INFO] tunnel start | mode=quick port=8758 url=https://live.churchofgodtm.com/hymn_search named_url=https://live.churchofgodtm.com/hymn_search service_installed=False service_running=False use_https=False
+[2026-08-15 11:45:20] [INFO] cloudflared subprocess session | mode=quick port=8758 stderr_log=C:\python\hymn_search\cloudflared-tunnel.log
+[2026-08-15 11:45:23] [INFO] tunnel url assigned | mode=quick port=8758 url=https://anderson-disabled-basic-cookie.trycloudflare.com
+[2026-08-15 11:45:36] [INFO] tunnel ready | mode=quick port=8758 url=https://anderson-disabled-basic-cookie.trycloudflare.com local_dns_ok=False
+[2026-08-15 11:45:47] [INFO] tunnel stop | mode=quick port=8758 url=https://live.churchofgodtm.com/hymn_search
+[2026-08-15 11:45:47] [INFO] tunnel start | mode=service port=8758 url=https://live.churchofgodtm.com/hymn_search named_url=https://live.churchofgodtm.com/hymn_search service_installed=False service_running=False use_https=False
+[2026-08-15 11:45:47] [ERROR] cloudflared Windows 服務未安裝。請按「安裝 cloudflared 服務」或以管理員執行。 | mode=service port=8758 url=https://live.churchofgodtm.com/hymn_search
+[2026-08-15 11:45:52] [INFO] tunnel stop | mode=service port=8758 url=https://live.churchofgodtm.com/hymn_search
+[2026-08-15 11:45:55] [INFO] tunnel start | mode=service port=8758 url=https://live.churchofgodtm.com/hymn_search named_url=https://live.churchofgodtm.com/hymn_search service_installed=False service_running=False use_https=False
+[2026-08-15 11:45:55] [ERROR] cloudflared Windows 服務未安裝。請按「安裝 cloudflared 服務」或以管理員執行。 | mode=service port=8758 url=https://live.churchofgodtm.com/hymn_search
+[2026-08-15 11:46:02] [INFO] tunnel stop | mode=service port=8758 url=https://live.churchofgodtm.com/hymn_search
+[2026-08-15 11:58:43] [INFO] tunnel start | mode=service port=8758 url=https://live.churchofgodtm.com/hymn_search named_url=https://live.churchofgodtm.com/hymn_search service_installed=False service_running=False use_https=False
+[2026-08-15 11:58:43] [ERROR] cloudflared Windows 服務未安裝。請按「安裝 cloudflared 服務」或以管理員執行。 | mode=service port=8758 url=https://live.churchofgodtm.com/hymn_search
+[2026-08-15 11:58:49] [INFO] tunnel start | mode=quick port=8758 service_installed=False service_running=False use_https=False
+[2026-08-15 11:58:49] [INFO] cloudflared subprocess session | mode=quick port=8758 stderr_log=C:\python\hymn_search\cloudflared-tunnel.log
+[2026-08-15 11:58:52] [INFO] tunnel url assigned | mode=quick port=8758 url=https://accessory-electronics-flexibility-upgrading.trycloudflare.com
+[2026-08-15 11:58:58] [INFO] tunnel ready | mode=quick port=8758 url=https://accessory-electronics-flexibility-upgrading.trycloudflare.com local_dns_ok=False
+[2026-08-15 12:00:09] [INFO] tunnel stop | mode=service port=8758 url=https://live.churchofgodtm.com/hymn_search
+[2026-08-15 12:00:10] [INFO] tunnel start | mode=service port=8758 url=https://live.churchofgodtm.com/hymn_search named_url=https://live.churchofgodtm.com/hymn_search service_installed=True service_running=True use_https=False
+[2026-08-15 12:00:10] [INFO] tunnel url assigned | mode=service port=8758 url=https://live.churchofgodtm.com/hymn_search
+[2026-08-15 12:00:17] [INFO] tunnel stop | mode=quick port=8758
+[2026-08-15 12:00:19] [INFO] tunnel stop | mode=service port=8758 url=https://live.churchofgodtm.com/hymn_search
+[2026-08-15 12:00:20] [INFO] tunnel start | mode=service port=8758 url=https://live.churchofgodtm.com/hymn_search named_url=https://live.churchofgodtm.com/hymn_search service_installed=True service_running=True use_https=False
+[2026-08-15 12:00:20] [INFO] tunnel url assigned | mode=service port=8758 url=https://live.churchofgodtm.com/hymn_search
+[2026-08-15 12:01:22] [ERROR] 本機 HTTP 正常，但 Cloudflare 回 error 502。Cloudflare Zero Trust → Networks → Tunnels → Public Hostname：/hymn_search → http://127.0.0.1:8758（必須用 http，勿用 https 或 localhost）。儲存後以管理員執行：net stop cloudflared && net start cloudflared。 | mode=service port=8758 url=https://live.churchofgodtm.com/hymn_search
+[2026-08-15 12:01:48] [INFO] tunnel stop | mode=service port=8758 url=https://live.churchofgodtm.com/hymn_search
+[2026-08-15 12:01:51] [INFO] tunnel start | mode=service port=8758 url=https://live.churchofgodtm.com/hymn_search named_url=https://live.churchofgodtm.com/hymn_search service_installed=True service_running=True use_https=False
+[2026-08-15 12:01:51] [INFO] tunnel url assigned | mode=service port=8758 url=https://live.churchofgodtm.com/hymn_search
+[2026-08-15 12:02:53] [ERROR] 本機 HTTP 正常，但 Cloudflare 回 error 502。Cloudflare Zero Trust → Networks → Tunnels → Public Hostname：/hymn_search → http://127.0.0.1:8758（必須用 http，勿用 https 或 localhost）。儲存後以管理員執行：net stop cloudflared && net start cloudflared。 | mode=service port=8758 url=https://live.churchofgodtm.com/hymn_search
+[2026-08-15 12:03:46] [INFO] tunnel stop | mode=service port=8758 url=https://live.churchofgodtm.com/hymn_search
+[2026-08-15 12:04:01] [INFO] tunnel start | mode=service port=8758 url=https://live.churchofgodtm.com/hymn_search named_url=https://live.churchofgodtm.com/hymn_search service_installed=True service_running=True use_https=False
+[2026-08-15 12:04:02] [INFO] tunnel url assigned | mode=service port=8758 url=https://live.churchofgodtm.com/hymn_search
+[2026-08-15 12:04:25] [INFO] tunnel stop | mode=service port=8758 url=https://live.churchofgodtm.com/hymn_search
+[2026-08-15 12:04:26] [INFO] tunnel start | mode=service port=8758 url=https://live.churchofgodtm.com/hymn_search named_url=https://live.churchofgodtm.com/hymn_search service_installed=True service_running=True use_https=False
+[2026-08-15 12:04:26] [INFO] tunnel url assigned | mode=service port=8758 url=https://live.churchofgodtm.com/hymn_search
+[2026-08-15 12:05:19] [INFO] tunnel start | mode=quick port=8758 service_installed=True service_running=True use_https=False
+[2026-08-15 12:05:19] [INFO] cloudflared subprocess session | mode=quick port=8758 stderr_log=C:\python\hymn_search\cloudflared-tunnel.log
+[2026-08-15 12:05:23] [INFO] tunnel url assigned | mode=quick port=8758 url=https://sensitivity-pledge-cellular-highs.trycloudflare.com
+[2026-08-15 12:05:27] [ERROR] 本機 HTTP 正常，但固定外網回 error 502。Cloudflare Zero Trust → Networks → Tunnels → Public Hostname：/hymn_search → http://127.0.0.1:8758（必須用 http，勿用 https 或 localhost）。儲存後以管理員執行：net stop cloudflared && net start cloudflared。 | mode=service port=8758 url=https://live.churchofgodtm.com/hymn_search
+[2026-08-15 12:05:28] [INFO] tunnel ready | mode=quick port=8758 url=https://sensitivity-pledge-cellular-highs.trycloudflare.com local_dns_ok=False
+[2026-08-15 12:07:22] [INFO] tunnel stop | mode=service port=8758 url=https://live.churchofgodtm.com/hymn_search
+[2026-08-15 12:08:46] [INFO] tunnel stop | mode=quick port=8758

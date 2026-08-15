@@ -501,6 +501,17 @@ class EnhancementMixin:
             self._persist_settings(**{k: self._settings[k] for k in EXPORT_KEYS if k in self._settings})
             self._sync_operator_mode_checkboxes()
             self._apply_operator_mode_ui()
+            if hasattr(self, '_apply_senior_ui'):
+                self.senior_mode = bool(self._settings.get('senior_mode'))
+                if hasattr(self, 'btn_senior'):
+                    self.btn_senior.blockSignals(True)
+                    self.btn_senior.setChecked(self.senior_mode)
+                    self.btn_senior.blockSignals(False)
+                self.theme_name = self._settings.get('theme', self.theme_name)
+                self.font_size = int(self._settings.get('font_size', self.font_size))
+                self._apply_senior_ui(self.senior_mode, persist=False)
+                if hasattr(self, '_apply_theme'):
+                    self._apply_theme()
             self._apply_setlist_from_settings()
             self._rebuild_book_list()
             self._update_footer_status()
@@ -513,6 +524,14 @@ class EnhancementMixin:
     def _qr_pixmap_from_url(self, url, size=128, border=4):
         from io import BytesIO
         import qrcode
+        key = (str(url), int(size), int(border))
+        cache = getattr(self, '_qr_pixmap_by_key', None)
+        if cache is None:
+            self._qr_pixmap_by_key = {}
+            cache = self._qr_pixmap_by_key
+        hit = cache.get(key)
+        if hit is not None and not hit.isNull():
+            return hit
         buf = BytesIO()
         qr = qrcode.QRCode(border=max(1, int(border)))
         qr.add_data(url)
@@ -532,40 +551,81 @@ class EnhancementMixin:
             Qt.TransformationMode.SmoothTransformation,
         )
         self._qr_pixmap_cache = scaled
+        cache[key] = scaled
+        if len(cache) > 16:
+            cache.pop(next(iter(cache)))
         return scaled
 
-    def _update_qr_code(self):
-        lbl = getattr(self, 'remote_qr_lbl', None)
-        if lbl is not None:
-            lbl.clear()
-            if not getattr(self._remote, 'running', False):
-                lbl.setText('啟用 Mobile API 後顯示 QR')
-                lbl.setToolTip('')
-            else:
-                if hasattr(self, '_remote_share_url'):
-                    url = self._remote_share_url()
-                elif hasattr(self, '_remote_public_base_url'):
-                    url = self._remote_public_base_url()
-                else:
-                    url = self._remote.url()
-                if not url:
-                    lbl.setText('啟用 Mobile API 後顯示 QR')
-                    lbl.setToolTip('')
-                else:
-                    mode = '外網' if getattr(self, 'enable_tunnel', False) else '本機 WiFi'
-                    lbl.setToolTip(f'{url}\n（{mode}）')
-                    try:
-                        pix = self._qr_pixmap_from_url(url, size=128)
-                        lbl.setPixmap(pix)
-                    except ImportError:
-                        lbl.setText('缺少 qrcode\n請 pip install')
-                        lbl.setToolTip(url)
-                    except Exception as exc:
-                        lbl.setText('QR 無法顯示')
-                        lbl.setToolTip(f'{url}\n({exc})')
-        sync = getattr(self, '_sync_desktop_qr_overlay', None)
-        if sync:
-            sync()
+    def _fill_settings_qr_preview(self, lbl, link_lbl, url, empty_text):
+        if lbl is None:
+            return
+        lbl.clear()
+        if link_lbl is not None:
+            link_lbl.setText(url or '—')
+            link_lbl.setToolTip(url or '')
+        if not getattr(self._remote, 'running', False):
+            lbl.setText(empty_text)
+            lbl.setToolTip('')
+            return
+        if not url:
+            lbl.setText(empty_text)
+            lbl.setToolTip('')
+            return
+        lbl.setToolTip(url)
+        try:
+            pix = self._qr_pixmap_from_url(url, size=110)
+            lbl.setPixmap(pix)
+        except ImportError:
+            lbl.setText('缺少 qrcode\n請 pip install')
+        except Exception as exc:
+            lbl.setText('QR 無法顯示')
+            lbl.setToolTip(f'{url}\n({exc})')
+
+    def _update_qr_code(self, sync_desktop=True):
+        running = getattr(self._remote, 'running', False)
+        lan_url = ''
+        fixed_url = ''
+        quick_url = ''
+        if running:
+            if hasattr(self, '_remote_lan_viewer_url'):
+                lan_url = self._remote_lan_viewer_url() or ''
+            if hasattr(self, '_remote_fixed_viewer_url'):
+                fixed_url = self._remote_fixed_viewer_url() or ''
+            if hasattr(self, '_remote_quick_viewer_url'):
+                quick_url = self._remote_quick_viewer_url() or ''
+            elif hasattr(self, '_remote_wan_viewer_url'):
+                # legacy single-wan fallback
+                if getattr(self, 'enable_tunnel_quick', False):
+                    quick_url = self._remote_wan_viewer_url() or ''
+                elif getattr(self, 'enable_tunnel_fixed', False) or getattr(self, 'enable_tunnel', False):
+                    fixed_url = self._remote_wan_viewer_url() or ''
+        self._fill_settings_qr_preview(
+            getattr(self, 'remote_qr_lan_lbl', None) or getattr(self, 'remote_qr_lbl', None),
+            getattr(self, 'remote_qr_lan_link', None),
+            lan_url,
+            '啟用 API 後顯示',
+        )
+        self._fill_settings_qr_preview(
+            getattr(self, 'remote_qr_fixed_lbl', None) or getattr(self, 'remote_qr_wan_lbl', None),
+            getattr(self, 'remote_qr_fixed_link', None) or getattr(self, 'remote_qr_wan_link', None),
+            fixed_url,
+            '啟用固定外網後顯示',
+        )
+        self._fill_settings_qr_preview(
+            getattr(self, 'remote_qr_quick_lbl', None),
+            getattr(self, 'remote_qr_quick_link', None),
+            quick_url,
+            '啟用隨機外網後顯示',
+        )
+        legacy = getattr(self, 'remote_qr_lbl', None)
+        lan_lbl = getattr(self, 'remote_qr_lan_lbl', None)
+        if legacy is not None and legacy is not lan_lbl:
+            url = fixed_url or quick_url or lan_url
+            self._fill_settings_qr_preview(legacy, None, url, '啟用 Mobile API 後顯示 QR')
+        if sync_desktop:
+            sync = getattr(self, '_sync_desktop_qr_overlay', None)
+            if sync:
+                sync()
 
     def _refresh_remote_log_view(self):
         view = getattr(self, 'remote_log_list', None)

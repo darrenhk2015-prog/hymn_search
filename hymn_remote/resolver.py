@@ -3,6 +3,41 @@ import re
 
 from hymn_features.fuzzy import fuzzy_match_score, rank_titles
 
+HYMN_NUM_MODE_CONTAINS = 'contains'
+HYMN_NUM_MODE_EXACT = 'exact'
+HYMN_NUM_MODES = (HYMN_NUM_MODE_CONTAINS, HYMN_NUM_MODE_EXACT)
+
+
+def _extract_primary_number(text):
+    """Primary hymn number from title/filename (ignores leading zeros)."""
+    t = (text or '').strip()
+    if not t:
+        return None
+    stem = re.sub(r'\.[A-Za-z0-9]+$', '', t)
+    if stem.isdigit():
+        return int(stem)
+    m = re.match(r'^第\s*(\d+)\s*首', stem)
+    if m:
+        return int(m.group(1))
+    m = re.match(r'^(\d+)(?:[.。、\s_\-]|$)', stem)
+    if m:
+        return int(m.group(1))
+    nums = re.findall(r'\d+', stem)
+    if not nums:
+        return None
+    if re.search(r'[-_]\d', stem):
+        return int(nums[-1])
+    return int(nums[0])
+
+
+def hymn_number_exact_match(query, text):
+    """Digit query equals primary number in text (004/04/4 all match 4; 14 does not)."""
+    q = str(query or '').strip()
+    if not q.isdigit():
+        return False
+    n = _extract_primary_number(text)
+    return n is not None and n == int(q)
+
 
 def _find_page_in_toc(toc_list, hymn_num, raw=''):
     """Match hymn number in TOC titles (supports H22-04 style codes)."""
@@ -178,7 +213,7 @@ def list_book_entries(book):
     return entries
 
 
-def list_entries_for_book(books, book_ref, query=''):
+def list_entries_for_book(books, book_ref, query='', num_mode=HYMN_NUM_MODE_CONTAINS):
     matched = resolve_books(books, book_ref)
     if not matched:
         return []
@@ -186,6 +221,13 @@ def list_entries_for_book(books, book_ref, query=''):
     q = (query or '').strip()
     if not q:
         return entries
+    mode = num_mode if num_mode in HYMN_NUM_MODES else HYMN_NUM_MODE_CONTAINS
+    if mode == HYMN_NUM_MODE_EXACT and q.isdigit():
+        return [
+            e for e in entries
+            if hymn_number_exact_match(q, e.get('value', ''))
+            or hymn_number_exact_match(q, e.get('label', ''))
+        ]
     ql = q.lower()
     out = []
     for e in entries:
@@ -196,11 +238,20 @@ def list_entries_for_book(books, book_ref, query=''):
     return out
 
 
-def _bookmark_hits(book, q, raw):
+def _bookmark_hits(book, q, raw, num_mode=HYMN_NUM_MODE_CONTAINS):
     """Match bookmark titles; never include the bare PDF file."""
     hits = []
+    exact_num = (
+        num_mode == HYMN_NUM_MODE_EXACT and str(raw).strip().isdigit()
+    )
     for fi in _pdf_files(book):
         if not book.get('bookmark') or not book.get('toc'):
+            continue
+
+        if exact_num:
+            for lvl, title, page in _toc_entries(book, hymns_only=True):
+                if hymn_number_exact_match(raw, title):
+                    hits.append(_bookmark_target(book, fi, title.strip(), page, lvl))
             continue
 
         if raw.isdigit():
@@ -238,14 +289,36 @@ def _bookmark_hits(book, q, raw):
     return _prefer_bookmark_targets(_dedupe_targets(hits))
 
 
-def resolve_targets(book, num_ref):
+def _file_hits(book, q, raw, num_mode=HYMN_NUM_MODE_CONTAINS):
+    exact_num = (
+        num_mode == HYMN_NUM_MODE_EXACT and str(raw).strip().isdigit()
+    )
+    file_hits = []
+    for fi in book.get('files', []):
+        name = fi['name']
+        if exact_num:
+            if hymn_number_exact_match(raw, name):
+                file_hits.append(_file_target(fi, book))
+        elif q in name.lower():
+            file_hits.append(_file_target(fi, book))
+    return file_hits
+
+
+def resolve_targets(book, num_ref, num_mode=HYMN_NUM_MODE_CONTAINS):
     """Return actionable payloads (same shape as file_list UserRole)."""
     raw = str(num_ref).strip() if num_ref is not None else ''
     if not raw:
         return [_file_target(fi, book) for fi in book.get('files', [])]
 
+    mode = num_mode if num_mode in HYMN_NUM_MODES else HYMN_NUM_MODE_CONTAINS
     q = raw.lower()
     kind, _val = _parse_ref(num_ref)
+
+    if mode == HYMN_NUM_MODE_EXACT and raw.isdigit():
+        bm_hits = _bookmark_hits(book, q, raw, mode)
+        if bm_hits:
+            return bm_hits
+        return _file_hits(book, q, raw, mode)
 
     if kind is not None and book.get('bookmark') and book.get('toc'):
         for fi in _pdf_files(book):
@@ -255,18 +328,14 @@ def resolve_targets(book, num_ref):
                 return [_bookmark_target(book, fi, title, page, lvl)]
 
     if book.get('bookmark') and book.get('toc'):
-        bm_hits = _bookmark_hits(book, q, raw)
+        bm_hits = _bookmark_hits(book, q, raw, mode)
         if bm_hits:
             return bm_hits
 
-    file_hits = []
-    for fi in book.get('files', []):
-        if q in fi['name'].lower():
-            file_hits.append(_file_target(fi, book))
-    return file_hits
+    return _file_hits(book, q, raw, mode)
 
 
-def resolve_open_request(books, book_ref, num_ref):
+def resolve_open_request(books, book_ref, num_ref, num_mode=HYMN_NUM_MODE_CONTAINS):
     """Resolve across matched books; dedupe by kind+path+page."""
     matched_books = resolve_books(books, book_ref)
     if not matched_books:
@@ -274,7 +343,7 @@ def resolve_open_request(books, book_ref, num_ref):
 
     all_targets = []
     for book in matched_books:
-        all_targets.extend(resolve_targets(book, num_ref))
+        all_targets.extend(resolve_targets(book, num_ref, num_mode=num_mode))
 
     return _dedupe_targets(all_targets)
 
