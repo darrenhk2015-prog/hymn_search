@@ -86,6 +86,7 @@ from hymn_features.update_check import (
     DEFAULT_UPDATE_CHECK_URL,
     DEFAULT_UPDATE_DOWNLOAD_URL,
     UpdateCheckWorker,
+    normalize_fetch_url,
 )
 
 from hymn_remote.server import RemoteServer
@@ -1175,9 +1176,10 @@ def normalize_settings(raw):
         merged['qr_bg_opacity'] = max(0, min(100, int(opacity)))
     except (TypeError, ValueError):
         merged['qr_bg_opacity'] = DEFAULT_QR_BG_OPACITY
-    merged['update_check_url'] = str(
+    check_url = str(
         merged.get('update_check_url') or DEFAULT_UPDATE_CHECK_URL
     ).strip() or DEFAULT_UPDATE_CHECK_URL
+    merged['update_check_url'] = normalize_fetch_url(check_url) or DEFAULT_UPDATE_CHECK_URL
     merged['update_download_url'] = str(
         merged.get('update_download_url') or DEFAULT_UPDATE_DOWNLOAD_URL
     ).strip() or DEFAULT_UPDATE_DOWNLOAD_URL
