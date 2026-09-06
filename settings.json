@@ -6,17 +6,17 @@
   "senior_mode": false,
   "senior_snapshot": null,
   "search_mode": "book",
-  "open_overlay": false,
+  "open_overlay": true,
   "overlay_duration": 10,
   "overlay_mode": "center_then_corner",
   "overlay_bg_color": "#000000",
   "overlay_text_color": "#ffffff",
   "display_duplicate": false,
   "display_switch_mode": "ccd",
-  "word_auto_fullscreen": false,
+  "word_auto_fullscreen": true,
   "pdf_auto_fullscreen": false,
   "keyword_instant": true,
-  "book_auto_focus_hymn": true,
+  "book_auto_focus_hymn": false,
   "hymn_num_mode": "exact",
   "click_to_open": false,
   "remote_api_enabled": true,
@@ -55,10 +55,198 @@
     {
       "book": "S1神家詩歌合訂本1大字拍子版",
       "num": "2\t祢這份愛"
+    },
+    {
+      "book": "03 神家詩歌",
+      "num": ""
+    },
+    {
+      "book": "22 神家詩歌",
+      "num": "H22-65 神是我們的避難所、力量、隨時的幫助"
     }
   ],
   "setlist_index": 0,
   "session_history": [
+    {
+      "book": "05 神家詩歌",
+      "num": "P02  耶和華尼西.doc",
+      "label": "05 神家詩歌 · P02  耶和華尼西.doc"
+    },
+    {
+      "book": "01 神家詩歌",
+      "num": "P003  004 哈哈歌.doc",
+      "label": "01 神家詩歌 · "
+    },
+    {
+      "book": "22 神家詩歌",
+      "num": "H22-65 神是我們的避難所、力量、隨時的幫助",
+      "label": "22 神家詩歌 · H22-65 神是我們的避難所、力量、隨時的幫助 · P.66"
+    },
+    {
+      "book": "S1神家詩歌合訂本1大字拍子版",
+      "num": "2\t祢這份愛",
+      "label": "S1神家詩歌合訂本1大字拍子版 · 2\t祢這份愛 · P.21"
+    },
+    {
+      "book": "S1神家詩歌合訂本1大字拍子版",
+      "num": "1\t祢這份愛",
+      "label": "S1神家詩歌合訂本1大字拍子版 · 1\t祢這份愛 · P.18"
+    },
+    {
+      "book": "S2神家詩歌合訂本2大字拍子版",
+      "num": "22\t天父的心曲",
+      "label": "S2神家詩歌合訂本2大字拍子版 · 22\t天父的心曲 · P.46"
+    },
+    {
+      "book": "S2神家詩歌合訂本2大字拍子版",
+      "num": "119\t得勝者的信心",
+      "label": "S2神家詩歌合訂本2大字拍子版 · 119\t得勝者的信心 · P.208"
+    },
+    {
+      "book": "S2神家詩歌合訂本2大字拍子版",
+      "num": "119 得勝者的信心_P.208.pdf",
+      "label": "S2神家詩歌合訂本2大字拍子版 · 119 得勝者的信心_P.208.pdf"
+    },
+    {
+      "book": "S2神家詩歌合訂本2大字拍子版",
+      "num": "10 超奇愛的神蹟_P.25.pdf",
+      "label": "S2神家詩歌合訂本2大字拍子版 · 10 超奇愛的神蹟_P.25.pdf"
+    },
+    {
+      "book": "S2神家詩歌合訂本2大字拍子版",
+      "num": "179 珍貴親弟兄的神蹟_P.306.pdf",
+      "label": "S2神家詩歌合訂本2大字拍子版 · 179 珍貴親弟兄的神蹟_P.306.pdf"
+    },
+    {
+      "book": "03 神家詩歌",
+      "num": "P33  親近主的甜美.doc",
+      "label": "03 神家詩歌 · P33  親近主的甜美.doc"
+    },
+    {
+      "book": "03 神家詩歌",
+      "num": "P31  勝過仇敵.doc",
+      "label": "03 神家詩歌 · P31  勝過仇敵.doc"
+    },
+    {
+      "book": "03 神家詩歌",
+      "num": "P30  喜樂之源.doc",
+      "label": "03 神家詩歌 · P30  喜樂之源.doc"
+    },
+    {
+      "book": "03 神家詩歌",
+      "num": "P29  歸到源頭.doc",
+      "label": "03 神家詩歌 · P29  歸到源頭.doc"
+    },
+    {
+      "book": "03 神家詩歌",
+      "num": "P28  恩典的教訓.doc",
+      "label": "03 神家詩歌 · P28  恩典的教訓.doc"
+    },
+    {
+      "book": "03 神家詩歌",
+      "num": "P20  萬古之先的恩典.doc",
+      "label": "03 神家詩歌 · P20  萬古之先的恩典.doc"
+    },
+    {
+      "book": "03 神家詩歌",
+      "num": "P19  慈愛憐憫每晨新.doc",
+      "label": "03 神家詩歌 · P19  慈愛憐憫每晨新.doc"
+    },
+    {
+      "book": "03 神家詩歌",
+      "num": "P02  神得榮耀人蒙恩.doc",
+      "label": "03 神家詩歌 · P02  神得榮耀人蒙恩.doc"
+    },
+    {
+      "book": "04 神家詩歌",
+      "num": "P40 此愛難忘.doc",
+      "label": "04 神家詩歌 · P40 此愛難忘.doc"
+    },
+    {
+      "book": "04 神家詩歌",
+      "num": "P25 這就是愛了.doc",
+      "label": "04 神家詩歌 · P25 這就是愛了.doc"
+    },
+    {
+      "book": "15 神家詩歌",
+      "num": "16.無限者，祢「無限」奇妙.docx",
+      "label": "15 神家詩歌 · 16.無限者，祢「無限」奇妙.docx"
+    },
+    {
+      "book": "15 神家詩歌",
+      "num": "12.深哉，無限者的情愛.docx",
+      "label": "15 神家詩歌 · 12.深哉，無限者的情愛.docx"
+    },
+    {
+      "book": "15 神家詩歌",
+      "num": "34.道成肉身感人、溫暖的表達.docx",
+      "label": "15 神家詩歌 · 34.道成肉身感人、溫暖的表達.docx"
+    },
+    {
+      "book": "02 神家詩歌",
+      "num": "P34  動人隱藏的愛.doc",
+      "label": "02 神家詩歌 · P34  動人隱藏的愛.doc"
+    },
+    {
+      "book": "02 神家詩歌",
+      "num": "P36  真榮耀.doc",
+      "label": "02 神家詩歌 · P36  真榮耀.doc"
+    },
+    {
+      "book": "02 神家詩歌",
+      "num": "P11  榮耀的復活.doc",
+      "label": "02 神家詩歌 · P11  榮耀的復活.doc"
+    },
+    {
+      "book": "02 神家詩歌",
+      "num": "P13  加利利海邊的温情.doc",
+      "label": "02 神家詩歌 · P13  加利利海邊的温情.doc"
+    },
+    {
+      "book": "02 神家詩歌",
+      "num": "P09  與主同坐天上.doc",
+      "label": "02 神家詩歌 · "
+    },
+    {
+      "book": "02 神家詩歌",
+      "num": "P09  與主同坐天上.doc",
+      "label": "02 神家詩歌 · P09  與主同坐天上.doc"
+    },
+    {
+      "book": "02 神家詩歌",
+      "num": "P07  幔子裂開.doc",
+      "label": "02 神家詩歌 · P07  幔子裂開.doc"
+    },
+    {
+      "book": "02 神家詩歌",
+      "num": "P04  十架愛的震撼.doc",
+      "label": "02 神家詩歌 · P04  十架愛的震撼.doc"
+    },
+    {
+      "book": "02 神家詩歌",
+      "num": "P01  祂從天來到地上.doc",
+      "label": "02 神家詩歌 · P01  祂從天來到地上.doc"
+    },
+    {
+      "book": "02 神家詩歌",
+      "num": "P23  最創意的約會.doc",
+      "label": "02 神家詩歌 · P23  最創意的約會.doc"
+    },
+    {
+      "book": "S2神家詩歌合訂本2大字拍子版",
+      "num": "100 十架大愛_P.173.pdf",
+      "label": "S2神家詩歌合訂本2大字拍子版 · 100 十架大愛_P.173.pdf"
+    },
+    {
+      "book": "S2神家詩歌合訂本2大字拍子版",
+      "num": "1 齊來慶祝_P.12.pdf",
+      "label": "S2神家詩歌合訂本2大字拍子版 · 1 齊來慶祝_P.12.pdf"
+    },
+    {
+      "book": "S2神家詩歌合訂本2大字拍子版",
+      "num": "139 當我思念耶穌_P.244.pdf",
+      "label": "S2神家詩歌合訂本2大字拍子版 · 139 當我思念耶穌_P.244.pdf"
+    },
     {
       "book": "01 神家詩歌",
       "num": "P004  005 天父愛我.doc",
@@ -68,11 +256,6 @@
       "book": "06 神家詩歌",
       "num": "P03   賜各樣安慰的父神.doc",
       "label": "06 神家詩歌 · "
-    },
-    {
-      "book": "01 神家詩歌",
-      "num": "P003  004 哈哈歌.doc",
-      "label": "01 神家詩歌 · "
     },
     {
       "book": "02 神家詩歌",
@@ -133,181 +316,6 @@
       "book": "01 神家詩歌",
       "num": "P014  012 耶穌是主.doc",
       "label": "01 神家詩歌 · "
-    },
-    {
-      "book": "S2神家詩歌合訂本2大字拍子版",
-      "num": "132 因信而活_P.232.pdf",
-      "label": "S2神家詩歌合訂本2大字拍子版 · "
-    },
-    {
-      "book": "",
-      "num": "7\t我已奪去父的心",
-      "label": " · 7\t我已奪去父的心 · P.20"
-    },
-    {
-      "book": "S2神家詩歌合訂本2大字拍子版",
-      "num": "103 羔羊的血_P.176.pdf",
-      "label": "S2神家詩歌合訂本2大字拍子版 · "
-    },
-    {
-      "book": "",
-      "num": "5\t我最真實的阿爸",
-      "label": " · 5\t我最真實的阿爸 · P.17"
-    },
-    {
-      "book": "",
-      "num": "3\t父子聖靈的愛河",
-      "label": " · 3\t父子聖靈的愛河 · P.24"
-    },
-    {
-      "book": "",
-      "num": "22\t良人的愛",
-      "label": " · 22\t良人的愛 · P.52"
-    },
-    {
-      "book": "01 神家詩歌",
-      "num": "P002  002 可敬可親紳 003 宇宙講故事.doc",
-      "label": "01 神家詩歌 · "
-    },
-    {
-      "book": "神家詩歌合訂本2大字拍子版",
-      "num": "106 血的至情_P.182.pdf",
-      "label": "神家詩歌合訂本2大字拍子版 · "
-    },
-    {
-      "book": "神家詩歌合訂本2大字拍子版",
-      "num": "104 「成了」至寶甜美的果實_P.178.pdf",
-      "label": "神家詩歌合訂本2大字拍子版 · "
-    },
-    {
-      "book": "神家詩歌合訂本2大字拍子版",
-      "num": "1 齊來慶祝_P.12.pdf",
-      "label": "神家詩歌合訂本2大字拍子版 · "
-    },
-    {
-      "book": "",
-      "num": "5\t愛的創造",
-      "label": " · 5\t愛的創造 · P.27"
-    },
-    {
-      "book": "01 神家詩歌",
-      "num": "P001  001 父的名.doc",
-      "label": "01 神家詩歌 · "
-    },
-    {
-      "book": "05 神家詩歌",
-      "num": "P01  與聖靈配合，想望復興.doc",
-      "label": "05 神家詩歌 · P01  與聖靈配合，想望復興.doc"
-    },
-    {
-      "book": "05 神家詩歌",
-      "num": "P06  釋放、昂首.doc",
-      "label": "05 神家詩歌 · P06  釋放、昂首.doc"
-    },
-    {
-      "book": "07 神家詩歌",
-      "num": "P05   無保留的愛.doc",
-      "label": "07 神家詩歌 · "
-    },
-    {
-      "book": "",
-      "num": "102\t思念十架",
-      "label": " · 102\t思念十架 · P.175"
-    },
-    {
-      "book": "",
-      "num": "81\t我的鴿子、佳偶，我的完全人",
-      "label": " · 81\t我的鴿子、佳偶，我的完全人 · P.140"
-    },
-    {
-      "book": "",
-      "num": "3\tEternal Dance of Love",
-      "label": " · 3\tEternal Dance of Love · P.14"
-    },
-    {
-      "book": "",
-      "num": "4\t至寶的陪伴",
-      "label": " · 4\t至寶的陪伴 · P.16"
-    },
-    {
-      "book": "",
-      "num": "H23-05 耶和華是我的產業、我杯中的分",
-      "label": " · H23-05 耶和華是我的產業、我杯中的分 · P.6"
-    },
-    {
-      "book": "05 神家詩歌",
-      "num": "P03  主領我進入享受.doc",
-      "label": "05 神家詩歌 · "
-    },
-    {
-      "book": "",
-      "num": "H22-06 基督在你們心裡成了有榮耀的盼望",
-      "label": " · H22-06 基督在你們心裡成了有榮耀的盼望 · P.7"
-    },
-    {
-      "book": "",
-      "num": "116\t荊棘裡的百合花",
-      "label": " · 116\t荊棘裡的百合花 · P.205"
-    },
-    {
-      "book": "",
-      "num": "20\t至寶的親情",
-      "label": " · 20\t至寶的親情 · P.43"
-    },
-    {
-      "book": "",
-      "num": "H23-25 天天背負我們重擔的主",
-      "label": " · H23-25 天天背負我們重擔的主 · P.26"
-    },
-    {
-      "book": "",
-      "num": "H22-05 藉著聖靈的能力大有盼望",
-      "label": " · H22-05 藉著聖靈的能力大有盼望 · P.6"
-    },
-    {
-      "book": "合訂本目錄對照表",
-      "num": "合訂本目錄對照表.pdf",
-      "label": "合訂本目錄對照表 · "
-    },
-    {
-      "book": "經典詩歌",
-      "num": "P05   願明主愛.doc",
-      "label": "經典詩歌 · "
-    },
-    {
-      "book": "21 神家詩歌",
-      "num": "07.三一神創發了最相愛、合一、永恆的甜美家！！！.docx",
-      "label": "21 神家詩歌 · "
-    },
-    {
-      "book": "01 神家詩歌",
-      "num": "P013  011 主是我一切.doc",
-      "label": "01 神家詩歌 · "
-    },
-    {
-      "book": "",
-      "num": "H23-45 神不會忘記你們所作的工，為祂名所顯的愛心",
-      "label": " · H23-45 神不會忘記你們所作的工，為祂名所顯的愛心 · P.46"
-    },
-    {
-      "book": "15 神家詩歌",
-      "num": "80.永恆主向祂骨中骨絕配的愛.docx",
-      "label": "15 神家詩歌 · "
-    },
-    {
-      "book": "11 神家詩歌",
-      "num": "P071   無限個人性情愛、真情.doc",
-      "label": "11 神家詩歌 · "
-    },
-    {
-      "book": "21 神家詩歌",
-      "num": "36.祢恩愛瀑布洪流，永遠湧流.docx",
-      "label": "21 神家詩歌 · "
-    },
-    {
-      "book": "03 神家詩歌",
-      "num": "P27  心被恩感.doc",
-      "label": "03 神家詩歌 · "
     }
   ],
   "session_cursor": 0,
@@ -315,13 +323,13 @@
   "auto_rescan": true,
   "startup_tray": false,
   "minimize_to_tray": false,
-  "last_opened": "01 神家詩歌 · ",
+  "last_opened": "05 神家詩歌 · P02  耶和華尼西.doc",
   "show_qr_code": false,
-  "show_qr_lan": false,
+  "show_qr_lan": true,
   "show_qr_fixed": false,
-  "show_qr_quick": false,
-  "show_qr_wan": false,
-  "qr_x": 1400,
+  "show_qr_quick": true,
+  "show_qr_wan": true,
+  "qr_x": 1398,
   "qr_y": 744,
   "qr_width": 180,
   "qr_height": 180,
@@ -329,5 +337,7 @@
   "qr_bg_color": "#000000",
   "qr_text_color": "#ffffff",
   "qr_text_size": 12,
-  "qr_bg_opacity": 20
+  "qr_bg_opacity": 20,
+  "update_check_url": "https://api.github.com/repos/darrenhk2015-prog/hymn_search/releases/latest",
+  "update_download_url": "https://github.com/darrenhk2015-prog/hymn_search/releases/latest"
 }

@@ -406,14 +406,16 @@ class EnhancementMixin:
         dlg.setWindowTitle('快捷鍵')
         lay = QVBoxLayout(dlg)
         lines = [
-            'F1 / F2 / F3 / F4 — 書本 / 全局 / 關鍵字 / 排程模式',
-            'Ctrl+Enter — 聚焦書冊輸入（書本模式）',
+            'F1 / F2 / F3 / F4 / F5 — 標準 / 書本 / 全局 / 關鍵字 / 排程模式',
+            'Ctrl+Enter — 聚焦書冊輸入（標準／書本模式）',
             'Enter — 確認 Mobile 待辦（有待確認時）',
             'Ctrl+← / Ctrl+→ — Session 上一首 / 下一首',
             'Alt+← / Alt+→ — 排程上一首 / 下一首',
-            'Filter / Open — 書本模式過濾或開啟唯一結果',
+            'Filter / Open — 標準／書本模式過濾或開啟唯一結果',
+            '🎤 — 廣東話語音輸入詩歌號／歌名（書冊欄有焦點則輸入書冊）',
             '雙擊搜尋結果 — 排程模式加入播放清單',
             '雙擊播放清單 — 開啟該首',
+            'Esc — 取消全黑畫面（手機遙控「結束並全黑」後）',
         ]
         body = QLabel('\n'.join(lines))
         body.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
@@ -583,44 +585,76 @@ class EnhancementMixin:
 
     def _update_qr_code(self, sync_desktop=True):
         running = getattr(self._remote, 'running', False)
-        lan_url = ''
-        fixed_url = ''
-        quick_url = ''
+        lan_viewer = ''
+        lan_admin = ''
+        fixed_viewer = ''
+        fixed_admin = ''
+        quick_viewer = ''
+        quick_admin = ''
         if running:
             if hasattr(self, '_remote_lan_viewer_url'):
-                lan_url = self._remote_lan_viewer_url() or ''
+                lan_viewer = self._remote_lan_viewer_url() or ''
+            if hasattr(self, '_remote_lan_admin_url'):
+                lan_admin = self._remote_lan_admin_url() or ''
             if hasattr(self, '_remote_fixed_viewer_url'):
-                fixed_url = self._remote_fixed_viewer_url() or ''
+                fixed_viewer = self._remote_fixed_viewer_url() or ''
+            if hasattr(self, '_remote_fixed_admin_url'):
+                fixed_admin = self._remote_fixed_admin_url() or ''
+            elif hasattr(self, '_remote_admin_url'):
+                fixed_admin = self._remote_admin_url() or ''
+                if fixed_admin == '—':
+                    fixed_admin = ''
             if hasattr(self, '_remote_quick_viewer_url'):
-                quick_url = self._remote_quick_viewer_url() or ''
+                quick_viewer = self._remote_quick_viewer_url() or ''
+            if hasattr(self, '_remote_quick_admin_url'):
+                quick_admin = self._remote_quick_admin_url() or ''
             elif hasattr(self, '_remote_wan_viewer_url'):
                 # legacy single-wan fallback
                 if getattr(self, 'enable_tunnel_quick', False):
-                    quick_url = self._remote_wan_viewer_url() or ''
+                    quick_viewer = self._remote_wan_viewer_url() or ''
                 elif getattr(self, 'enable_tunnel_fixed', False) or getattr(self, 'enable_tunnel', False):
-                    fixed_url = self._remote_wan_viewer_url() or ''
+                    fixed_viewer = self._remote_wan_viewer_url() or ''
+
         self._fill_settings_qr_preview(
             getattr(self, 'remote_qr_lan_lbl', None) or getattr(self, 'remote_qr_lbl', None),
             getattr(self, 'remote_qr_lan_link', None),
-            lan_url,
+            lan_viewer,
+            '啟用 API 後顯示',
+        )
+        self._fill_settings_qr_preview(
+            getattr(self, 'remote_qr_lan_admin_lbl', None),
+            getattr(self, 'remote_qr_lan_admin_link', None),
+            lan_admin,
             '啟用 API 後顯示',
         )
         self._fill_settings_qr_preview(
             getattr(self, 'remote_qr_fixed_lbl', None) or getattr(self, 'remote_qr_wan_lbl', None),
             getattr(self, 'remote_qr_fixed_link', None) or getattr(self, 'remote_qr_wan_link', None),
-            fixed_url,
+            fixed_viewer,
+            '啟用固定外網後顯示',
+        )
+        self._fill_settings_qr_preview(
+            getattr(self, 'remote_qr_fixed_admin_lbl', None),
+            getattr(self, 'remote_qr_fixed_admin_link', None),
+            fixed_admin,
             '啟用固定外網後顯示',
         )
         self._fill_settings_qr_preview(
             getattr(self, 'remote_qr_quick_lbl', None),
             getattr(self, 'remote_qr_quick_link', None),
-            quick_url,
+            quick_viewer,
+            '啟用隨機外網後顯示',
+        )
+        self._fill_settings_qr_preview(
+            getattr(self, 'remote_qr_quick_admin_lbl', None),
+            getattr(self, 'remote_qr_quick_admin_link', None),
+            quick_admin,
             '啟用隨機外網後顯示',
         )
         legacy = getattr(self, 'remote_qr_lbl', None)
         lan_lbl = getattr(self, 'remote_qr_lan_lbl', None)
         if legacy is not None and legacy is not lan_lbl:
-            url = fixed_url or quick_url or lan_url
+            url = fixed_viewer or quick_viewer or lan_viewer
             self._fill_settings_qr_preview(legacy, None, url, '啟用 Mobile API 後顯示 QR')
         if sync_desktop:
             sync = getattr(self, '_sync_desktop_qr_overlay', None)

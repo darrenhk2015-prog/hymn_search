@@ -38,6 +38,7 @@ class RemoteControlState:
         self._handle_setlist_prepare_next: Optional[Callable] = None
         self._handle_setlist_prepare_open: Optional[Callable] = None
         self._handle_setlist_add: Optional[Callable] = None
+        self._handle_display: Optional[Callable] = None
         self._get_books: Optional[Callable] = None
         self._get_setlist_info: Optional[Callable] = None
         self.operation_log = RemoteOperationLog()
@@ -47,6 +48,7 @@ class RemoteControlState:
         }
         self.hymn_num_mode = HYMN_NUM_MODE_CONTAINS
         self.viewer_show_debug = False
+        self.click_to_open = False
 
     def set_hymn_num_mode(self, mode):
         mode = str(mode or HYMN_NUM_MODE_CONTAINS).strip().lower()
@@ -69,6 +71,7 @@ class RemoteControlState:
         get_setlist_info=None,
         handle_setlist_prepare_open=None,
         handle_setlist_add=None,
+        handle_display=None,
     ):
         self._get_books = get_books
         self._handle_open = handle_open
@@ -78,6 +81,7 @@ class RemoteControlState:
         self._get_setlist_info = get_setlist_info
         self._handle_setlist_prepare_open = handle_setlist_prepare_open
         self._handle_setlist_add = handle_setlist_add
+        self._handle_display = handle_display
 
     def get_books(self):
         if self._get_books:
@@ -99,7 +103,16 @@ class RemoteControlState:
                 'has_token': bool(self.api_token),
                 'pending_count': len(self._pending),
                 'setlist': self.get_setlist_info(),
+                'click_to_open': bool(self.click_to_open),
             }
+
+    def set_click_to_open(self, enabled: bool):
+        with self._lock:
+            self.click_to_open = bool(enabled)
+
+    def get_click_to_open(self) -> bool:
+        with self._lock:
+            return bool(self.click_to_open)
 
     def log(self, action, detail='', client=''):
         return self.operation_log.add(action, detail, client)
@@ -240,6 +253,21 @@ class RemoteControlState:
             return {'status': 'not_accepting', 'message': '桌面端暫停接受請求，請聯絡操作員'}
 
         return self._dispatch_open_with_policy(book_ref, num_ref)
+
+    def dispatch_display_control(self, action, client=''):
+        action = str(action or '').strip().lower()
+        self.log('display', action, client)
+        if not self.is_accepting():
+            return {'status': 'not_accepting', 'message': '桌面端暫停接受請求，請聯絡操作員'}
+        if action not in ('close', 'black'):
+            return {
+                'status': 'invalid',
+                'message': 'action 須為 close（結束程式）或 black（結束並全黑）',
+            }
+        if not self._handle_display:
+            return {'status': 'unsupported', 'message': '桌面端未支援顯示控制'}
+        self._handle_display(action)
+        return {'status': 'ok', 'action': action}
 
     def dispatch_next(self, client=''):
         self.log('next', '', client)

@@ -6,8 +6,8 @@
 
 【程式簡介】
     本程式為 PyQt6 桌面應用，用於在本地詩歌資料夾中快速搜尋、瀏覽及開啟
-    Word / PDF 詩歌檔案。支援三種搜尋模式（書本 / 全局 / 關鍵字）、PDF 書籤
-    跳頁、全文索引、開啟檔案時的置頂書名提示、多螢幕延伸顯示，以及可選的
+    Word / PDF 詩歌檔案。支援多種搜尋模式（標準 / 書本 / 全局 / 關鍵字 / 排程）、
+    PDF 書籤跳頁、全文索引、開啟檔案時的置頂書名提示、多螢幕延伸顯示，以及可選的
     同步畫面切換（Windows）。
 
 【執行環境】
@@ -50,15 +50,15 @@ from PyQt6.QtWidgets import (
     QLineEdit, QLabel, QListWidget, QListWidgetItem,
     QComboBox, QSlider, QFrame, QScrollArea, QCheckBox, QSpinBox,
     QGroupBox, QFileDialog, QTabWidget, QPlainTextEdit, QMenu, QDialog,
-    QSystemTrayIcon, QColorDialog,
+    QSystemTrayIcon, QColorDialog, QMessageBox,
 )
 from PyQt6.QtCore import (
     Qt, QTimer, QPoint, pyqtSignal, pyqtSlot, QEvent, QThread, QRectF, QRect,
-    QPropertyAnimation, QEasingCurve, QFileSystemWatcher,
+    QPropertyAnimation, QEasingCurve, QFileSystemWatcher, QUrl,
 )
 from PyQt6.QtGui import (
     QColor, QPalette, QFont, QPainter, QPainterPath, QIcon, QShortcut, QKeySequence,
-    QAction, QImage, QPixmap,
+    QAction, QImage, QPixmap, QDesktopServices,
 )
 
 from hymn_features.mixin import EnhancementMixin
@@ -68,11 +68,24 @@ from hymn_features.session_store import (
     add_setlist_entry, advance_setlist_index, clear_setlist, clamp_setlist, move_setlist_entry,
     parse_setlist, remove_setlist_at, session_history_list, setlist_index,
 )
-from hymn_features.display_flow import OpenFlowController, run_pdf_projection_flow, run_word_projection_flow
+from hymn_features.display_flow import (
+    OpenFlowController,
+    close_document_viewer,
+    run_pdf_projection_flow,
+    run_word_projection_flow,
+    send_alt_f4_close,
+)
 from hymn_features.win_display import (
     DISPLAY_SWITCH_CCD,
     DISPLAY_SWITCH_LEGACY,
     switch_windows_display_mode,
+)
+from hymn_features.phone_control_wizard import PhoneControlWizard
+from hymn_features.voice_input import VoiceInputController, voice_input_available
+from hymn_features.update_check import (
+    DEFAULT_UPDATE_CHECK_URL,
+    DEFAULT_UPDATE_DOWNLOAD_URL,
+    UpdateCheckWorker,
 )
 
 from hymn_remote.server import RemoteServer
@@ -874,6 +887,9 @@ DEFAULT_QR_STACK_GAP = 12
 
 SETTINGS_VERSION = 5
 
+SEARCH_MODES = ('standard', 'book', 'global', 'keyword', 'schedule')
+BOOK_UI_MODES = ('standard', 'book')
+
 
 def default_settings():
     return {
@@ -883,7 +899,7 @@ def default_settings():
         'font_size': 13,
         'senior_mode': False,
         'senior_snapshot': None,
-        'search_mode': 'book',
+        'search_mode': 'standard',
         'open_overlay': True,
         'overlay_duration': DEFAULT_OVERLAY_SECS,
         'overlay_mode': OVERLAY_MODE_CORNER,
@@ -944,6 +960,8 @@ def default_settings():
         'qr_text_color': DEFAULT_QR_TEXT_COLOR,
         'qr_text_size': DEFAULT_QR_TEXT_SIZE,
         'qr_bg_opacity': DEFAULT_QR_BG_OPACITY,
+        'update_check_url': DEFAULT_UPDATE_CHECK_URL,
+        'update_download_url': DEFAULT_UPDATE_DOWNLOAD_URL,
     }
 
 
@@ -969,7 +987,7 @@ def normalize_settings(raw):
             pass
         if 'click_to_open' in snap:
             clean['click_to_open'] = bool(snap['click_to_open'])
-        if snap.get('search_mode') in ('book', 'global', 'keyword', 'schedule'):
+        if snap.get('search_mode') in SEARCH_MODES:
             clean['search_mode'] = snap['search_mode']
         merged['senior_snapshot'] = clean or None
     else:
@@ -978,8 +996,8 @@ def normalize_settings(raw):
         merged['font_size'] = max(FONT_SIZE_MIN, min(FONT_SIZE_MAX, int(merged['font_size'])))
     except (TypeError, ValueError):
         merged['font_size'] = SENIOR_FONT_SIZE if merged['senior_mode'] else 13
-    if merged['search_mode'] not in ('book', 'global', 'keyword', 'schedule'):
-        merged['search_mode'] = 'book'
+    if merged['search_mode'] not in SEARCH_MODES:
+        merged['search_mode'] = 'standard'
     merged['open_overlay'] = bool(merged['open_overlay'])
     try:
         dur = int(merged['overlay_duration'])
@@ -1157,6 +1175,12 @@ def normalize_settings(raw):
         merged['qr_bg_opacity'] = max(0, min(100, int(opacity)))
     except (TypeError, ValueError):
         merged['qr_bg_opacity'] = DEFAULT_QR_BG_OPACITY
+    merged['update_check_url'] = str(
+        merged.get('update_check_url') or DEFAULT_UPDATE_CHECK_URL
+    ).strip() or DEFAULT_UPDATE_CHECK_URL
+    merged['update_download_url'] = str(
+        merged.get('update_download_url') or DEFAULT_UPDATE_DOWNLOAD_URL
+    ).strip() or DEFAULT_UPDATE_DOWNLOAD_URL
     merged = clamp_setlist(merged)
     merged['version'] = SETTINGS_VERSION
     return merged
@@ -1796,6 +1820,79 @@ class BookNameOverlay:
             panel._deactivate()
 
 
+class _BlackScreenPanel(QWidget):
+    """One-screen black cover; Esc / double-click dismisses all."""
+
+    def __init__(self, screen):
+        super().__init__(None)
+        self._screen = screen
+        self.setWindowFlags(
+            Qt.WindowType.FramelessWindowHint
+            | Qt.WindowType.WindowStaysOnTopHint
+            | Qt.WindowType.Tool
+        )
+        self.setStyleSheet('background: #000000;')
+        self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
+
+    def keyPressEvent(self, event):
+        if event.key() == Qt.Key.Key_Escape:
+            BlackScreenOverlay.hide()
+            event.accept()
+            return
+        super().keyPressEvent(event)
+
+    def mouseDoubleClickEvent(self, event):
+        BlackScreenOverlay.hide()
+        event.accept()
+
+
+class BlackScreenOverlay:
+    """Fullscreen black cover on all screens until next open or Esc."""
+
+    _panels = []
+
+    @classmethod
+    def _sync_panels(cls):
+        screens = QApplication.screens() or []
+        screen_set = set(screens)
+        for panel in list(cls._panels):
+            if panel._screen not in screen_set:
+                panel.hide()
+                panel.deleteLater()
+                cls._panels.remove(panel)
+        by_screen = {p._screen: p for p in cls._panels}
+        for screen in screens:
+            if screen not in by_screen:
+                cls._panels.append(_BlackScreenPanel(screen))
+
+    @classmethod
+    def show(cls):
+        cls._sync_panels()
+        primary = QApplication.primaryScreen()
+        focus_panel = None
+        for panel in cls._panels:
+            geo = panel._screen.geometry()
+            panel.setGeometry(geo)
+            panel.show()
+            panel.raise_()
+            if panel._screen is primary:
+                focus_panel = panel
+        if focus_panel is None and cls._panels:
+            focus_panel = cls._panels[0]
+        if focus_panel:
+            focus_panel.activateWindow()
+            focus_panel.setFocus(Qt.FocusReason.OtherFocusReason)
+
+    @classmethod
+    def hide(cls):
+        for panel in cls._panels:
+            panel.hide()
+
+    @classmethod
+    def is_visible(cls):
+        return any(p.isVisible() for p in cls._panels)
+
+
 def _normalize_hex_color(value, default='#ffffff'):
     s = str(value or '').strip()
     if not s:
@@ -2272,6 +2369,7 @@ class MainWindow(QMainWindow, EnhancementMixin):
     remote_open_payload = pyqtSignal(dict)
     remote_populate_ui = pyqtSignal(str, str, list)
     remote_pending_request = pyqtSignal(object)
+    remote_display_action = pyqtSignal(str)  # close | black
     tunnel_url_signal = pyqtSignal(str, str)  # role, url
     tunnel_ready_signal = pyqtSignal(str, str)
     tunnel_error_signal = pyqtSignal(str, str)
@@ -2312,6 +2410,7 @@ class MainWindow(QMainWindow, EnhancementMixin):
         self._open_flow = OpenFlowController()
         self._open_flow_generation = 0
         self._open_flow.set_on_esc_cancelled(self.open_flow_esc_cancelled.emit)
+        self._last_opened_path = ''
 
         ver_suffix = f" v{APP_VERSION}"
         if BUILD_DATE:
@@ -2338,6 +2437,7 @@ class MainWindow(QMainWindow, EnhancementMixin):
         self.remote_open_payload.connect(self._on_remote_open_payload)
         self.remote_populate_ui.connect(self._on_remote_populate_ui)
         self.remote_pending_request.connect(self._on_remote_pending_request)
+        self.remote_display_action.connect(self._on_remote_display_action)
         self.tunnel_url_signal.connect(self._on_tunnel_url)
         self.tunnel_ready_signal.connect(self._on_tunnel_ready)
         self.tunnel_error_signal.connect(self._on_tunnel_error)
@@ -2353,6 +2453,7 @@ class MainWindow(QMainWindow, EnhancementMixin):
             self._get_setlist_info,
             self._remote_prepare_setlist_open,
             self._remote_handle_setlist_add,
+            lambda action: self.remote_display_action.emit(action),
         )
 
         self._build_ui()
@@ -2389,10 +2490,11 @@ class MainWindow(QMainWindow, EnhancementMixin):
         sc.setContext(Qt.ShortcutContext.WindowShortcut)
         sc.activated.connect(self._show_shortcuts_dialog)
         for key, mode in (
-            (Qt.Key.Key_F1, 'book'),
-            (Qt.Key.Key_F2, 'global'),
-            (Qt.Key.Key_F3, 'keyword'),
-            (Qt.Key.Key_F4, 'schedule'),
+            (Qt.Key.Key_F1, 'standard'),
+            (Qt.Key.Key_F2, 'book'),
+            (Qt.Key.Key_F3, 'global'),
+            (Qt.Key.Key_F4, 'keyword'),
+            (Qt.Key.Key_F5, 'schedule'),
         ):
             sc = QShortcut(QKeySequence(key), self)
             sc.setContext(Qt.ShortcutContext.WindowShortcut)
@@ -2411,10 +2513,18 @@ class MainWindow(QMainWindow, EnhancementMixin):
             sc = QShortcut(QKeySequence(Qt.Modifier.ALT | key), self)
             sc.setContext(Qt.ShortcutContext.WindowShortcut)
             sc.activated.connect(fn)
+        sc_esc = QShortcut(QKeySequence(Qt.Key.Key_Escape), self)
+        sc_esc.setContext(Qt.ShortcutContext.ApplicationShortcut)
+        sc_esc.activated.connect(self._dismiss_black_screen_shortcut)
+
+    def _dismiss_black_screen_shortcut(self):
+        if BlackScreenOverlay.is_visible():
+            BlackScreenOverlay.hide()
+            self._show_toast('已取消全黑', 'ok')
 
     def _focus_book_input(self):
-        if self.search_mode != 'book':
-            self._set_search_mode('book')
+        if self.search_mode not in BOOK_UI_MODES:
+            self._set_search_mode('standard')
         self.inp_book.setFocus(Qt.FocusReason.ShortcutFocusReason)
 
     def resizeEvent(self, event):
@@ -2523,6 +2633,15 @@ class MainWindow(QMainWindow, EnhancementMixin):
         self.btn_senior.setToolTip("一鍵切換大字簡化介面")
         self.btn_senior.toggled.connect(self._on_senior_mode_toggled)
         h.addWidget(self.btn_senior)
+
+        h.addSpacing(8)
+
+        self.btn_phone_control = QPushButton("手機控制")
+        self.btn_phone_control.setFixedHeight(30)
+        self.btn_phone_control.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_phone_control.setToolTip("教學：開啟外網隨機並用手機 Admin 遙控")
+        self.btn_phone_control.clicked.connect(self._show_phone_control_wizard)
+        h.addWidget(self.btn_phone_control)
 
         h.addSpacing(8)
 
@@ -2712,23 +2831,27 @@ class MainWindow(QMainWindow, EnhancementMixin):
         lay.setContentsMargins(20, 16, 20, 14)
         lay.setSpacing(12)
 
-        # ── 模式切換：書本 / 全局 / 關鍵字 ─────────────────────
+        # ── 模式切換：標準 / 書本 / 全局 / 關鍵字 / 排程 ────────
         self.mode_row_widget = QWidget()
         mode_row = QHBoxLayout(self.mode_row_widget)
         mode_row.setContentsMargins(0, 0, 0, 0)
         mode_row.setSpacing(8)
-        self.btn_book     = QPushButton("📖  書本模式 (F1)")
-        self.btn_global   = QPushButton("🌐  全局模式 (F2)")
-        self.btn_keyword  = QPushButton("🔤  關鍵字模式 (F3)")
-        self.btn_schedule = QPushButton("📋  排程模式 (F4)")
-        for btn in (self.btn_book, self.btn_global, self.btn_keyword, self.btn_schedule):
+        self.btn_standard = QPushButton("⭐  標準模式 (F1)")
+        self.btn_book     = QPushButton("📖  書本模式 (F2)")
+        self.btn_global   = QPushButton("🌐  全局模式 (F3)")
+        self.btn_keyword  = QPushButton("🔤  關鍵字模式 (F4)")
+        self.btn_schedule = QPushButton("📋  排程模式 (F5)")
+        for btn in (self.btn_standard, self.btn_book, self.btn_global,
+                    self.btn_keyword, self.btn_schedule):
             btn.setCheckable(True)
             btn.setFixedHeight(30)
             btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_standard.clicked.connect(lambda: self._set_search_mode('standard'))
         self.btn_book.clicked.connect(lambda: self._set_search_mode('book'))
         self.btn_global.clicked.connect(lambda: self._set_search_mode('global'))
         self.btn_keyword.clicked.connect(lambda: self._set_search_mode('keyword'))
         self.btn_schedule.clicked.connect(lambda: self._set_search_mode('schedule'))
+        mode_row.addWidget(self.btn_standard)
         mode_row.addWidget(self.btn_book)
         mode_row.addWidget(self.btn_global)
         mode_row.addWidget(self.btn_keyword)
@@ -2736,7 +2859,7 @@ class MainWindow(QMainWindow, EnhancementMixin):
         mode_row.addStretch()
         lay.addWidget(self.mode_row_widget)
 
-        # ── 書本模式：書冊 + 詩歌號/名 + Filter/Open 按鈕（上下兩行）──
+        # ── 標準／書本：書冊 + 詩歌號/名 + Filter/Open 按鈕（上下兩行）──
         self.book_row = QWidget()
         br = QVBoxLayout(self.book_row)
         br.setContentsMargins(0, 0, 0, 0)
@@ -2772,6 +2895,15 @@ class MainWindow(QMainWindow, EnhancementMixin):
         self.inp_num.textChanged.connect(self._apply_sidebar_filter)
         self.inp_num.returnPressed.connect(self._on_book_filter_action)
 
+        self.btn_voice = QPushButton("🎤")
+        self.btn_voice.setFixedSize(40, 40)
+        self.btn_voice.setToolTip("語音輸入（廣東話）— 再按一次可停止")
+        self.btn_voice.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_voice.clicked.connect(self._toggle_voice_input)
+        if not voice_input_available():
+            self.btn_voice.setEnabled(False)
+            self.btn_voice.setToolTip("未安裝語音辨識套件")
+
         self.btn_filter = QPushButton("Filter")
         self.btn_filter.setFixedHeight(40)
         self.btn_filter.setFixedWidth(84)
@@ -2781,7 +2913,14 @@ class MainWindow(QMainWindow, EnhancementMixin):
         bar.addWidget(self.btn_sess_prev)
         bar.addWidget(self.btn_sess_next)
         bar.addWidget(self.inp_num, 1)
+        bar.addWidget(self.btn_voice)
         bar.addWidget(self.btn_filter)
+
+        self._voice = VoiceInputController(self, listen_seconds=5.0)
+        self._voice.transcript.connect(self._on_voice_transcript)
+        self._voice.error.connect(self._on_voice_error)
+        self._voice.status.connect(self._on_voice_status)
+        self._voice.listening_changed.connect(self._on_voice_listening_changed)
 
         br.addWidget(self.inp_book)
         br.addWidget(book_action_row)
@@ -3392,14 +3531,23 @@ class MainWindow(QMainWindow, EnhancementMixin):
         self.tunnel_status_quick_lbl.setWordWrap(True)
         self.tunnel_status_lbl = self.tunnel_status_fixed_lbl
 
-        self.lbl_local_url = QLabel("連結")
+        self.lbl_local_url = QLabel("內網會眾")
         self.lbl_local_url.setMinimumWidth(label_min_w)
         self.local_url_lbl = QLabel("—")
         self.local_url_lbl.setWordWrap(True)
         self.local_url_lbl.setTextInteractionFlags(
             Qt.TextInteractionFlag.TextSelectableByMouse
         )
-        self.local_url_lbl.setToolTip("同 WiFi 手機用此網址")
+        self.local_url_lbl.setToolTip("同 WiFi 會眾觀看頁")
+
+        self.lbl_local_admin_url = QLabel("內網遙控")
+        self.lbl_local_admin_url.setMinimumWidth(label_min_w)
+        self.local_admin_url_lbl = QLabel("—")
+        self.local_admin_url_lbl.setWordWrap(True)
+        self.local_admin_url_lbl.setTextInteractionFlags(
+            Qt.TextInteractionFlag.TextSelectableByMouse
+        )
+        self.local_admin_url_lbl.setToolTip("同 WiFi 操作員遙控頁（/admin）")
 
         self.lbl_remote_url = QLabel("固定遙控")
         self.lbl_remote_url.setMinimumWidth(label_min_w)
@@ -3452,41 +3600,30 @@ class MainWindow(QMainWindow, EnhancementMixin):
         self.chk_show_qr_quick.toggled.connect(self._on_show_qr_role_toggled)
         self.chk_show_qr_wan = self.chk_show_qr_fixed
 
-        self.remote_qr_lan_lbl = QLabel("啟用 API 後顯示")
-        self.remote_qr_lan_lbl.setObjectName('remoteQrLanLabel')
-        self.remote_qr_lan_lbl.setFixedSize(120, 120)
-        self.remote_qr_lan_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.remote_qr_lan_lbl.setWordWrap(True)
-        self.remote_qr_lan_link = QLabel("—")
-        self.remote_qr_lan_link.setWordWrap(True)
-        self.remote_qr_lan_link.setTextInteractionFlags(
-            Qt.TextInteractionFlag.TextSelectableByMouse
+        (
+            self.remote_qr_lan_pair,
+            self.remote_qr_lan_lbl, self.remote_qr_lan_link,
+            self.remote_qr_lan_admin_lbl, self.remote_qr_lan_admin_link,
+        ) = self._make_settings_qr_pair(
+            'remoteQrLanLabel', 'remoteQrLanAdminLabel',
+            '啟用 API 後顯示', '啟用 API 後顯示',
         )
-        self.remote_qr_lan_link.setAlignment(Qt.AlignmentFlag.AlignHCenter)
-
-        self.remote_qr_fixed_lbl = QLabel("啟用固定外網後顯示")
-        self.remote_qr_fixed_lbl.setObjectName('remoteQrFixedLabel')
-        self.remote_qr_fixed_lbl.setFixedSize(120, 120)
-        self.remote_qr_fixed_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.remote_qr_fixed_lbl.setWordWrap(True)
-        self.remote_qr_fixed_link = QLabel("—")
-        self.remote_qr_fixed_link.setWordWrap(True)
-        self.remote_qr_fixed_link.setTextInteractionFlags(
-            Qt.TextInteractionFlag.TextSelectableByMouse
+        (
+            self.remote_qr_fixed_pair,
+            self.remote_qr_fixed_lbl, self.remote_qr_fixed_link,
+            self.remote_qr_fixed_admin_lbl, self.remote_qr_fixed_admin_link,
+        ) = self._make_settings_qr_pair(
+            'remoteQrFixedLabel', 'remoteQrFixedAdminLabel',
+            '啟用固定外網後顯示', '啟用固定外網後顯示',
         )
-        self.remote_qr_fixed_link.setAlignment(Qt.AlignmentFlag.AlignHCenter)
-
-        self.remote_qr_quick_lbl = QLabel("啟用隨機外網後顯示")
-        self.remote_qr_quick_lbl.setObjectName('remoteQrQuickLabel')
-        self.remote_qr_quick_lbl.setFixedSize(120, 120)
-        self.remote_qr_quick_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.remote_qr_quick_lbl.setWordWrap(True)
-        self.remote_qr_quick_link = QLabel("—")
-        self.remote_qr_quick_link.setWordWrap(True)
-        self.remote_qr_quick_link.setTextInteractionFlags(
-            Qt.TextInteractionFlag.TextSelectableByMouse
+        (
+            self.remote_qr_quick_pair,
+            self.remote_qr_quick_lbl, self.remote_qr_quick_link,
+            self.remote_qr_quick_admin_lbl, self.remote_qr_quick_admin_link,
+        ) = self._make_settings_qr_pair(
+            'remoteQrQuickLabel', 'remoteQrQuickAdminLabel',
+            '啟用隨機外網後顯示', '啟用隨機外網後顯示',
         )
-        self.remote_qr_quick_link.setAlignment(Qt.AlignmentFlag.AlignHCenter)
 
         self.remote_qr_wan_lbl = self.remote_qr_fixed_lbl
         self.remote_qr_wan_link = self.remote_qr_fixed_link
@@ -3637,12 +3774,10 @@ class MainWindow(QMainWindow, EnhancementMixin):
         lan_grid.setColumnStretch(1, 1)
         lan_grid.addWidget(self.lbl_local_url, 0, 0)
         lan_grid.addWidget(self.local_url_lbl, 0, 1)
-        lan_grid.addWidget(self.chk_show_qr_lan, 1, 0, 1, 2)
-        lan_qr_box = QVBoxLayout()
-        lan_qr_box.setSpacing(4)
-        lan_qr_box.addWidget(self.remote_qr_lan_lbl, 0, Qt.AlignmentFlag.AlignHCenter)
-        lan_qr_box.addWidget(self.remote_qr_lan_link)
-        lan_grid.addLayout(lan_qr_box, 2, 0, 1, 2)
+        lan_grid.addWidget(self.lbl_local_admin_url, 1, 0)
+        lan_grid.addWidget(self.local_admin_url_lbl, 1, 1)
+        lan_grid.addWidget(self.chk_show_qr_lan, 2, 0, 1, 2)
+        lan_grid.addWidget(self.remote_qr_lan_pair, 3, 0, 1, 2)
 
         # ── 分區：外網固定 ──
         grp_wan_fixed = QGroupBox("外網 · 固定網址")
@@ -3677,11 +3812,7 @@ class MainWindow(QMainWindow, EnhancementMixin):
         wan_urls.addWidget(self.remote_url_lbl, 1, 1)
         wan_fixed_lay.addLayout(wan_urls)
         wan_fixed_lay.addWidget(self.chk_show_qr_fixed)
-        fixed_qr_box = QVBoxLayout()
-        fixed_qr_box.setSpacing(4)
-        fixed_qr_box.addWidget(self.remote_qr_fixed_lbl, 0, Qt.AlignmentFlag.AlignHCenter)
-        fixed_qr_box.addWidget(self.remote_qr_fixed_link)
-        wan_fixed_lay.addLayout(fixed_qr_box)
+        wan_fixed_lay.addWidget(self.remote_qr_fixed_pair)
 
         # ── 分區：外網隨機 ──
         grp_wan_quick = QGroupBox("外網 · 隨機網址")
@@ -3695,13 +3826,19 @@ class MainWindow(QMainWindow, EnhancementMixin):
         quick_urls.setColumnStretch(1, 1)
         quick_urls.addWidget(self.lbl_quick_url, 0, 0)
         quick_urls.addWidget(self.quick_url_lbl, 0, 1)
+        self.lbl_quick_admin_url = QLabel("隨機遙控")
+        self.lbl_quick_admin_url.setMinimumWidth(label_min_w)
+        self.quick_admin_url_lbl = QLabel("—")
+        self.quick_admin_url_lbl.setWordWrap(True)
+        self.quick_admin_url_lbl.setTextInteractionFlags(
+            Qt.TextInteractionFlag.TextSelectableByMouse
+        )
+        self.quick_admin_url_lbl.setToolTip("快速通道臨時 HTTPS 操作員遙控頁（/admin）")
+        quick_urls.addWidget(self.lbl_quick_admin_url, 1, 0)
+        quick_urls.addWidget(self.quick_admin_url_lbl, 1, 1)
         wan_quick_lay.addLayout(quick_urls)
         wan_quick_lay.addWidget(self.chk_show_qr_quick)
-        quick_qr_box = QVBoxLayout()
-        quick_qr_box.setSpacing(4)
-        quick_qr_box.addWidget(self.remote_qr_quick_lbl, 0, Qt.AlignmentFlag.AlignHCenter)
-        quick_qr_box.addWidget(self.remote_qr_quick_link)
-        wan_quick_lay.addLayout(quick_qr_box)
+        wan_quick_lay.addWidget(self.remote_qr_quick_pair)
 
         # ── 分區：桌面 QR 樣式（內網／外網共用）──
         grp_qr = QGroupBox("桌面 QR 樣式（內網／固定／隨機共用）")
@@ -3765,12 +3902,39 @@ class MainWindow(QMainWindow, EnhancementMixin):
         tab_about_lay = QVBoxLayout(tab_about)
         tab_about_lay.setContentsMargins(0, 8, 0, 0)
         tab_about_lay.setSpacing(12)
-        about_ver = QLabel(f"詩歌冊搜索系統 v{APP_VERSION}" + (f"  ·  {BUILD_DATE}" if BUILD_DATE else ""))
-        about_ver.setAlignment(Qt.AlignmentFlag.AlignLeft)
-        tab_about_lay.addWidget(about_ver)
+        self.about_ver_lbl = QLabel(
+            f"詩歌冊搜索系統 v{APP_VERSION}" + (f"  ·  {BUILD_DATE}" if BUILD_DATE else "")
+        )
+        self.about_ver_lbl.setAlignment(Qt.AlignmentFlag.AlignLeft)
+        tab_about_lay.addWidget(self.about_ver_lbl)
         about_design = QLabel("Designed By Darren Ho")
         about_design.setAlignment(Qt.AlignmentFlag.AlignLeft)
         tab_about_lay.addWidget(about_design)
+
+        grp_update = QGroupBox("更新")
+        update_lay = QVBoxLayout(grp_update)
+        update_lay.setSpacing(8)
+        self.lbl_update_status = QLabel("按「檢查更新」查詢是否有新版本")
+        self.lbl_update_status.setWordWrap(True)
+        update_lay.addWidget(self.lbl_update_status)
+        update_btn_row = QHBoxLayout()
+        update_btn_row.setSpacing(8)
+        self.btn_check_update = QPushButton("檢查更新")
+        self.btn_check_update.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_check_update.setToolTip(
+            "查詢 GitHub Release／latest.json，比較版本號"
+        )
+        self.btn_check_update.clicked.connect(self._on_check_update)
+        self.btn_open_download = QPushButton("前往下載")
+        self.btn_open_download.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_open_download.setToolTip("用瀏覽器開啟下載頁")
+        self.btn_open_download.clicked.connect(self._on_open_download_page)
+        update_btn_row.addWidget(self.btn_check_update)
+        update_btn_row.addWidget(self.btn_open_download)
+        update_btn_row.addStretch()
+        update_lay.addLayout(update_btn_row)
+        tab_about_lay.addWidget(grp_update)
+
         about_btn_row = QHBoxLayout()
         about_btn_row.setSpacing(8)
         self.btn_export_settings = QPushButton("匯出設定")
@@ -3789,6 +3953,7 @@ class MainWindow(QMainWindow, EnhancementMixin):
         )
         tab_about_lay.addWidget(self.settings_credit)
         tab_about_lay.addStretch()
+        self._update_check_worker = None
 
         # ── 會眾 Drive Mapping（外置 gdrive_hymn_index.json）────────
         tab_mapping = QWidget()
@@ -4177,8 +4342,10 @@ class MainWindow(QMainWindow, EnhancementMixin):
         self._persist_settings(hymn_num_mode=mode)
         if getattr(self, '_remote', None):
             self._remote.state.set_hymn_num_mode(mode)
-        if self.search_mode == 'book' and self.current_book:
+        if self.search_mode in BOOK_UI_MODES and self.current_book:
             self._show_book_files(self.current_book, self.inp_num.text().strip().lower())
+        elif self.search_mode == 'standard' and not self.inp_book.text().strip():
+            self._apply_sidebar_filter()
         elif self.search_mode == 'schedule':
             self._refresh_schedule_search()
 
@@ -4191,6 +4358,10 @@ class MainWindow(QMainWindow, EnhancementMixin):
     def _on_click_to_open_toggled(self, checked):
         self._sync_click_to_open_checkboxes(checked)
         self._persist_settings(click_to_open=checked)
+        try:
+            self._remote.state.set_click_to_open(checked)
+        except Exception:
+            pass
 
     def _on_click_to_open_hdr_toggled(self, checked):
         self._sync_click_to_open_checkboxes(checked)
@@ -4218,6 +4389,45 @@ class MainWindow(QMainWindow, EnhancementMixin):
         lay.addWidget(preview)
         lay.addWidget(btn)
         return row, inp, preview, btn
+
+    def _make_settings_qr_column(self, title, object_name, empty_text):
+        col = QWidget()
+        lay = QVBoxLayout(col)
+        lay.setContentsMargins(0, 0, 0, 0)
+        lay.setSpacing(4)
+        title_lbl = QLabel(title)
+        title_lbl.setAlignment(Qt.AlignmentFlag.AlignHCenter)
+        title_lbl.setObjectName('remoteQrTitle')
+        qr_lbl = QLabel(empty_text)
+        qr_lbl.setObjectName(object_name)
+        qr_lbl.setFixedSize(120, 120)
+        qr_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        qr_lbl.setWordWrap(True)
+        link_lbl = QLabel("—")
+        link_lbl.setWordWrap(True)
+        link_lbl.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
+        link_lbl.setAlignment(Qt.AlignmentFlag.AlignHCenter)
+        lay.addWidget(title_lbl)
+        lay.addWidget(qr_lbl, 0, Qt.AlignmentFlag.AlignHCenter)
+        lay.addWidget(link_lbl)
+        return col, qr_lbl, link_lbl, title_lbl
+
+    def _make_settings_qr_pair(
+        self, viewer_obj_name, admin_obj_name, viewer_empty, admin_empty,
+    ):
+        pair = QWidget()
+        row = QHBoxLayout(pair)
+        row.setContentsMargins(0, 0, 0, 0)
+        row.setSpacing(16)
+        viewer_col, viewer_qr, viewer_link, _ = self._make_settings_qr_column(
+            '普通（會眾）', viewer_obj_name, viewer_empty,
+        )
+        admin_col, admin_qr, admin_link, _ = self._make_settings_qr_column(
+            'Admin（遙控）', admin_obj_name, admin_empty,
+        )
+        row.addWidget(viewer_col, 1)
+        row.addWidget(admin_col, 1)
+        return pair, viewer_qr, viewer_link, admin_qr, admin_link
 
     def _update_qr_color_preview(self, preview_lbl, hex_color, fallback='#ffffff'):
         raw = str(hex_color or '').strip()
@@ -4800,6 +5010,8 @@ class MainWindow(QMainWindow, EnhancementMixin):
         self._remote.state.set_viewer_show_debug(s['viewer_show_debug'])
         if hasattr(self._remote.state, 'set_hymn_num_mode'):
             self._remote.state.set_hymn_num_mode(s.get('hymn_num_mode', HYMN_NUM_MODE_CONTAINS))
+        if hasattr(self._remote.state, 'set_click_to_open'):
+            self._remote.state.set_click_to_open(s.get('click_to_open', False))
         if hasattr(self, 'combo_hymn_num_mode'):
             idx = self.combo_hymn_num_mode.findData(
                 s.get('hymn_num_mode', HYMN_NUM_MODE_CONTAINS)
@@ -4928,9 +5140,7 @@ class MainWindow(QMainWindow, EnhancementMixin):
             'theme': self.theme_name if self.theme_name in THEMES else 'dark',
             'font_size': max(FONT_SIZE_MIN, min(FONT_SIZE_MAX, int(self.font_size))),
             'click_to_open': bool(self._settings.get('click_to_open')),
-            'search_mode': self.search_mode if self.search_mode in (
-                'book', 'global', 'keyword', 'schedule',
-            ) else 'book',
+            'search_mode': self.search_mode if self.search_mode in SEARCH_MODES else 'standard',
         }
         self.senior_mode = True
         self._settings['senior_snapshot'] = snap
@@ -4941,7 +5151,9 @@ class MainWindow(QMainWindow, EnhancementMixin):
         self.theme_combo.setCurrentText('light')
         self.theme_combo.blockSignals(False)
         self._sync_click_to_open_checkboxes(True)
-        self._set_search_mode('book')
+        if hasattr(self._remote.state, 'set_click_to_open'):
+            self._remote.state.set_click_to_open(True)
+        self._set_search_mode('standard')
         # 進入簡易版時若字偏小，升到預設大字；已夠大則保留
         enter_fs = max(SENIOR_FONT_SIZE, int(self.font_size))
         enter_fs = max(FONT_SIZE_MIN, min(FONT_SIZE_MAX, enter_fs))
@@ -4954,7 +5166,7 @@ class MainWindow(QMainWindow, EnhancementMixin):
             theme='light',
             font_size=enter_fs,
             click_to_open=True,
-            search_mode='book',
+            search_mode='standard',
         )
         self.btn_senior.blockSignals(True)
         self.btn_senior.setChecked(True)
@@ -4970,14 +5182,16 @@ class MainWindow(QMainWindow, EnhancementMixin):
             font_size = 13
         click_to_open = bool(snap.get('click_to_open', False))
         search_mode = snap.get('search_mode')
-        if search_mode not in ('book', 'global', 'keyword', 'schedule'):
-            search_mode = 'book'
+        if search_mode not in SEARCH_MODES:
+            search_mode = 'standard'
         self.senior_mode = False
         self.theme_name = theme
         self.theme_combo.blockSignals(True)
         self.theme_combo.setCurrentText(theme)
         self.theme_combo.blockSignals(False)
         self._sync_click_to_open_checkboxes(click_to_open)
+        if hasattr(self._remote.state, 'set_click_to_open'):
+            self._remote.state.set_click_to_open(click_to_open)
         self._apply_senior_ui(False, persist=False)
         self._set_search_mode(search_mode)
         self._set_font_size(font_size, persist=False)
@@ -5027,26 +5241,33 @@ class MainWindow(QMainWindow, EnhancementMixin):
 
         self.inp_book.setFixedHeight(input_h)
         self.inp_num.setFixedHeight(input_h)
+        if hasattr(self, 'btn_voice'):
+            self.btn_voice.setFixedSize(input_h, input_h)
         self.btn_filter.setFixedHeight(input_h)
         self.btn_filter.setFixedWidth(filter_w)
         self.btn_senior.setFixedHeight(40 if enabled else 30)
         self.btn_senior.setText("標準版" if enabled else "簡易版")
+        if hasattr(self, 'btn_phone_control'):
+            self.btn_phone_control.setFixedHeight(40 if enabled else 30)
 
         if enabled:
-            self.inp_book.setPlaceholderText("輸入書冊名稱…")
-            self.inp_num.setPlaceholderText("輸入詩歌號或歌名…")
-            self.hint_lbl.setText("左邊選書冊，輸入詩歌號後按「開啟」；也可直接點列表開啟")
+            self.inp_book.setPlaceholderText("輸入書冊號／名稱…（可留空）")
+            self.inp_num.setPlaceholderText("詩歌號或歌名（無書冊＝全局搜索）")
+            self.hint_lbl.setText("可輸入書冊再搜詩歌；無書冊時歌名會全局搜索")
             self.file_hdr.setText("詩歌列表")
             self.hdr_title.setText("詩歌冊搜索 · 簡易版")
-            if self.search_mode != 'book':
-                self._set_search_mode('book')
+            if self.search_mode != 'standard':
+                self._set_search_mode('standard')
         else:
             self.inp_book.setPlaceholderText("請按 Ctrl+Enter 開始輸入書冊名稱...")
             self.inp_num.setPlaceholderText("詩歌號/名")
             self.hdr_title.setText("詩歌冊搜索")
-            if self.search_mode == 'book':
+            if self.search_mode in BOOK_UI_MODES:
                 self.file_hdr.setText("檔案 / 書籤")
-                self.hint_lbl.setText("選一個左邊書冊，右邊會列出該書的所有檔案")
+                if self.search_mode == 'standard':
+                    self.hint_lbl.setText("有書冊則搜該書；無書冊時歌名做全局搜索")
+                else:
+                    self.hint_lbl.setText("選一個左邊書冊，右邊會列出該書的所有檔案")
 
         self._update_search_action_buttons()
         if persist and not self._loading_settings:
@@ -5148,6 +5369,7 @@ class MainWindow(QMainWindow, EnhancementMixin):
         self._apply_display_mode('duplicate', generation)
 
     def _open_docx_with_flow(self, path, item_name='', *, show_overlay=True):
+        self._last_opened_path = path or ''
         if show_overlay:
             self._show_open_book_popup(path, item_name or os.path.basename(path))
         open_docx(path)
@@ -5158,6 +5380,7 @@ class MainWindow(QMainWindow, EnhancementMixin):
         )
 
     def _open_pdf_with_flow(self, path, item_name='', page=None, *, show_overlay=True):
+        self._last_opened_path = path or ''
         if show_overlay:
             self._show_open_book_popup(path, item_name or os.path.basename(path))
         auto_fs = self._settings.get('pdf_auto_fullscreen', False)
@@ -5283,6 +5506,7 @@ class MainWindow(QMainWindow, EnhancementMixin):
                 border-color: {t['accent_h']}; color: {t['text']};
             }}
         """
+        self.btn_standard.setStyleSheet(toggle_style)
         self.btn_book.setStyleSheet(toggle_style)
         self.btn_global.setStyleSheet(toggle_style)
         self.btn_keyword.setStyleSheet(toggle_style)
@@ -5305,6 +5529,8 @@ class MainWindow(QMainWindow, EnhancementMixin):
             }}
         """
         self.btn_reopen_last.setStyleSheet(hdr_btn_style)
+        if hasattr(self, 'btn_phone_control'):
+            self.btn_phone_control.setStyleSheet(hdr_btn_style)
         senior_btn_style = f"""
             QPushButton {{
                 border-radius: 14px; padding: 4px 14px;
@@ -5420,8 +5646,11 @@ class MainWindow(QMainWindow, EnhancementMixin):
         )
         for lbl in (
             getattr(self, 'remote_qr_lan_lbl', None),
+            getattr(self, 'remote_qr_lan_admin_lbl', None),
             getattr(self, 'remote_qr_fixed_lbl', None),
+            getattr(self, 'remote_qr_fixed_admin_lbl', None),
             getattr(self, 'remote_qr_quick_lbl', None),
+            getattr(self, 'remote_qr_quick_admin_lbl', None),
             getattr(self, 'remote_qr_wan_lbl', None),
             getattr(self, 'remote_qr_lbl', None),
         ):
@@ -5431,14 +5660,22 @@ class MainWindow(QMainWindow, EnhancementMixin):
             lbl.setStyleSheet(f"QLabel#{name} {{ {qr_preview_ss} }}")
         for link in (
             getattr(self, 'remote_qr_lan_link', None),
+            getattr(self, 'remote_qr_lan_admin_link', None),
             getattr(self, 'remote_qr_fixed_link', None),
+            getattr(self, 'remote_qr_fixed_admin_link', None),
             getattr(self, 'remote_qr_quick_link', None),
+            getattr(self, 'remote_qr_quick_admin_link', None),
             getattr(self, 'remote_qr_wan_link', None),
         ):
             if link is not None:
                 link.setStyleSheet(
                     f"font-size: {max(9, fs - 3)}px; color: {t['text2']}; background: transparent;"
                 )
+        for title in self.findChildren(QLabel, 'remoteQrTitle'):
+            title.setStyleSheet(
+                f"font-size: {max(10, fs - 2)}px; font-weight: 600; "
+                f"color: {t['text']}; background: transparent;"
+            )
         self.remote_log_list.setStyleSheet(
             f"QListWidget {{ background: {t['in_bg']}; color: {t['text2']}; "
             f"border: 1px solid {t['border']}; border-radius: 6px; "
@@ -5487,6 +5724,18 @@ class MainWindow(QMainWindow, EnhancementMixin):
         self.btn_apply_hymn_folder.setStyleSheet(action_style)
         self.btn_export_settings.setStyleSheet(index_btn_style)
         self.btn_import_settings.setStyleSheet(index_btn_style)
+        if hasattr(self, 'btn_check_update'):
+            self.btn_check_update.setStyleSheet(index_btn_style)
+        if hasattr(self, 'btn_open_download'):
+            self.btn_open_download.setStyleSheet(action_style)
+        if hasattr(self, 'lbl_update_status'):
+            self.lbl_update_status.setStyleSheet(
+                f"font-size: {fs - 1}px; color: {t['text2']}; background: transparent;"
+            )
+        if hasattr(self, 'about_ver_lbl'):
+            self.about_ver_lbl.setStyleSheet(
+                f"font-size: {fs + 1}px; font-weight: 600; color: {t['text']}; background: transparent;"
+            )
         compact_btn_style = f"""
             QPushButton {{
                 background: {t['panel2']}; color: {t['text2']};
@@ -5501,6 +5750,20 @@ class MainWindow(QMainWindow, EnhancementMixin):
                     self.btn_sched_remove, self.btn_sched_up,
                     self.btn_sched_down, self.btn_sched_clear):
             btn.setStyleSheet(compact_btn_style)
+        if hasattr(self, 'btn_voice'):
+            voice_idle = compact_btn_style
+            voice_listen = f"""
+                QPushButton {{
+                    background: {t['err_bg']}; color: {t['err']};
+                    border: 1.5px solid {t['err']}; border-radius: 6px;
+                    font-size: {max(12, fs - 1)}px; font-weight: 700; padding: 0;
+                }}
+                QPushButton:hover {{ background: {t['err_bg']}; color: {t['err']}; }}
+            """
+            self._voice_btn_idle_style = voice_idle
+            self._voice_btn_listen_style = voice_listen
+            listening = bool(getattr(self, '_voice', None) and self._voice.is_listening)
+            self.btn_voice.setStyleSheet(voice_listen if listening else voice_idle)
         self.lbl_sched_info.setStyleSheet(
             f"font-size: {max(10, fs - 2)}px; color: {t['text2']}; background: transparent;"
         )
@@ -5544,11 +5807,13 @@ class MainWindow(QMainWindow, EnhancementMixin):
             chk.setStyleSheet(checkbox_style)
         for lbl in (self.lbl_remote_policy, self.lbl_remote_port,
                     self.lbl_remote_token, self.lbl_remote_url, self.lbl_viewer_url,
-                    self.lbl_quick_url, self.lbl_local_url,
+                    self.lbl_quick_url, getattr(self, 'lbl_quick_admin_url', None),
+                    self.lbl_local_url, getattr(self, 'lbl_local_admin_url', None),
                     self.lbl_public_tunnel_url):
-            lbl.setStyleSheet(
-                f"font-size: {fs - 2}px; color: {t['muted']}; background: transparent;"
-            )
+            if lbl is not None:
+                lbl.setStyleSheet(
+                    f"font-size: {fs - 2}px; color: {t['muted']}; background: transparent;"
+                )
         self.remote_url_lbl.setStyleSheet(
             f"font-size: {fs - 2}px; color: {t['accent_h']}; background: transparent;"
         )
@@ -5559,8 +5824,16 @@ class MainWindow(QMainWindow, EnhancementMixin):
             self.quick_url_lbl.setStyleSheet(
                 f"font-size: {fs - 2}px; color: {t['ok']}; background: transparent;"
             )
+        if hasattr(self, 'quick_admin_url_lbl'):
+            self.quick_admin_url_lbl.setStyleSheet(
+                f"font-size: {fs - 2}px; color: {t['accent_h']}; background: transparent;"
+            )
         if hasattr(self, 'local_url_lbl'):
             self.local_url_lbl.setStyleSheet(
+                f"font-size: {fs - 2}px; color: {t['ok']}; background: transparent;"
+            )
+        if hasattr(self, 'local_admin_url_lbl'):
+            self.local_admin_url_lbl.setStyleSheet(
                 f"font-size: {fs - 2}px; color: {t['accent_h']}; background: transparent;"
             )
         for status_lbl in (
@@ -5608,11 +5881,14 @@ class MainWindow(QMainWindow, EnhancementMixin):
                     self.lbl_overlay_bg, self.lbl_overlay_text_color,
                     self.lbl_remote_policy, self.lbl_remote_port, self.lbl_remote_token, self.lbl_remote_url,
                     self.lbl_viewer_url, self.lbl_local_url, self.lbl_quick_url,
+                    getattr(self, 'lbl_quick_admin_url', None),
+                    getattr(self, 'lbl_local_admin_url', None),
                     self.lbl_public_tunnel_url,
                     self.lbl_qr_x, self.lbl_qr_y, self.lbl_qr_w, self.lbl_qr_h,
                     self.lbl_qr_caption, self.lbl_qr_bg, self.lbl_qr_text_color,
                     self.lbl_qr_text_size, self.lbl_qr_bg_opacity):
-            lbl.setStyleSheet(f"font-size: {fs - 1}px; color: {t['text2']}; background: transparent;")
+            if lbl is not None:
+                lbl.setStyleSheet(f"font-size: {fs - 1}px; color: {t['text2']}; background: transparent;")
 
         # ── Content sep + file area ──────────────────────────────
         self.content_sep.set_theme(self.theme_name)
@@ -5792,8 +6068,11 @@ class MainWindow(QMainWindow, EnhancementMixin):
         self.inp_num.blockSignals(True)
         self.inp_num.clear()
         self.inp_num.blockSignals(False)
-        if self.current_book and self.search_mode == 'book':
+        if self.current_book and self.search_mode in BOOK_UI_MODES:
             self._show_book_files(self.current_book, '')
+            self._update_search_action_buttons()
+        elif self.search_mode == 'standard':
+            self._apply_sidebar_filter()
             self._update_search_action_buttons()
 
     # ─────────────────────────────────────────────────────────────
@@ -6101,6 +6380,7 @@ class MainWindow(QMainWindow, EnhancementMixin):
         self._open_from_payload(payload)
 
     def _open_from_payload(self, payload, record=True, *, show_overlay=True, show_toast=True):
+        BlackScreenOverlay.hide()
         kind = payload.get('kind')
         opened = False
         if kind == 'file':
@@ -6235,7 +6515,7 @@ class MainWindow(QMainWindow, EnhancementMixin):
         single = len(self._actionable_file_items()) == 1
         open_style = getattr(self, '_open_btn_style', '')
         action_style = getattr(self, '_action_btn_style', '')
-        if self.search_mode == 'book':
+        if self.search_mode in BOOK_UI_MODES:
             is_open = single
             if getattr(self, 'senior_mode', False):
                 self.btn_filter.setText('開啟' if is_open else '搜尋')
@@ -6263,11 +6543,56 @@ class MainWindow(QMainWindow, EnhancementMixin):
         return False
 
     def _on_book_filter_action(self, *_):
-        if self.search_mode != 'book':
+        if self.search_mode not in BOOK_UI_MODES:
             return
         if self._try_open_single_result():
             return
         self._apply_sidebar_filter()
+
+    def _toggle_voice_input(self):
+        if not hasattr(self, '_voice'):
+            return
+        if not voice_input_available():
+            self._show_toast('未安裝語音辨識套件', 'err')
+            return
+        self._voice.toggle()
+
+    def _on_voice_listening_changed(self, listening: bool):
+        if not hasattr(self, 'btn_voice'):
+            return
+        if listening:
+            self.btn_voice.setText('⏹')
+            self.btn_voice.setToolTip('停止語音輸入')
+            style = getattr(self, '_voice_btn_listen_style', '')
+        else:
+            self.btn_voice.setText('🎤')
+            self.btn_voice.setToolTip('語音輸入（廣東話）— 再按一次可停止')
+            style = getattr(self, '_voice_btn_idle_style', '')
+        if style:
+            self.btn_voice.setStyleSheet(style)
+
+    def _on_voice_status(self, msg: str):
+        if msg:
+            self._show_toast(msg, 'warn')
+
+    def _on_voice_error(self, msg: str):
+        self._show_toast(msg or '語音辨識失敗', 'err')
+
+    def _on_voice_transcript(self, text: str):
+        text = (text or '').strip()
+        if not text:
+            self._show_toast('聽唔到內容', 'warn')
+            return
+        target = self.inp_num
+        focus = QApplication.focusWidget()
+        if focus is self.inp_book:
+            target = self.inp_book
+        target.setText(text)
+        target.setFocus()
+        self._show_toast(f'語音：{text}', 'ok')
+        # 只過濾／更新列表，唔自動開檔（避免單一結果即刻 Open）
+        if self.search_mode in BOOK_UI_MODES:
+            self._apply_sidebar_filter()
 
     def _on_keyword_search_action(self, *_):
         if self.search_mode != 'keyword':
@@ -6280,6 +6605,9 @@ class MainWindow(QMainWindow, EnhancementMixin):
         self._apply_sidebar_filter()
 
     def _apply_sidebar_filter(self, *_):
+        if self.search_mode == 'standard':
+            self._apply_standard_filter()
+            return
         if self.search_mode != 'book':
             return
         bq = self.inp_book.text().strip().lower()
@@ -6313,6 +6641,69 @@ class MainWindow(QMainWindow, EnhancementMixin):
         self._update_search_action_buttons()
         self._maybe_focus_hymn_after_book_match(visible, bq)
 
+    def _apply_standard_filter(self):
+        """標準模式：有書冊則搜該書；無書冊時歌名做全局搜索（同簡易版／手機）。"""
+        bq_raw = self.inp_book.text().strip()
+        bq = bq_raw.lower()
+        fq_raw = self.inp_num.text().strip()
+        fq = fq_raw.lower()
+        t = THEMES[self.theme_name]
+
+        visible = []
+        for i in range(self.book_list.count()):
+            item = self.book_list.item(i)
+            book = item.data(Qt.ItemDataRole.UserRole)
+            if not book:
+                continue
+            match = not bq or bq in book['name'].lower()
+            item.setHidden(not match)
+            if match:
+                visible.append(book)
+
+        if not bq:
+            # 顯示全部書冊；歌名 → 全局搜索
+            for i in range(self.book_list.count()):
+                item = self.book_list.item(i)
+                if item.data(Qt.ItemDataRole.UserRole):
+                    item.setHidden(False)
+            if fq:
+                self.file_hdr.setText("全局搜索結果")
+                self.hint_lbl.setText("無書冊：以歌名／號做全局搜索")
+                self.sel_info.setText(f"  ▸  標準模式 — 全局「{fq_raw}」")
+                self._show_global_results(fq_raw)
+            else:
+                self.file_hdr.setText("檔案 / 書籤" if not getattr(self, 'senior_mode', False) else "詩歌列表")
+                self.file_list.clear()
+                ni = QListWidgetItem("  輸入書冊號／名，或直接輸入歌名做全局搜索")
+                ni.setForeground(QColor(t['muted']))
+                self.file_list.addItem(ni)
+                self.file_count_lbl.setText("")
+                self._update_sel_info(None)
+                if not getattr(self, 'senior_mode', False):
+                    self.hint_lbl.setText("有書冊則搜該書；無書冊時歌名做全局搜索")
+                self._update_search_action_buttons()
+            return
+
+        preview = self.current_book if self.current_book in visible else None
+        if not preview and visible:
+            preview = visible[0]
+
+        if preview:
+            self.file_hdr.setText("檔案 / 書籤" if not getattr(self, 'senior_mode', False) else "詩歌列表")
+            if not getattr(self, 'senior_mode', False):
+                self.hint_lbl.setText("已選書冊 — 右邊列出該書檔案／書籤")
+            self._show_book_files(preview, fq)
+            self._update_sel_info(preview)
+        else:
+            self.file_list.clear()
+            ni = QListWidgetItem("  找不到符合條件的書冊")
+            ni.setForeground(QColor(t['muted']))
+            self.file_list.addItem(ni)
+            self.file_count_lbl.setText("")
+            self._update_sel_info(None)
+            self._update_search_action_buttons()
+        self._maybe_focus_hymn_after_book_match(visible, bq)
+
     def _maybe_focus_hymn_after_book_match(self, visible, bq):
         if not self._settings.get('book_auto_focus_hymn'):
             return
@@ -6323,7 +6714,7 @@ class MainWindow(QMainWindow, EnhancementMixin):
         QTimer.singleShot(0, lambda: self.inp_num.setFocus(Qt.FocusReason.OtherFocusReason))
 
     # ─────────────────────────────────────────────────────────────
-    #  SEARCH MODE — 切換書本/全局/關鍵字模式與主題、字體
+    #  SEARCH MODE — 切換標準/書本/全局/關鍵字模式與主題、字體
     # ─────────────────────────────────────────────────────────────
     def _apply_schedule_file_layout(self, in_schedule):
         if hasattr(self, 'schedule_panel'):
@@ -6336,18 +6727,21 @@ class MainWindow(QMainWindow, EnhancementMixin):
             self.sched_entry_dropdown.hide()
 
     def _set_search_mode(self, mode):
-        if getattr(self, 'senior_mode', False) and mode != 'book':
-            mode = 'book'
+        if getattr(self, 'senior_mode', False) and mode != 'standard':
+            mode = 'standard'
+        if mode not in SEARCH_MODES:
+            mode = 'standard'
         if mode != 'keyword':
             self._stop_search_worker()
             self._keyword_debounce.stop()
 
         self.search_mode = mode
+        self.btn_standard.setChecked(mode == 'standard')
         self.btn_book.setChecked(mode == 'book')
         self.btn_global.setChecked(mode == 'global')
         self.btn_keyword.setChecked(mode == 'keyword')
         self.btn_schedule.setChecked(mode == 'schedule')
-        self.book_row.setVisible(mode == 'book')
+        self.book_row.setVisible(mode in BOOK_UI_MODES)
         self.schedule_row.setVisible(mode == 'schedule')
         self.global_row.setVisible(mode == 'global')
         self.keyword_row.setVisible(mode == 'keyword')
@@ -6357,12 +6751,28 @@ class MainWindow(QMainWindow, EnhancementMixin):
             self.sched_entry_dropdown.hide()
         self._apply_schedule_file_layout(mode == 'schedule')
 
-        if mode == 'book':
+        if mode == 'standard':
+            if getattr(self, 'senior_mode', False):
+                self.inp_book.setPlaceholderText("輸入書冊號／名稱…（可留空）")
+                self.inp_num.setPlaceholderText("詩歌號或歌名（無書冊＝全局搜索）")
+                self.hint_lbl.setText("可輸入書冊再搜詩歌；無書冊時歌名會全局搜索")
+                self.file_hdr.setText("詩歌列表")
+            else:
+                self.inp_book.setPlaceholderText("書冊號／名（可留空＝全局搜歌名）")
+                self.inp_num.setPlaceholderText("詩歌號／歌名")
+                self.file_hdr.setText("檔案 / 書籤")
+                self.hint_lbl.setText("有書冊則搜該書；無書冊時歌名做全局搜索")
+            self._apply_standard_filter()
+        elif mode == 'book':
+            self.inp_book.setPlaceholderText("請按 Ctrl+Enter 開始輸入書冊名稱...")
+            self.inp_num.setPlaceholderText("詩歌號/名")
             self.file_hdr.setText("檔案 / 書籤")
             self.hint_lbl.setText("選一個左邊書冊，右邊會列出該書的所有檔案")
             if self.current_book:
                 self._show_book_files(self.current_book, self.inp_num.text().strip().lower())
                 self._update_sel_info(self.current_book)
+            else:
+                self._apply_sidebar_filter()
         elif mode == 'schedule':
             self.hint_lbl.setText("雙擊搜尋結果加入播放清單；雙擊播放清單開啟")
             self.sel_info.setText("  ▸  排程模式 — 管理今日詩歌順序")
@@ -6403,6 +6813,8 @@ class MainWindow(QMainWindow, EnhancementMixin):
         elif self.search_mode == 'schedule':
             self._refresh_schedule_list()
             self._refresh_schedule_search()
+        elif self.search_mode == 'standard':
+            self._apply_standard_filter()
         elif self.current_book:
             self._show_book_files(self.current_book, self.inp_num.text().strip().lower())
             self._update_sel_info(self.current_book)
@@ -6449,6 +6861,8 @@ class MainWindow(QMainWindow, EnhancementMixin):
         elif self.search_mode == 'schedule':
             self._refresh_schedule_list()
             self._refresh_schedule_search()
+        elif self.search_mode == 'standard':
+            self._apply_standard_filter()
         elif self.current_book:
             self._show_book_files(self.current_book, self.inp_num.text().strip().lower())
         if persist and not self._loading_settings:
@@ -6476,6 +6890,111 @@ class MainWindow(QMainWindow, EnhancementMixin):
         self.toast_bar.setText(f"   {msg}")
         self.toast_bar.setFixedHeight(34)
         self._toast_timer.start(3500)
+
+    # ─────────────────────────────────────────────────────────────
+    #  UPDATE — 檢查更新／前往下載（唔自動安裝）
+    # ─────────────────────────────────────────────────────────────
+    def _update_download_url(self):
+        return (
+            str(self._settings.get('update_download_url') or DEFAULT_UPDATE_DOWNLOAD_URL).strip()
+            or DEFAULT_UPDATE_DOWNLOAD_URL
+        )
+
+    def _update_check_url(self):
+        return (
+            str(self._settings.get('update_check_url') or DEFAULT_UPDATE_CHECK_URL).strip()
+            or DEFAULT_UPDATE_CHECK_URL
+        )
+
+    def _open_url_in_browser(self, url: str) -> bool:
+        url = (url or '').strip()
+        if not url:
+            return False
+        return QDesktopServices.openUrl(QUrl(url))
+
+    def _on_open_download_page(self):
+        url = self._update_download_url()
+        if self._open_url_in_browser(url):
+            self._show_toast('已開啟下載頁', 'ok')
+            if hasattr(self, 'lbl_update_status'):
+                self.lbl_update_status.setText(f'已開啟：{url}')
+        else:
+            self._show_toast('無法開啟下載頁', 'err')
+
+    def _on_check_update(self):
+        worker = getattr(self, '_update_check_worker', None)
+        if worker is not None and worker.isRunning():
+            self._show_toast('正在檢查更新…', 'warn')
+            return
+        check_url = self._update_check_url()
+        if hasattr(self, 'lbl_update_status'):
+            self.lbl_update_status.setText('檢查中…')
+        if hasattr(self, 'btn_check_update'):
+            self.btn_check_update.setEnabled(False)
+        self._show_toast('正在檢查更新…', 'warn')
+        worker = UpdateCheckWorker(check_url, APP_VERSION, parent=self)
+        worker.finished_ok.connect(self._on_update_check_ok)
+        worker.finished_err.connect(self._on_update_check_err)
+        worker.finished.connect(self._on_update_check_finished)
+        self._update_check_worker = worker
+        worker.start()
+
+    def _on_update_check_finished(self):
+        if hasattr(self, 'btn_check_update'):
+            self.btn_check_update.setEnabled(True)
+        self._update_check_worker = None
+
+    def _on_update_check_err(self, msg: str):
+        text = msg or '檢查更新失敗'
+        if hasattr(self, 'lbl_update_status'):
+            self.lbl_update_status.setText(text + ' — 可按「前往下載」手動查看')
+        self._show_toast(text, 'err')
+        box = QMessageBox(self)
+        box.setIcon(QMessageBox.Icon.Warning)
+        box.setWindowTitle('檢查更新')
+        box.setText(text)
+        box.setInformativeText('要開啟下載頁嗎？')
+        box.setStandardButtons(
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
+        )
+        box.setDefaultButton(QMessageBox.StandardButton.Yes)
+        if box.exec() == QMessageBox.StandardButton.Yes:
+            self._on_open_download_page()
+
+    def _on_update_check_ok(self, info: dict):
+        remote = int(info.get('remote_version') or 0)
+        current = int(info.get('current') or APP_VERSION)
+        notes = str(info.get('notes') or '').strip()
+        build_date = str(info.get('build_date') or '').strip()
+        download = str(info.get('url') or '').strip() or self._update_download_url()
+        if info.get('has_update'):
+            detail = f'目前 v{current} → 最新 v{remote}'
+            if build_date:
+                detail += f'（{build_date}）'
+            if notes:
+                detail += f'\n{notes}'
+            if hasattr(self, 'lbl_update_status'):
+                self.lbl_update_status.setText(f'有新版本 v{remote} — {notes or "請前往下載"}')
+            self._show_toast(f'有新版本 v{remote}', 'warn')
+            box = QMessageBox(self)
+            box.setIcon(QMessageBox.Icon.Information)
+            box.setWindowTitle('發現新版本')
+            box.setText(f'有新版本 v{remote}')
+            box.setInformativeText(detail + '\n\n要開啟下載頁嗎？')
+            box.setStandardButtons(
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
+            )
+            box.setDefaultButton(QMessageBox.StandardButton.Yes)
+            if box.exec() == QMessageBox.StandardButton.Yes:
+                if self._open_url_in_browser(download):
+                    self._show_toast('已開啟下載頁', 'ok')
+        else:
+            msg = f'已是最新版本 v{current}'
+            if remote:
+                msg = f'已是最新（遠端 v{remote}）'
+            if hasattr(self, 'lbl_update_status'):
+                self.lbl_update_status.setText(msg)
+            self._show_toast(msg, 'ok')
 
     # ─────────────────────────────────────────────────────────────
     #  REMOTE — Mobile API 遙控開檔
@@ -6508,18 +7027,33 @@ class MainWindow(QMainWindow, EnhancementMixin):
         return self._remote_fixed_base_url() or self._remote_quick_base_url()
 
     def _remote_lan_viewer_url(self):
-        """內網會眾／遙控入口（同 WiFi）。"""
+        """內網會眾入口（同 WiFi）。"""
         if not getattr(self._remote, 'running', False):
             return ''
         return self._remote_local_base_url() or ''
+
+    def _remote_lan_admin_url(self):
+        """內網操作員遙控頁（/admin）。"""
+        base = self._remote_local_base_url()
+        return f"{base}/admin" if base else ''
 
     def _remote_fixed_viewer_url(self):
         base = self._remote_fixed_base_url()
         return tunnel_viewer_url(base) if base else ''
 
+    def _remote_fixed_admin_url(self):
+        base = self._remote_fixed_base_url()
+        return f"{base.rstrip('/')}/admin" if base else ''
+
     def _remote_quick_viewer_url(self):
         base = self._remote_quick_base_url()
         return tunnel_viewer_url(base) if base else ''
+
+    def _remote_quick_admin_url(self):
+        base = self._remote_quick_base_url()
+        if not base:
+            return ''
+        return f"{base.rstrip('/')}/admin"
 
     def _remote_wan_viewer_url(self):
         """相容：優先固定，其次隨機。"""
@@ -6540,12 +7074,13 @@ class MainWindow(QMainWindow, EnhancementMixin):
         return self._remote_fixed_viewer_url() or '—'
 
     def _remote_admin_url(self):
-        base = self._remote_fixed_base_url()
-        return f"{base}/admin" if base else '—'
+        return self._remote_fixed_admin_url() or '—'
 
     def _update_remote_url_labels(self):
         if self._remote.running:
             self.local_url_lbl.setText(self._remote_lan_viewer_url() or '—')
+            if hasattr(self, 'local_admin_url_lbl'):
+                self.local_admin_url_lbl.setText(self._remote_lan_admin_url() or '—')
             if getattr(self, 'enable_tunnel_fixed', False):
                 self.viewer_url_lbl.setText(self._remote_viewer_url())
                 self.remote_url_lbl.setText(self._remote_admin_url())
@@ -6557,16 +7092,28 @@ class MainWindow(QMainWindow, EnhancementMixin):
                     self.quick_url_lbl.setText(self._remote_quick_viewer_url() or '—')
                 else:
                     self.quick_url_lbl.setText('—')
+            if hasattr(self, 'quick_admin_url_lbl'):
+                if getattr(self, 'enable_tunnel_quick', False):
+                    self.quick_admin_url_lbl.setText(self._remote_quick_admin_url() or '—')
+                else:
+                    self.quick_admin_url_lbl.setText('—')
         else:
             self.local_url_lbl.setText('—')
+            if hasattr(self, 'local_admin_url_lbl'):
+                self.local_admin_url_lbl.setText('—')
             self.remote_url_lbl.setText('—')
             self.viewer_url_lbl.setText('—')
             if hasattr(self, 'quick_url_lbl'):
                 self.quick_url_lbl.setText('—')
+            if hasattr(self, 'quick_admin_url_lbl'):
+                self.quick_admin_url_lbl.setText('—')
         for lbl_name, url_fn in (
             ('remote_qr_lan_link', self._remote_lan_viewer_url),
+            ('remote_qr_lan_admin_link', self._remote_lan_admin_url),
             ('remote_qr_fixed_link', self._remote_fixed_viewer_url),
+            ('remote_qr_fixed_admin_link', self._remote_fixed_admin_url),
             ('remote_qr_quick_link', self._remote_quick_viewer_url),
+            ('remote_qr_quick_admin_link', self._remote_quick_admin_url),
             ('remote_qr_wan_link', self._remote_wan_viewer_url),
         ):
             lbl = getattr(self, lbl_name, None)
@@ -6768,8 +7315,7 @@ class MainWindow(QMainWindow, EnhancementMixin):
             self.lbl_viewer_url, self.viewer_url_lbl,
             self.lbl_remote_url, self.remote_url_lbl,
             self.chk_show_qr_fixed,
-            self.remote_qr_fixed_lbl,
-            self.remote_qr_fixed_link,
+            self.remote_qr_fixed_pair,
         ):
             w.setVisible(fixed_on)
         self.inp_cloudflared_token.setVisible(show_install)
@@ -6788,11 +7334,13 @@ class MainWindow(QMainWindow, EnhancementMixin):
         for w in (
             self.tunnel_status_quick_lbl,
             self.lbl_quick_url, self.quick_url_lbl,
+            getattr(self, 'lbl_quick_admin_url', None),
+            getattr(self, 'quick_admin_url_lbl', None),
             self.chk_show_qr_quick,
-            self.remote_qr_quick_lbl,
-            self.remote_qr_quick_link,
+            self.remote_qr_quick_pair,
         ):
-            w.setVisible(quick_on)
+            if w is not None:
+                w.setVisible(quick_on)
 
         self._update_remote_url_labels()
         if update_qr:
@@ -7093,6 +7641,73 @@ class MainWindow(QMainWindow, EnhancementMixin):
         self._open_from_payload(payload)
         self._show_toast('📱  Mobile 遙控已開啟', 'ok')
 
+    def _on_remote_display_action(self, action):
+        action = str(action or '').strip().lower()
+        try:
+            if hasattr(self, '_open_flow') and self._open_flow:
+                self._open_flow.cancel()
+        except Exception:
+            pass
+        watch = getattr(BookNameOverlay, '_watch_path', '') or ''
+        path = watch or getattr(self, '_last_opened_path', '') or ''
+        needle = ''
+        if path:
+            needle = os.path.splitext(os.path.basename(path))[0]
+        if not needle:
+            label = str(self._settings.get('last_opened') or '')
+            if ' / ' in label:
+                needle = label.rsplit(' / ', 1)[-1].strip()
+            else:
+                needle = label.strip()
+        BookNameOverlay.hide_overlay()
+        # Must close viewer BEFORE black overlay steals focus
+        BlackScreenOverlay.hide()
+
+        def _worker():
+            ok = False
+            try:
+                ok = close_document_viewer(path=path, title_needle=needle)
+            except Exception as exc:
+                print(f'[WARN] close_document_viewer: {exc}')
+                ok = False
+
+            def _ui():
+                if action == 'black':
+                    BlackScreenOverlay.show()
+                    msg = '📱  已結束並全黑' if ok else '📱  全黑已開（關檔可能失敗）'
+                    self._show_toast(msg, 'warn' if ok else 'err')
+                else:
+                    if ok:
+                        self._show_toast('📱  已結束目前檔案', 'ok')
+                    else:
+                        self._show_toast('📱  關檔失敗：搵唔到 Word/PDF 視窗', 'err')
+
+            self._main_invoke.emit(_ui)
+
+        threading.Thread(target=_worker, daemon=True).start()
+
+    def _show_phone_control_wizard(self):
+        dlg = PhoneControlWizard(self, theme=self.theme_name, parent=self)
+        dlg.exec()
+
+    def _ensure_phone_control_tunnel(self):
+        """One-tap: enable API + accept + quick tunnel for phone admin."""
+        if hasattr(self, 'chk_remote_api') and not self.chk_remote_api.isChecked():
+            self.chk_remote_api.setChecked(True)
+        if not getattr(self, '_remote', None) or not self._remote.running:
+            self._show_toast('API 尚未就緒，請稍候再試', 'warn')
+            return
+        if hasattr(self, 'chk_remote_accept') and not self.chk_remote_accept.isChecked():
+            self.chk_remote_accept.setChecked(True)
+        if hasattr(self, 'chk_enable_tunnel_quick'):
+            if not self.chk_enable_tunnel_quick.isChecked():
+                self.chk_enable_tunnel_quick.setChecked(True)
+            elif not self._remote_quick_base_url():
+                self._start_quick_tunnel()
+        if hasattr(self, 'chk_show_qr_quick') and not self.chk_show_qr_quick.isChecked():
+            self.chk_show_qr_quick.setChecked(True)
+        self._show_toast('正在啟動外網隨機…', 'ok')
+
     def _sync_remote_query(self, book_ref, num_ref):
         matched = resolve_books(self.books, book_ref)
         if not matched:
@@ -7141,6 +7756,7 @@ class MainWindow(QMainWindow, EnhancementMixin):
     def closeEvent(self, event):
         if self.handle_close_event(event):
             return
+        BlackScreenOverlay.hide()
         DesktopQrOverlay.hide()
         self._stop_cloudflare_tunnel()
         self._remote.stop()
@@ -7167,7 +7783,7 @@ class MainWindow(QMainWindow, EnhancementMixin):
             return True
 
         if obj == self.inp_book:
-            if event.type() == QEvent.Type.FocusIn and self.search_mode == 'book':
+            if event.type() == QEvent.Type.FocusIn and self.search_mode in BOOK_UI_MODES:
                 if self.inp_book.text():
                     self.inp_book.clear()
                     self.dropdown.hide()

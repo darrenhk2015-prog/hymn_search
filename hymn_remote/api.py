@@ -19,6 +19,10 @@ class SetlistOpenRequest(BaseModel):
     index: int
 
 
+class DisplayControlRequest(BaseModel):
+    action: str  # close | black
+
+
 def _static_dir():
     return Path(__file__).resolve().parent / 'static'
 
@@ -111,6 +115,23 @@ def create_app(state: RemoteControlState, path_prefix: str = '') -> FastAPI:
     def setlist_add(body: OpenRequest, request: Request, x_api_token: str = Header(default='')):
         _check_token(x_api_token)
         return state.dispatch_setlist_add(body.book, body.num, _client_ip(request))
+
+    @app.post('/api/display')
+    def display_control(
+        body: DisplayControlRequest,
+        request: Request,
+        x_api_token: str = Header(default=''),
+    ):
+        _check_token(x_api_token)
+        if not state.is_accepting():
+            return JSONResponse(
+                status_code=503,
+                content={
+                    'status': 'not_accepting',
+                    'message': '桌面端暫停接受請求，請聯絡操作員',
+                },
+            )
+        return state.dispatch_display_control(body.action, _client_ip(request))
 
     @app.get('/api/log')
     def get_log(limit: int = 50, x_api_token: str = Header(default='')):

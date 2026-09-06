@@ -267,3 +267,107 @@
 [2026-08-15 12:05:28] [INFO] tunnel ready | mode=quick port=8758 url=https://sensitivity-pledge-cellular-highs.trycloudflare.com local_dns_ok=False
 [2026-08-15 12:07:22] [INFO] tunnel stop | mode=service port=8758 url=https://live.churchofgodtm.com/hymn_search
 [2026-08-15 12:08:46] [INFO] tunnel stop | mode=quick port=8758
+[2026-08-15 23:51:54] [INFO] tunnel start | mode=quick port=8758 service_installed=False service_running=False use_https=False
+[2026-08-15 23:51:54] [INFO] cloudflared subprocess session | mode=quick port=8758 stderr_log=C:\python\hymn_search\cloudflared-tunnel.log
+[2026-08-15 23:51:57] [INFO] tunnel url assigned | mode=quick port=8758 url=https://accommodate-activated-those-alberta.trycloudflare.com
+[2026-08-15 23:52:01] [INFO] tunnel stop | mode=quick port=8758
+[2026-08-15 23:52:01] [INFO] tunnel start | mode=quick port=8758 service_installed=False service_running=False use_https=False
+[2026-08-15 23:52:01] [INFO] cloudflared subprocess session | mode=quick port=8758 stderr_log=C:\python\hymn_search\cloudflared-tunnel.log
+[2026-08-15 23:52:06] [INFO] tunnel url assigned | mode=quick port=8758 url=https://possess-tabs-technician-perry.trycloudflare.com
+[2026-08-15 23:52:10] [INFO] tunnel ready | mode=quick port=8758 url=https://possess-tabs-technician-perry.trycloudflare.com local_dns_ok=True
+[2026-08-15 23:59:59] [INFO] tunnel stop | mode=quick port=8758
+[2026-08-16 00:03:02] [INFO] tunnel start | mode=quick port=8758 service_installed=False service_running=False use_https=False
+[2026-08-16 00:03:02] [INFO] cloudflared subprocess session | mode=quick port=8758 stderr_log=C:\python\hymn_search\cloudflared-tunnel.log
+[2026-08-16 00:03:06] [INFO] tunnel url assigned | mode=quick port=8758 url=https://filters-exposure-deaths-modem.trycloudflare.com
+[2026-08-16 00:03:10] [INFO] tunnel ready | mode=quick port=8758 url=https://filters-exposure-deaths-modem.trycloudflare.com local_dns_ok=False
+[2026-08-16 00:10:58] [INFO] tunnel start | mode=quick port=8758 service_installed=False service_running=False use_https=False
+[2026-08-16 00:10:58] [INFO] cloudflared subprocess session | mode=quick port=8758 stderr_log=C:\python\hymn_search\cloudflared-tunnel.log
+[2026-08-16 00:11:02] [INFO] tunnel url assigned | mode=quick port=8758 url=https://affair-verde-campbell-leone.trycloudflare.com
+[2026-08-16 00:11:09] [INFO] tunnel ready | mode=quick port=8758 url=https://affair-verde-campbell-leone.trycloudflare.com local_dns_ok=False
+[2026-08-16 00:12:04] [INFO] tunnel stop | mode=quick port=8758
+[2026-08-16 00:16:38] [INFO] tunnel start | mode=quick port=8758 service_installed=False service_running=False use_https=False
+[2026-08-16 00:16:38] [INFO] cloudflared subprocess session | mode=quick port=8758 stderr_log=C:\python\hymn_search\cloudflared-tunnel.log
+[2026-08-16 00:16:41] [INFO] tunnel url assigned | mode=quick port=8758 url=https://unit-myers-couple-jamie.trycloudflare.com
+[2026-08-16 00:16:49] [INFO] tunnel ready | mode=quick port=8758 url=https://unit-myers-couple-jamie.trycloudflare.com local_dns_ok=True
+[2026-08-16 00:22:50] [INFO] tunnel stop | mode=quick port=8758
+[2026-08-16 00:33:43] [INFO] tunnel start | mode=quick port=8758 service_installed=False service_running=False use_https=False
+[2026-08-16 00:33:43] [INFO] cloudflared subprocess session | mode=quick port=8758 stderr_log=C:\python\hymn_search\cloudflared-tunnel.log
+[2026-08-16 00:33:47] [INFO] tunnel url assigned | mode=quick port=8758 url=https://font-multi-activated-merchandise.trycloudflare.com
+[2026-08-16 00:33:54] [INFO] tunnel ready | mode=quick port=8758 url=https://font-multi-activated-merchandise.trycloudflare.com local_dns_ok=True
+[2026-08-16 00:40:43] [INFO] tunnel stop | mode=quick port=8758
+[2026-09-06 07:56:13] [INFO] tunnel start | mode=quick port=8758 service_installed=False service_running=False use_https=False
+[2026-09-06 07:56:13] [INFO] cloudflared subprocess session | mode=quick port=8758 stderr_log=C:\python\hymn_search\cloudflared-tunnel.log
+[2026-09-06 07:56:17] [INFO] tunnel url assigned | mode=quick port=8758 url=https://republic-rebel-lamp-deck.trycloudflare.com
+[2026-09-06 07:56:24] [INFO] tunnel ready | mode=quick port=8758 url=https://republic-rebel-lamp-deck.trycloudflare.com local_dns_ok=False
+[2026-09-06 07:57:05] [INFO] tunnel stop | mode=quick port=8758
+[2026-09-06 07:57:42] [INFO] tunnel start | mode=quick port=8758 service_installed=False service_running=False use_https=False
+[2026-09-06 07:57:42] [INFO] cloudflared subprocess session | mode=quick port=8758 stderr_log=C:\python\hymn_search\cloudflared-tunnel.log
+[2026-09-06 07:57:45] [INFO] tunnel url assigned | mode=quick port=8758 url=https://surfaces-expression-sauce-raid.trycloudflare.com
+[2026-09-06 07:57:51] [INFO] tunnel ready | mode=quick port=8758 url=https://surfaces-expression-sauce-raid.trycloudflare.com local_dns_ok=True
+[2026-09-06 07:59:17] [INFO] tunnel stop | mode=quick port=8758
+[2026-09-06 08:07:28] [INFO] tunnel start | mode=quick port=8758 service_installed=False service_running=False use_https=False
+[2026-09-06 08:07:28] [INFO] cloudflared subprocess session | mode=quick port=8758 stderr_log=C:\python\hymn_search\cloudflared-tunnel.log
+[2026-09-06 08:07:31] [INFO] tunnel url assigned | mode=quick port=8758 url=https://issn-folder-vault-joined.trycloudflare.com
+[2026-09-06 08:07:36] [INFO] tunnel ready | mode=quick port=8758 url=https://issn-folder-vault-joined.trycloudflare.com local_dns_ok=False
+[2026-09-06 08:10:39] [INFO] tunnel stop | mode=quick port=8758
+[2026-09-06 08:10:51] [INFO] tunnel start | mode=quick port=8758 service_installed=False service_running=False use_https=False
+[2026-09-06 08:10:51] [INFO] cloudflared subprocess session | mode=quick port=8758 stderr_log=C:\python\hymn_search\cloudflared-tunnel.log
+[2026-09-06 08:10:56] [INFO] tunnel url assigned | mode=quick port=8758 url=https://settle-ferry-ball-caused.trycloudflare.com
+[2026-09-06 08:11:02] [INFO] tunnel ready | mode=quick port=8758 url=https://settle-ferry-ball-caused.trycloudflare.com local_dns_ok=False
+[2026-09-06 08:21:37] [INFO] tunnel stop | mode=quick port=8758
+[2026-09-06 08:30:12] [INFO] tunnel start | mode=quick port=8758 service_installed=False service_running=False use_https=False
+[2026-09-06 08:30:13] [INFO] cloudflared subprocess session | mode=quick port=8758 stderr_log=C:\python\hymn_search\cloudflared-tunnel.log
+[2026-09-06 08:30:17] [INFO] tunnel url assigned | mode=quick port=8758 url=https://saskatchewan-homework-chest-lot.trycloudflare.com
+[2026-09-06 08:30:31] [INFO] tunnel ready | mode=quick port=8758 url=https://saskatchewan-homework-chest-lot.trycloudflare.com local_dns_ok=False
+[2026-09-06 08:50:38] [WARN] Tunnel URL unreachable — restart session to get a new link. | mode=quick port=8758 url=https://saskatchewan-homework-chest-lot.trycloudflare.com
+[2026-09-06 12:39:01] [WARN] Tunnel URL unreachable — restart session to get a new link. | mode=quick port=8758 url=https://saskatchewan-homework-chest-lot.trycloudflare.com
+[2026-09-06 12:39:15] [WARN] Tunnel URL unreachable — restart session to get a new link. | mode=quick port=8758 url=https://saskatchewan-homework-chest-lot.trycloudflare.com
+[2026-09-06 12:39:20] [INFO] tunnel stop | mode=quick port=8758
+[2026-09-06 12:39:43] [INFO] tunnel start | mode=quick port=8758 service_installed=False service_running=False use_https=False
+[2026-09-06 12:39:43] [INFO] cloudflared subprocess session | mode=quick port=8758 stderr_log=C:\python\hymn_search\cloudflared-tunnel.log
+[2026-09-06 12:39:46] [INFO] tunnel url assigned | mode=quick port=8758 url=https://pod-multiple-broad-parcel.trycloudflare.com
+[2026-09-06 12:39:52] [INFO] tunnel ready | mode=quick port=8758 url=https://pod-multiple-broad-parcel.trycloudflare.com local_dns_ok=False
+[2026-09-06 12:40:07] [INFO] tunnel stop | mode=quick port=8758
+[2026-09-06 16:32:46] [INFO] tunnel start | mode=quick port=8758 service_installed=False service_running=False use_https=False
+[2026-09-06 16:32:46] [INFO] cloudflared subprocess session | mode=quick port=8758 stderr_log=C:\python\hymn_search\cloudflared-tunnel.log
+[2026-09-06 16:32:50] [INFO] tunnel url assigned | mode=quick port=8758 url=https://expand-sender-wholesale-vitamin.trycloudflare.com
+[2026-09-06 16:32:55] [INFO] tunnel ready | mode=quick port=8758 url=https://expand-sender-wholesale-vitamin.trycloudflare.com local_dns_ok=False
+[2026-09-06 16:37:43] [WARN] Tunnel URL unreachable — restart session to get a new link. | mode=quick port=8758 url=https://expand-sender-wholesale-vitamin.trycloudflare.com
+[2026-09-06 16:38:10] [INFO] tunnel stop | mode=quick port=8758
+[2026-09-06 16:38:10] [INFO] tunnel start | mode=quick port=8758 service_installed=False service_running=False use_https=False
+[2026-09-06 16:38:10] [INFO] cloudflared subprocess session | mode=quick port=8758 stderr_log=C:\python\hymn_search\cloudflared-tunnel.log
+[2026-09-06 16:38:12] [INFO] tunnel stop | mode=quick port=8758
+[2026-09-06 16:38:12] [INFO] tunnel start | mode=quick port=8758 service_installed=False service_running=False use_https=False
+[2026-09-06 16:38:12] [INFO] cloudflared subprocess session | mode=quick port=8758 stderr_log=C:\python\hymn_search\cloudflared-tunnel.log
+[2026-09-06 16:38:16] [INFO] tunnel url assigned | mode=quick port=8758 url=https://buzz-believes-arrivals-drum.trycloudflare.com
+[2026-09-06 16:38:23] [INFO] tunnel ready | mode=quick port=8758 url=https://buzz-believes-arrivals-drum.trycloudflare.com local_dns_ok=False
+[2026-09-06 16:39:19] [INFO] tunnel stop | mode=quick port=8758
+[2026-09-06 16:39:36] [INFO] tunnel start | mode=quick port=8758 service_installed=False service_running=False use_https=False
+[2026-09-06 16:39:36] [INFO] cloudflared subprocess session | mode=quick port=8758 stderr_log=C:\python\hymn_search\cloudflared-tunnel.log
+[2026-09-06 16:39:40] [INFO] tunnel url assigned | mode=quick port=8758 url=https://corporation-bald-loans-stuart.trycloudflare.com
+[2026-09-06 16:39:46] [INFO] tunnel ready | mode=quick port=8758 url=https://corporation-bald-loans-stuart.trycloudflare.com local_dns_ok=False
+[2026-09-06 16:40:50] [INFO] tunnel stop | mode=quick port=8758
+[2026-09-06 16:41:07] [INFO] tunnel start | mode=quick port=8758 service_installed=False service_running=False use_https=False
+[2026-09-06 16:41:07] [INFO] cloudflared subprocess session | mode=quick port=8758 stderr_log=C:\python\hymn_search\cloudflared-tunnel.log
+[2026-09-06 16:41:11] [INFO] tunnel url assigned | mode=quick port=8758 url=https://defeat-slight-additionally-mattress.trycloudflare.com
+[2026-09-06 16:41:17] [INFO] tunnel ready | mode=quick port=8758 url=https://defeat-slight-additionally-mattress.trycloudflare.com local_dns_ok=False
+[2026-09-06 16:41:31] [INFO] tunnel stop | mode=quick port=8758
+[2026-09-06 16:54:00] [INFO] tunnel start | mode=quick port=8758 service_installed=False service_running=False use_https=False
+[2026-09-06 16:54:00] [INFO] cloudflared subprocess session | mode=quick port=8758 stderr_log=C:\python\hymn_search\cloudflared-tunnel.log
+[2026-09-06 16:54:04] [INFO] tunnel url assigned | mode=quick port=8758 url=https://bean-dated-block-sensors.trycloudflare.com
+[2026-09-06 16:54:10] [INFO] tunnel ready | mode=quick port=8758 url=https://bean-dated-block-sensors.trycloudflare.com local_dns_ok=False
+[2026-09-06 17:02:19] [INFO] tunnel stop | mode=quick port=8758
+[2026-09-06 17:02:35] [INFO] tunnel start | mode=quick port=8758 service_installed=False service_running=False use_https=False
+[2026-09-06 17:02:35] [INFO] cloudflared subprocess session | mode=quick port=8758 stderr_log=C:\python\hymn_search\cloudflared-tunnel.log
+[2026-09-06 17:02:39] [INFO] tunnel url assigned | mode=quick port=8758 url=https://heart-anonymous-precision-zus.trycloudflare.com
+[2026-09-06 17:02:44] [INFO] tunnel ready | mode=quick port=8758 url=https://heart-anonymous-precision-zus.trycloudflare.com local_dns_ok=False
+[2026-09-06 17:03:01] [INFO] tunnel stop | mode=quick port=8758
+[2026-09-06 17:03:28] [INFO] tunnel start | mode=quick port=8758 service_installed=False service_running=False use_https=False
+[2026-09-06 17:03:28] [INFO] cloudflared subprocess session | mode=quick port=8758 stderr_log=C:\python\hymn_search\cloudflared-tunnel.log
+[2026-09-06 17:03:31] [INFO] tunnel url assigned | mode=quick port=8758 url=https://gamma-qualified-damaged-borough.trycloudflare.com
+[2026-09-06 17:03:37] [INFO] tunnel ready | mode=quick port=8758 url=https://gamma-qualified-damaged-borough.trycloudflare.com local_dns_ok=False
+[2026-09-06 17:05:03] [INFO] tunnel start | mode=quick port=8758 service_installed=False service_running=False use_https=False
+[2026-09-06 17:05:03] [INFO] cloudflared subprocess session | mode=quick port=8758 stderr_log=C:\python\hymn_search\cloudflared-tunnel.log
+[2026-09-06 17:05:07] [INFO] tunnel url assigned | mode=quick port=8758 url=https://volunteers-address-diagnostic-wrote.trycloudflare.com
+[2026-09-06 17:05:12] [INFO] tunnel ready | mode=quick port=8758 url=https://volunteers-address-diagnostic-wrote.trycloudflare.com local_dns_ok=False
+[2026-09-06 17:11:16] [INFO] tunnel stop | mode=quick port=8758

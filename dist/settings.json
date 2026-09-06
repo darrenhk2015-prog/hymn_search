@@ -21,12 +21,12 @@
   "click_to_open": false,
   "remote_api_enabled": false,
   "remote_accept": false,
-  "remote_port": 8715,
+  "remote_port": 8765,
   "remote_use_https": false,
   "remote_policy": "auto_single",
   "remote_token": "",
-  "enable_tunnel": false,
-  "enable_tunnel_fixed": false,
+  "enable_tunnel": true,
+  "enable_tunnel_fixed": true,
   "enable_tunnel_quick": false,
   "cloudflared_path": "",
   "tunnel_mode": "service",
@@ -42,11 +42,6 @@
   "setlist": [],
   "setlist_index": -1,
   "session_history": [
-    {
-      "book": "02 神家詩歌",
-      "num": "P20  彩雲會.doc",
-      "label": "02 神家詩歌 · "
-    },
     {
       "book": "01 神家詩歌",
       "num": "P002  002 可敬可親紳 003 宇宙講故事.doc",
@@ -133,7 +128,7 @@
   "auto_rescan": true,
   "startup_tray": false,
   "minimize_to_tray": false,
-  "last_opened": "02 神家詩歌 · ",
+  "last_opened": "01 神家詩歌 · ",
   "show_qr_code": false,
   "show_qr_lan": false,
   "show_qr_fixed": false,

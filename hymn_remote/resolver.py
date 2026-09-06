@@ -214,11 +214,16 @@ def list_book_entries(book):
 
 
 def list_entries_for_book(books, book_ref, query='', num_mode=HYMN_NUM_MODE_CONTAINS):
+    book_ref_s = str(book_ref or '').strip()
+    q = (query or '').strip()
+    # No book selected → global search by hymn/file name (desktop「全局」)
+    if not book_ref_s:
+        return list_global_entries(books, q, num_mode=num_mode)
+
     matched = resolve_books(books, book_ref)
     if not matched:
         return []
     entries = list_book_entries(matched[0])
-    q = (query or '').strip()
     if not q:
         return entries
     mode = num_mode if num_mode in HYMN_NUM_MODES else HYMN_NUM_MODE_CONTAINS
@@ -236,6 +241,47 @@ def list_entries_for_book(books, book_ref, query='', num_mode=HYMN_NUM_MODE_CONT
         elif fuzzy_match_score(q, e['value']) or fuzzy_match_score(q, e['label']):
             out.append(e)
     return out
+
+
+def list_global_entries(books, query='', num_mode=HYMN_NUM_MODE_CONTAINS, limit=80):
+    """Search hymn/file titles across all books (mobile global mode)."""
+    q = (query or '').strip()
+    if not q:
+        return []
+    mode = num_mode if num_mode in HYMN_NUM_MODES else HYMN_NUM_MODE_CONTAINS
+    ql = q.lower()
+    scored = []
+    for idx, book in enumerate(books):
+        book_ref = str(idx + 1)
+        book_name = book.get('name', '')
+        for e in list_book_entries(book):
+            value = e.get('value', '')
+            label = e.get('label', '')
+            score = 0
+            if mode == HYMN_NUM_MODE_EXACT and q.isdigit():
+                if hymn_number_exact_match(q, value) or hymn_number_exact_match(q, label):
+                    score = 100
+                else:
+                    continue
+            else:
+                if ql in value.lower() or ql in label.lower():
+                    score = 80
+                else:
+                    score = max(
+                        fuzzy_match_score(q, value) or 0,
+                        fuzzy_match_score(q, label) or 0,
+                    )
+                if not score:
+                    continue
+            scored.append((score, {
+                'kind': e.get('kind', 'file'),
+                'value': value,
+                'label': f'{book_name} · {label}',
+                'book': book_name,
+                'book_ref': book_ref,
+            }))
+    scored.sort(key=lambda x: (-x[0], x[1].get('label', '')))
+    return [item for _s, item in scored[: max(1, int(limit))]]
 
 
 def _bookmark_hits(book, q, raw, num_mode=HYMN_NUM_MODE_CONTAINS):

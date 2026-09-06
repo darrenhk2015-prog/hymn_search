@@ -78,6 +78,11 @@ if ($versionContent -match 'APP_VERSION\s*=\s*(\d+)') {
     --hidden-import hymn_features.session_store `
     --hidden-import hymn_features.preview `
     --hidden-import hymn_features.mixin `
+    --hidden-import hymn_features.voice_input `
+    --hidden-import speech_recognition `
+    --hidden-import sounddevice `
+    --hidden-import numpy `
+    --collect-all sounddevice `
     --hidden-import qrcode `
     --hidden-import qrcode.image `
     --hidden-import qrcode.image.pil `

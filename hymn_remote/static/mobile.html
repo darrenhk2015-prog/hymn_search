@@ -2,65 +2,125 @@
 <html lang="zh-Hant">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
   <title>詩歌冊遙控</title>
   <style>
     * { box-sizing: border-box; }
     body {
       font-family: 'Segoe UI', 'PingFang TC', 'Microsoft YaHei', sans-serif;
-      margin: 0; padding: 0 0 24px;
+      margin: 0; padding: 0 0 28px;
       background: #0c0e1a; color: #e4e8f5;
       min-height: 100vh;
     }
-    .page { padding: 16px; }
-    h1 { font-size: 1.25rem; margin: 0 0 4px; }
-    .sub { color: #8892b8; font-size: 0.85rem; margin-bottom: 16px; }
-    label { display: block; font-size: 0.85rem; color: #8892b8; margin: 12px 0 6px; }
-    input, button {
-      width: 100%; font-size: 1rem; padding: 12px 14px;
+    .page { padding: 14px 16px; }
+    h1 { font-size: 1.2rem; margin: 0 0 2px; }
+    .sub { color: #8892b8; font-size: 0.8rem; margin-bottom: 12px; }
+    label { display: block; font-size: 0.8rem; color: #8892b8; margin: 10px 0 5px; }
+    input, select, button {
+      width: 100%; font-size: 1.05rem; padding: 12px 14px;
       border-radius: 10px; border: 1.5px solid #2e3254;
       background: #191c30; color: #e4e8f5;
     }
+    select { appearance: none; }
     button.main {
-      margin-top: 16px; background: #7c6af7; border: none;
-      color: #fff; font-weight: 600; cursor: pointer;
+      margin-top: 12px; background: #7c6af7; border: none;
+      color: #fff; font-weight: 700; cursor: pointer;
     }
     button.main.ready { background: #34d399; }
     button.main.ready:active { background: #10b981; }
-    button.main.secondary {
-      background: #4338ca; margin-top: 10px;
+    button.main.secondary { background: #4338ca; margin-top: 8px; }
+    button.main.ghost {
+      background: transparent; border: 1.5px solid #2e3254;
+      color: #8892b8; margin-top: 8px; font-weight: 600;
+    }
+    button.main.danger { background: #7f1d1d; margin-top: 10px; }
+    button.main.danger.alt {
+      background: #1c1200; border: 1.5px solid #fbbf24; color: #fbbf24;
     }
     button.main:disabled { opacity: 0.45; cursor: not-allowed; }
     .field { position: relative; }
+    .input-row {
+      display: flex; gap: 6px; align-items: stretch;
+    }
+    .input-row input, .input-row select { flex: 1; min-width: 0; }
+    .icon-btn {
+      width: 44px; flex: 0 0 44px; padding: 0;
+      border-radius: 10px; font-size: 1.15rem; font-weight: 700;
+      background: #1b1f36; border: 1.5px solid #2e3254; color: #e4e8f5;
+    }
+    .icon-btn.clear { color: #8892b8; font-size: 1.35rem; line-height: 1; }
+    .icon-btn.listening {
+      background: #7c6af7; border-color: #7c6af7; color: #fff;
+    }
+    .icon-btn:disabled { opacity: 0.35; }
+    .icon-btn.hidden { display: none; }
+    .mode-row { display: flex; gap: 8px; margin-top: 4px; }
+    .mode-row button {
+      flex: 1; margin: 0; padding: 8px 10px; font-size: 0.85rem;
+      font-weight: 600; background: #13162a; color: #8892b8;
+    }
+    .mode-row button.active {
+      background: #1b1f36; color: #e4e8f5; border-color: #7c6af7;
+    }
+    .opt-row {
+      display: flex; align-items: center; gap: 10px;
+      margin-top: 12px; padding: 10px 12px;
+      background: #13162a; border-radius: 10px; border: 1.5px solid #2e3254;
+    }
+    .opt-row input[type="checkbox"] {
+      width: 20px; height: 20px; margin: 0; flex: 0 0 auto;
+      accent-color: #7c6af7;
+    }
+    .opt-row label {
+      margin: 0; flex: 1; color: #e4e8f5; font-size: 0.95rem;
+    }
+    .chips {
+      display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px;
+    }
+    .chips.hidden { display: none; }
+    .chip {
+      width: auto; margin: 0; padding: 7px 12px; font-size: 0.82rem;
+      border-radius: 999px; background: #13162a; color: #c8d0ef;
+      border: 1px solid #2e3254; white-space: nowrap; max-width: 100%;
+      overflow: hidden; text-overflow: ellipsis;
+    }
+    .chip:active { background: #1b1f36; border-color: #7c6af7; }
     .suggest {
-      margin-top: 6px; max-height: 220px; overflow-y: auto;
-      border: 1.5px solid #2e3254; border-radius: 10px;
-      background: #13162a;
+      margin-top: 6px; max-height: 240px; overflow-y: auto;
+      border: 1.5px solid #7c6af7; border-radius: 10px;
+      background: #13162a; -webkit-overflow-scrolling: touch;
     }
     .suggest.hidden { display: none; }
     .suggest button {
       width: 100%; text-align: left; border: none; border-radius: 0;
-      background: transparent; color: #e4e8f5; padding: 10px 14px;
-      border-bottom: 1px solid #252840; font-size: 0.95rem;
+      background: transparent; color: #e4e8f5; padding: 13px 14px;
+      border-bottom: 1px solid #252840; font-size: 1rem;
     }
     .suggest button:last-child { border-bottom: none; }
     .suggest button:active { background: #1b1f36; }
     .suggest .tag {
-      display: inline-block; font-size: 0.75rem; color: #8892b8;
+      display: inline-block; font-size: 0.72rem; color: #8892b8;
       margin-right: 6px;
     }
-    #status, #openResult, #scheduleResult {
-      margin-top: 14px; padding: 12px 14px; border-radius: 10px;
-      font-size: 0.9rem; line-height: 1.5;
+    .suggest .meta { color: #505870; font-size: 0.8rem; margin-left: 4px; }
+    .action-row { display: flex; gap: 8px; margin-top: 12px; }
+    .action-row button { flex: 1; margin-top: 0; }
+    #status, #openResult, #scheduleResult, #displayResult {
+      margin-top: 12px; padding: 11px 13px; border-radius: 10px;
+      font-size: 0.9rem; line-height: 1.45;
     }
     #status { background: #13162a; color: #8892b8; }
     #status.ok { color: #34d399; }
     #status.warn { background: #1c1200; color: #fbbf24; }
-    #openResult, #scheduleResult {
+    #openResult, #scheduleResult, #displayResult {
       background: #13162a; white-space: pre-wrap; word-break: break-word;
     }
     .hidden { display: none !important; }
-    .hint { font-size: 0.8rem; color: #505870; margin-top: 4px; }
+    .hint { font-size: 0.78rem; color: #505870; margin-top: 4px; }
+    .section-title {
+      margin-top: 18px; font-size: 0.85rem; color: #8892b8;
+      border-top: 1px solid #252840; padding-top: 14px;
+    }
     .tabs {
       display: flex; gap: 0; border-bottom: 1.5px solid #2e3254;
       background: #13162a; position: sticky; top: 0; z-index: 10;
@@ -103,8 +163,8 @@
   </div>
 
   <div class="page">
-    <h1>🎵 詩歌冊遙控</h1>
-    <p class="sub">由桌面端開啟詩歌；有排程時可切換「排程」分頁</p>
+    <h1>詩歌冊遙控</h1>
+    <p class="sub">打字選歌如電腦版 · 開檔後自動清詩歌號再下一首</p>
     <div id="status">連線中…</div>
 
     <div id="panelOpen" class="panel active">
@@ -114,23 +174,62 @@
         <div id="tokenHint" class="hint">請輸入 API Token</div>
       </div>
 
-      <label for="book">書冊號（順序或書名）</label>
-      <div class="field">
-        <input id="book" type="text" inputmode="text" placeholder="e.g. 1 或 讚美詩" list="booklist" autocomplete="off">
-        <datalist id="booklist"></datalist>
+      <label>輸入方式</label>
+      <div class="mode-row">
+        <button type="button" id="modeType" class="active">快速輸入</button>
+        <button type="button" id="modeSelect">選單</button>
       </div>
 
-      <label for="num">檔案 / 書籤號</label>
-      <div class="field">
-        <input id="num" type="text" inputmode="text" placeholder="先選書冊，再選檔案或書籤" list="numlist" autocomplete="off">
-        <datalist id="numlist"></datalist>
-        <div id="numHint" class="hint">請先輸入書冊</div>
-        <div id="numSuggest" class="suggest hidden"></div>
+      <div class="opt-row">
+        <input type="checkbox" id="chkClickToOpen">
+        <label for="chkClickToOpen">一點即開（點建議即開啟）</label>
       </div>
 
-      <button id="openBtn" class="main" disabled>開啟</button>
+      <div id="typeMode">
+        <label for="book">書冊（號或名）</label>
+        <div class="field">
+          <div class="input-row">
+            <input id="book" type="search" enterkeyhint="next" inputmode="search"
+              placeholder="輸入 1 / 書名…" autocomplete="off" autocorrect="off" spellcheck="false">
+            <button type="button" class="icon-btn clear hidden" id="clearBook" title="清空書冊">×</button>
+            <button type="button" class="icon-btn" id="micBook" title="語音輸入書冊（廣東話）">🎤</button>
+          </div>
+          <div id="bookSuggest" class="suggest hidden"></div>
+          <div id="recentBooks" class="chips hidden"></div>
+        </div>
+
+        <label for="num">詩歌號 / 歌名</label>
+        <div class="field">
+          <div class="input-row">
+            <input id="num" type="search" enterkeyhint="go" inputmode="search"
+              placeholder="詩歌號／歌名（無書冊＝全局搜索）" autocomplete="off" autocorrect="off" spellcheck="false">
+            <button type="button" class="icon-btn clear hidden" id="clearNum" title="清空詩歌號">×</button>
+            <button type="button" class="icon-btn" id="micNum" title="語音輸入詩歌（廣東話）">🎤</button>
+          </div>
+          <div id="numHint" class="hint">先輸入書冊，再打詩歌號</div>
+          <div id="numSuggest" class="suggest hidden"></div>
+        </div>
+      </div>
+
+      <div id="selectMode" class="hidden">
+        <label for="bookSelect">書冊</label>
+        <select id="bookSelect"><option value="">— 請選擇 —</option></select>
+        <label for="numSelect">檔案 / 書籤</label>
+        <select id="numSelect"><option value="">— 先選書冊 —</option></select>
+      </div>
+
+      <div class="action-row">
+        <button id="openBtn" class="main" disabled>開啟</button>
+        <button id="clearAllBtn" class="main ghost" type="button">清空</button>
+      </div>
       <button id="addBtn" class="main secondary" disabled>＋ 加入排程</button>
       <div id="openResult" class="hidden"></div>
+
+      <div class="section-title">開檔後控制</div>
+      <button id="closeBtn" class="main danger" disabled>結束程式（Alt+F4）</button>
+      <button id="blackBtn" class="main danger alt" disabled>結束並全黑（等下一首）</button>
+      <div id="displayResult" class="hidden"></div>
+      <div class="hint">全黑畫面會保留直至再開下一首；操作員可按 Esc 取消</div>
     </div>
 
     <div id="panelSchedule" class="panel">
@@ -151,22 +250,42 @@
     const panelSchedule = document.getElementById('panelSchedule');
     const openBtn = document.getElementById('openBtn');
     const addBtn = document.getElementById('addBtn');
+    const clearAllBtn = document.getElementById('clearAllBtn');
+    const closeBtn = document.getElementById('closeBtn');
+    const blackBtn = document.getElementById('blackBtn');
     const prevBtn = document.getElementById('prevBtn');
     const nextBtn = document.getElementById('nextBtn');
     const setlistBox = document.getElementById('setlistBox');
     const scheduleHint = document.getElementById('scheduleHint');
     const openResult = document.getElementById('openResult');
     const scheduleResult = document.getElementById('scheduleResult');
+    const displayResult = document.getElementById('displayResult');
     const bookInput = document.getElementById('book');
     const numInput = document.getElementById('num');
-    const booklist = document.getElementById('booklist');
-    const numlist = document.getElementById('numlist');
+    const bookSelect = document.getElementById('bookSelect');
+    const numSelect = document.getElementById('numSelect');
+    const bookSuggest = document.getElementById('bookSuggest');
     const numSuggest = document.getElementById('numSuggest');
+    const recentBooksEl = document.getElementById('recentBooks');
     const numHint = document.getElementById('numHint');
     const tokenInput = document.getElementById('apiToken');
     const tokenHint = document.getElementById('tokenHint');
     const tokenSection = document.getElementById('tokenSection');
+    const selectModeEl = document.getElementById('selectMode');
+    const typeModeEl = document.getElementById('typeMode');
+    const modeSelectBtn = document.getElementById('modeSelect');
+    const modeTypeBtn = document.getElementById('modeType');
+    const micBook = document.getElementById('micBook');
+    const micNum = document.getElementById('micNum');
+    const clearBookBtn = document.getElementById('clearBook');
+    const clearNumBtn = document.getElementById('clearNum');
+    const chkClickToOpen = document.getElementById('chkClickToOpen');
     const TOKEN_KEY = 'hymn_remote_api_token';
+    const MODE_KEY = 'hymn_remote_input_mode';
+    const RECENT_KEY = 'hymn_remote_recent_books';
+    const CLICK_OPEN_KEY = 'hymn_remote_click_to_open';
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+
     function apiBasePath() {
       const p = window.location.pathname;
       const m = p.match(/^(.*)\/(admin|view)\/?$/);
@@ -179,12 +298,46 @@
     let serverNeedsToken = false;
     let allEntries = [];
     let entriesBook = '';
+    let booksCache = [];
     let setlistData = { entries: [], index: -1, total: 0 };
     let activeTab = 'open';
+    let inputMode = 'type';
+    let activeMic = null;
+    let suppressSelectAll = false;
+    let clickToOpen = false;
+    let clickToOpenUserSet = false;
 
-    function getToken() {
-      return tokenInput.value.trim();
+    function isClickToOpen() {
+      return !!clickToOpen;
     }
+
+    function setClickToOpen(on, persist) {
+      clickToOpen = !!on;
+      chkClickToOpen.checked = clickToOpen;
+      if (persist) {
+        clickToOpenUserSet = true;
+        try { localStorage.setItem(CLICK_OPEN_KEY, clickToOpen ? '1' : '0'); } catch (_) {}
+      }
+    }
+
+    function loadClickToOpenPref() {
+      try {
+        const raw = localStorage.getItem(CLICK_OPEN_KEY);
+        if (raw === '1' || raw === '0') {
+          clickToOpenUserSet = true;
+          setClickToOpen(raw === '1', false);
+          return;
+        }
+      } catch (_) {}
+      clickToOpenUserSet = false;
+      setClickToOpen(false, false);
+    }
+
+    chkClickToOpen.addEventListener('change', () => {
+      setClickToOpen(chkClickToOpen.checked, true);
+    });
+
+    function getToken() { return tokenInput.value.trim(); }
 
     function apiHeaders(extra = {}) {
       const h = { 'Content-Type': 'application/json', ...extra };
@@ -224,11 +377,6 @@
       statusEl.className = kind || '';
     }
 
-    function showResult(el, text) {
-      el.textContent = text;
-      el.classList.remove('hidden');
-    }
-
     function formatOpenPolicyResult(data, okPrefix) {
       const summaries = (data.matches || []).map(m => m.summary).join('\n');
       if (data.status === 'opened') {
@@ -257,46 +405,200 @@
       });
     });
 
-    function fillDatalist(listEl, items) {
-      listEl.innerHTML = '';
+    function setInputMode(mode) {
+      inputMode = mode === 'select' ? 'select' : 'type';
+      selectModeEl.classList.toggle('hidden', inputMode !== 'select');
+      typeModeEl.classList.toggle('hidden', inputMode !== 'type');
+      modeSelectBtn.classList.toggle('active', inputMode === 'select');
+      modeTypeBtn.classList.toggle('active', inputMode === 'type');
+      try { localStorage.setItem(MODE_KEY, inputMode); } catch (_) {}
+      if (inputMode === 'type') {
+        syncClearBtns();
+        renderRecentBooks();
+        if (bookInput.value.trim()) loadEntries();
+      }
+    }
+
+    modeSelectBtn.addEventListener('click', () => setInputMode('select'));
+    modeTypeBtn.addEventListener('click', () => setInputMode('type'));
+
+    function currentBook() {
+      if (inputMode === 'select') return bookSelect.value.trim();
+      return bookInput.value.trim();
+    }
+
+    function currentNum() {
+      if (inputMode === 'select') return numSelect.value.trim();
+      return numInput.value.trim();
+    }
+
+    function syncClearBtns() {
+      clearBookBtn.classList.toggle('hidden', !bookInput.value);
+      clearNumBtn.classList.toggle('hidden', !numInput.value);
+    }
+
+    function selectAllOnFocus(el) {
+      el.addEventListener('focus', () => {
+        if (suppressSelectAll) return;
+        requestAnimationFrame(() => {
+          try { el.select(); } catch (_) {}
+        });
+      });
+    }
+    selectAllOnFocus(bookInput);
+    selectAllOnFocus(numInput);
+
+    function getRecentBooks() {
+      try {
+        const raw = JSON.parse(localStorage.getItem(RECENT_KEY) || '[]');
+        return Array.isArray(raw) ? raw.slice(0, 6) : [];
+      } catch (_) {
+        return [];
+      }
+    }
+
+    function pushRecentBook(ref, label) {
+      const item = { ref: String(ref || '').trim(), label: String(label || ref || '').trim() };
+      if (!item.ref) return;
+      const list = getRecentBooks().filter(x => x.ref !== item.ref);
+      list.unshift(item);
+      try { localStorage.setItem(RECENT_KEY, JSON.stringify(list.slice(0, 6))); } catch (_) {}
+      renderRecentBooks();
+    }
+
+    function renderRecentBooks() {
+      const list = getRecentBooks();
+      recentBooksEl.innerHTML = '';
+      if (!list.length || bookInput.value.trim()) {
+        recentBooksEl.classList.add('hidden');
+        return;
+      }
+      list.forEach(item => {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'chip';
+        btn.textContent = item.label || item.ref;
+        btn.addEventListener('click', () => pickBook(item.ref, item.label));
+        recentBooksEl.appendChild(btn);
+      });
+      recentBooksEl.classList.remove('hidden');
+    }
+
+    function filterBooks(q) {
+      const s = (q || '').trim().toLowerCase();
+      if (!s) return booksCache.slice(0, 12);
+      return booksCache.filter(b => {
+        const name = String(b.name || '').toLowerCase();
+        const idx = String(b.index);
+        return idx === s || idx.startsWith(s) || name.includes(s);
+      }).slice(0, 20);
+    }
+
+    function renderBookSuggest() {
+      const q = bookInput.value.trim();
+      bookSuggest.innerHTML = '';
+      if (!q) {
+        bookSuggest.classList.add('hidden');
+        renderRecentBooks();
+        return;
+      }
+      recentBooksEl.classList.add('hidden');
+      const items = filterBooks(q);
+      if (!items.length) {
+        bookSuggest.classList.add('hidden');
+        return;
+      }
+      items.forEach(b => {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.innerHTML = `<span class="tag">${b.index}</span>${b.name}`;
+        btn.addEventListener('click', () => pickBook(String(b.index), `${b.index}. ${b.name}`));
+        bookSuggest.appendChild(btn);
+      });
+      bookSuggest.classList.remove('hidden');
+    }
+
+    function pickBook(ref, label) {
+      suppressSelectAll = true;
+      bookInput.value = ref;
+      bookSuggest.classList.add('hidden');
+      syncClearBtns();
+      pushRecentBook(ref, label || ref);
+      numInput.value = '';
+      entriesBook = '';
+      allEntries = [];
+      syncClearBtns();
+      loadEntries().then(() => {
+        numInput.focus();
+        try { numInput.select(); } catch (_) {}
+        suppressSelectAll = false;
+      });
+    }
+
+    function fillNumSelect(items) {
+      numSelect.innerHTML = '';
+      const empty = document.createElement('option');
+      empty.value = '';
+      empty.textContent = items.length ? '— 請選擇 —' : '— 先選書冊 —';
+      numSelect.appendChild(empty);
       items.forEach(item => {
         const o = document.createElement('option');
         o.value = item.value;
-        o.label = item.label;
-        listEl.appendChild(o);
+        const tag = item.kind === 'bookmark' ? '書籤' : '檔案';
+        o.textContent = `[${tag}] ${item.label}`;
+        numSelect.appendChild(o);
       });
     }
 
     function renderNumSuggest(items) {
       numSuggest.innerHTML = '';
-      if (!bookInput.value.trim()) {
+      const book = bookInput.value.trim();
+      const globalMode = !book;
+      if (globalMode && !numInput.value.trim()) {
         numSuggest.classList.add('hidden');
-        numHint.textContent = '請先輸入書冊';
+        numHint.textContent = '未選書冊：輸入歌名做全局搜索';
         return;
       }
       if (!items.length) {
         numSuggest.classList.add('hidden');
-        numHint.textContent = entriesBook ? '沒有符合的檔案或書籤' : '載入中或書冊無效';
+        numHint.textContent = globalMode
+          ? (numInput.value.trim() ? '全局找不到' : '未選書冊：輸入歌名做全局搜索')
+          : (entriesBook ? '沒有符合項目' : '載入中…');
         return;
       }
       const q = numInput.value.trim().toLowerCase();
-      const shown = q
-        ? items.filter(i => i.value.toLowerCase().includes(q) || i.label.toLowerCase().includes(q))
-        : items.slice(0, 80);
+      const shown = globalMode
+        ? items.slice(0, 40)
+        : (q
+          ? items.filter(i =>
+              String(i.value).toLowerCase().includes(q)
+              || String(i.label).toLowerCase().includes(q)
+            ).slice(0, 40)
+          : items.slice(0, 30));
       if (!shown.length) {
         numSuggest.classList.add('hidden');
-        numHint.textContent = '沒有符合的檔案或書籤';
+        numHint.textContent = '沒有符合 · 可直接按開啟';
         return;
       }
-      numHint.textContent = `${shown.length} 項可選（${items.length} 項總計）`;
+      numHint.textContent = globalMode
+        ? `全局 ${shown.length} 項`
+        : (q ? `${shown.length} 項符合` : `${items.length} 項 · 繼續輸入過濾`);
       shown.forEach(item => {
         const btn = document.createElement('button');
         btn.type = 'button';
-        const tag = item.kind === 'bookmark' ? '書籤' : '檔案';
+        const tag = item.kind === 'bookmark' ? '書籤' : (globalMode ? '全局' : '檔案');
         btn.innerHTML = `<span class="tag">${tag}</span>${item.label}`;
         btn.addEventListener('click', () => {
+          if (item.book_ref) {
+            bookInput.value = String(item.book_ref);
+            entriesBook = '';
+            allEntries = [];
+          }
           numInput.value = item.value;
           numSuggest.classList.add('hidden');
+          syncClearBtns();
+          if (isClickToOpen()) doOpen();
+          else if (item.book_ref) loadEntries();
         });
         numSuggest.appendChild(btn);
       });
@@ -304,70 +606,185 @@
     }
 
     async function loadEntries() {
-      const book = bookInput.value.trim();
+      const book = currentBook();
+      const numQ = (inputMode === 'type' ? numInput.value : '').trim();
+      // Global search when no book: need a query
       if (!book) {
         allEntries = [];
         entriesBook = '';
-        fillDatalist(numlist, []);
-        numInput.value = '';
-        numInput.placeholder = '先選書冊，再選檔案或書籤';
-        renderNumSuggest([]);
+        fillNumSelect([]);
+        if (inputMode !== 'type') {
+          return;
+        }
+        if (!numQ) {
+          renderNumSuggest([]);
+          return;
+        }
+        numHint.textContent = '全局搜索中…';
+        try {
+          const { ok, status, data } = await api(
+            '/api/entries?book=&q=' + encodeURIComponent(numQ),
+          );
+          if (status === 401) {
+            numHint.textContent = 'API Token 不正確';
+            renderNumSuggest([]);
+            return;
+          }
+          allEntries = (ok && Array.isArray(data)) ? data : [];
+          entriesBook = '';
+          renderNumSuggest(allEntries);
+        } catch (_) {
+          allEntries = [];
+          renderNumSuggest([]);
+        }
         return;
       }
       if (book === entriesBook && allEntries.length) {
-        renderNumSuggest(allEntries);
+        fillNumSelect(allEntries);
+        if (inputMode === 'type') renderNumSuggest(allEntries);
         return;
       }
-      numHint.textContent = '載入檔案 / 書籤…';
+      if (inputMode === 'type') numHint.textContent = '載入中…';
       try {
         const { ok, status, data } = await api('/api/entries?book=' + encodeURIComponent(book));
         if (status === 401) {
           allEntries = [];
-          numHint.textContent = 'API Token 不正確';
-          renderNumSuggest([]);
+          fillNumSelect([]);
+          if (inputMode === 'type') {
+            numHint.textContent = 'API Token 不正確';
+            renderNumSuggest([]);
+          }
           return;
         }
         if (!ok || !Array.isArray(data)) {
           allEntries = [];
-          renderNumSuggest([]);
+          fillNumSelect([]);
+          if (inputMode === 'type') renderNumSuggest([]);
           return;
         }
         entriesBook = book;
         allEntries = data;
-        fillDatalist(numlist, data);
-        renderNumSuggest(data);
+        fillNumSelect(data);
+        if (inputMode === 'type') renderNumSuggest(data);
       } catch (_) {
         allEntries = [];
-        renderNumSuggest([]);
+        fillNumSelect([]);
+        if (inputMode === 'type') renderNumSuggest([]);
       }
     }
 
     let bookDebounce, numDebounce;
     bookInput.addEventListener('input', () => {
+      syncClearBtns();
+      renderBookSuggest();
       clearTimeout(bookDebounce);
       const book = bookInput.value.trim();
       if (book !== entriesBook) {
         numInput.value = '';
         allEntries = [];
+        syncClearBtns();
       }
-      bookDebounce = setTimeout(loadEntries, 300);
+      bookDebounce = setTimeout(() => {
+        if (book) loadEntries();
+      }, 180);
     });
-    bookInput.addEventListener('change', () => {
-      numInput.value = '';
-      entriesBook = '';
-      allEntries = [];
-      loadEntries();
+
+    bookInput.addEventListener('keydown', (e) => {
+      if (e.key !== 'Enter') return;
+      e.preventDefault();
+      const matches = filterBooks(bookInput.value);
+      if (matches.length === 1) {
+        const b = matches[0];
+        pickBook(String(b.index), `${b.index}. ${b.name}`);
+        return;
+      }
+      bookSuggest.classList.add('hidden');
+      loadEntries().then(() => {
+        numInput.focus();
+        try { numInput.select(); } catch (_) {}
+      });
     });
 
     numInput.addEventListener('focus', () => {
-      if (bookInput.value.trim()) renderNumSuggest(allEntries);
+      if (bookInput.value.trim()) {
+        if (allEntries.length) renderNumSuggest(allEntries);
+        else loadEntries();
+      } else {
+        renderNumSuggest(allEntries);
+      }
     });
+
     numInput.addEventListener('input', () => {
+      syncClearBtns();
       clearTimeout(numDebounce);
-      numDebounce = setTimeout(() => renderNumSuggest(allEntries), 150);
+      numDebounce = setTimeout(() => {
+        if (!bookInput.value.trim()) loadEntries();
+        else renderNumSuggest(allEntries);
+      }, 180);
+    });
+
+    numInput.addEventListener('keydown', (e) => {
+      if (e.key !== 'Enter') return;
+      e.preventDefault();
+      doOpen();
+    });
+
+    bookSelect.addEventListener('change', () => {
+      entriesBook = '';
+      allEntries = [];
+      numSelect.value = '';
+      loadEntries();
+    });
+
+    numSelect.addEventListener('change', () => {
+      if (isClickToOpen() && numSelect.value.trim()) doOpen();
+    });
+
+    clearBookBtn.addEventListener('click', () => {
+      bookInput.value = '';
+      numInput.value = '';
+      entriesBook = '';
+      allEntries = [];
+      bookSuggest.classList.add('hidden');
+      numSuggest.classList.add('hidden');
+      syncClearBtns();
+      renderRecentBooks();
+      numHint.textContent = '未選書冊：輸入歌名做全局搜索';
+      numInput.focus();
+    });
+
+    clearNumBtn.addEventListener('click', () => {
+      numInput.value = '';
+      syncClearBtns();
+      renderNumSuggest(allEntries);
+      numInput.focus();
+      try { numInput.select(); } catch (_) {}
+    });
+
+    clearAllBtn.addEventListener('click', () => {
+      if (inputMode === 'select') {
+        bookSelect.value = '';
+        numSelect.value = '';
+        entriesBook = '';
+        allEntries = [];
+        fillNumSelect([]);
+        return;
+      }
+      bookInput.value = '';
+      numInput.value = '';
+      entriesBook = '';
+      allEntries = [];
+      bookSuggest.classList.add('hidden');
+      numSuggest.classList.add('hidden');
+      syncClearBtns();
+      renderRecentBooks();
+      bookInput.focus();
     });
 
     document.addEventListener('click', (e) => {
+      if (!bookSuggest.contains(e.target) && e.target !== bookInput) {
+        bookSuggest.classList.add('hidden');
+      }
       if (!numSuggest.contains(e.target) && e.target !== numInput) {
         numSuggest.classList.add('hidden');
       }
@@ -389,7 +806,6 @@
     function updateOpenBtn() {
       openBtn.classList.toggle('ready', !openBtn.disabled);
     }
-
     function updateAddBtn() {
       addBtn.classList.toggle('ready', !addBtn.disabled);
     }
@@ -398,8 +814,24 @@
       const canUse = apiEnabled && (!serverNeedsToken || getToken());
       openBtn.disabled = !canUse || !accepting;
       addBtn.disabled = !canUse;
+      closeBtn.disabled = !canUse || !accepting;
+      blackBtn.disabled = !canUse || !accepting;
       updateOpenBtn();
       updateAddBtn();
+    }
+
+    function readyForNextSong() {
+      if (inputMode !== 'type') return;
+      numInput.value = '';
+      syncClearBtns();
+      numSuggest.classList.add('hidden');
+      if (bookInput.value.trim()) {
+        numHint.textContent = '同一書冊 · 輸入下一首號即可';
+        setTimeout(() => {
+          numInput.focus();
+          try { numInput.select(); } catch (_) {}
+        }, 50);
+      }
     }
 
     function renderSetlist(data) {
@@ -407,9 +839,7 @@
       const total = setlistData.total || (setlistData.entries || []).length;
       const hasSchedule = total > 0;
       tabSchedule.classList.toggle('hidden', !hasSchedule);
-      if (!hasSchedule && activeTab === 'schedule') {
-        switchTab('open');
-      }
+      if (!hasSchedule && activeTab === 'schedule') switchTab('open');
 
       setlistBox.innerHTML = '';
       if (!hasSchedule) {
@@ -421,16 +851,14 @@
       }
 
       const idx = setlistData.index >= 0 ? setlistData.index : 0;
-      const pos = idx + 1;
-      scheduleHint.textContent = `共 ${total} 首 · 目前第 ${pos} 首`;
+      scheduleHint.textContent = `共 ${total} 首 · 目前第 ${idx + 1} 首`;
       (setlistData.entries || []).forEach((entry, i) => {
         const btn = document.createElement('button');
         btn.type = 'button';
         btn.className = 'setlist-item' + (i === idx ? ' current' : '');
         const book = entry.book || '';
         const num = entry.num || '';
-        const text = num ? `${book} / ${num}` : book;
-        btn.innerHTML = `<span class="idx">${i + 1}.</span>${text}`;
+        btn.innerHTML = `<span class="idx">${i + 1}.</span>${num ? `${book} / ${num}` : book}`;
         btn.addEventListener('click', () => openSetlistIndex(i));
         setlistBox.appendChild(btn);
       });
@@ -451,7 +879,7 @@
     async function openSetlistIndex(index) {
       scheduleResult.classList.remove('hidden');
       scheduleResult.textContent = '開啟中…';
-      const { ok, status, data } = await api('/api/setlist/open', {
+      const { status, data } = await api('/api/setlist/open', {
         method: 'POST',
         body: JSON.stringify({ index }),
       });
@@ -473,6 +901,9 @@
         if (!ok) throw new Error('health failed');
         accepting = !!data.accepting;
         serverNeedsToken = !!data.has_token;
+        if (!clickToOpenUserSet && typeof data.click_to_open === 'boolean') {
+          setClickToOpen(data.click_to_open, false);
+        }
         updateTokenSection();
         if (!data.api_enabled) {
           setStatus('桌面端 API 未啟用', 'warn');
@@ -488,11 +919,10 @@
           nextBtn.disabled = true;
           return;
         }
-        if (!accepting) {
-          setStatus('已連線 · 可加入排程（開檔暫停）', 'warn');
-        } else {
-          setStatus('已連線 · 可發送開檔請求', 'ok');
-        }
+        setStatus(
+          accepting ? '已連線 · 可發送開檔請求' : '已連線 · 可加入排程（開檔暫停）',
+          accepting ? 'ok' : 'warn',
+        );
         updateActionButtons(true);
         if (data.setlist) renderSetlist(data.setlist);
         else loadSetlist();
@@ -515,21 +945,29 @@
           return;
         }
         if (!ok || !Array.isArray(data)) return;
-        booklist.innerHTML = '';
+        booksCache = data;
+        bookSelect.innerHTML = '';
+        const empty = document.createElement('option');
+        empty.value = '';
+        empty.textContent = '— 請選擇 —';
+        bookSelect.appendChild(empty);
         data.forEach(b => {
-          const o = document.createElement('option');
-          o.value = String(b.index);
-          o.label = `${b.index}. ${b.name}`;
-          booklist.appendChild(o);
+          const s = document.createElement('option');
+          s.value = String(b.index);
+          s.textContent = `${b.index}. ${b.name}`;
+          bookSelect.appendChild(s);
         });
+        renderRecentBooks();
       } catch (_) {}
     }
 
-    openBtn.addEventListener('click', async () => {
+    async function doOpen() {
       openResult.classList.remove('hidden');
       openResult.textContent = '發送中…';
-      const body = JSON.stringify({ book: bookInput.value.trim(), num: numInput.value.trim() });
-      const { ok, status, data } = await api('/api/open', { method: 'POST', body });
+      const book = currentBook();
+      const num = currentNum();
+      const body = JSON.stringify({ book, num });
+      const { status, data } = await api('/api/open', { method: 'POST', body });
       if (status === 401) {
         openResult.textContent = '⚠ API Token 不正確';
         return;
@@ -539,12 +977,21 @@
         return;
       }
       openResult.textContent = formatOpenPolicyResult(data, '✅ 已開啟');
-    });
+      if (data.status === 'opened' || data.status === 'queued' || data.status === 'ui_populated') {
+        if (book) {
+          const hit = booksCache.find(b => String(b.index) === book || b.name === book);
+          pushRecentBook(book, hit ? `${hit.index}. ${hit.name}` : book);
+        }
+        readyForNextSong();
+      }
+    }
+
+    openBtn.addEventListener('click', () => doOpen());
 
     addBtn.addEventListener('click', async () => {
       openResult.classList.remove('hidden');
       openResult.textContent = '加入排程中…';
-      const body = JSON.stringify({ book: bookInput.value.trim(), num: numInput.value.trim() });
+      const body = JSON.stringify({ book: currentBook(), num: currentNum() });
       const { status, data } = await api('/api/setlist/add', { method: 'POST', body });
       if (status === 401) {
         openResult.textContent = '⚠ API Token 不正確';
@@ -553,20 +1000,42 @@
       if (data.status === 'added') {
         openResult.textContent = '✅ 已加入排程';
         if (data.setlist) renderSetlist(data.setlist);
+        readyForNextSong();
         return;
       }
-      if (data.status === 'not_found') {
-        openResult.textContent = '⚠ 找不到書冊';
-      } else if (data.status === 'ambiguous') {
-        openResult.textContent = '⚠ ' + (data.message || '書冊不明確');
-      } else if (data.status === 'invalid') {
-        openResult.textContent = '⚠ ' + (data.message || '請輸入書冊或詩歌號');
-      } else if (data.status === 'disabled') {
-        openResult.textContent = data.message || '桌面端 API 未啟用';
-      } else {
-        openResult.textContent = data.message || '⚠ 無法加入排程';
-      }
+      if (data.status === 'not_found') openResult.textContent = '⚠ 找不到書冊';
+      else if (data.status === 'ambiguous') openResult.textContent = '⚠ ' + (data.message || '書冊不明確');
+      else if (data.status === 'invalid') openResult.textContent = '⚠ ' + (data.message || '請輸入書冊或詩歌號');
+      else if (data.status === 'disabled') openResult.textContent = data.message || '桌面端 API 未啟用';
+      else openResult.textContent = data.message || '⚠ 無法加入排程';
     });
+
+    async function sendDisplay(action, label) {
+      displayResult.classList.remove('hidden');
+      displayResult.textContent = label + '…';
+      const { status, data } = await api('/api/display', {
+        method: 'POST',
+        body: JSON.stringify({ action }),
+      });
+      if (status === 401) {
+        displayResult.textContent = '⚠ API Token 不正確';
+        return;
+      }
+      if (status === 503 || data.status === 'not_accepting') {
+        displayResult.textContent = data.message || '桌面端暫停接受';
+        return;
+      }
+      if (data.status === 'ok') {
+        displayResult.textContent = action === 'black'
+          ? '✅ 已結束並全黑（Esc 可取消）'
+          : '✅ 已結束目前程式';
+        return;
+      }
+      displayResult.textContent = '⚠ ' + (data.message || '操作失敗');
+    }
+
+    closeBtn.addEventListener('click', () => sendDisplay('close', '結束程式'));
+    blackBtn.addEventListener('click', () => sendDisplay('black', '結束並全黑'));
 
     prevBtn.addEventListener('click', async () => {
       if (!setlistData.entries || !setlistData.entries.length) return;
@@ -578,7 +1047,7 @@
     nextBtn.addEventListener('click', async () => {
       scheduleResult.classList.remove('hidden');
       scheduleResult.textContent = '下一首…';
-      const { ok, status, data } = await api('/api/next', { method: 'POST', body: '{}' });
+      const { status, data } = await api('/api/next', { method: 'POST', body: '{}' });
       if (status === 401) {
         scheduleResult.textContent = '⚠ API Token 不正確';
         return;
@@ -590,6 +1059,45 @@
       scheduleResult.textContent = formatOpenPolicyResult(data, '✅ 已開啟下一首');
       if (data.setlist) renderSetlist(data.setlist);
     });
+
+    function setupVoice(btn, inputEl) {
+      if (!SpeechRecognition) {
+        btn.disabled = true;
+        btn.title = '此瀏覽器不支援語音輸入';
+        return;
+      }
+      btn.addEventListener('click', () => {
+        if (activeMic) {
+          try { activeMic.stop(); } catch (_) {}
+          activeMic = null;
+          micBook.classList.remove('listening');
+          micNum.classList.remove('listening');
+          return;
+        }
+        const rec = new SpeechRecognition();
+        rec.lang = 'yue-HK';
+        rec.interimResults = false;
+        rec.maxAlternatives = 1;
+        btn.classList.add('listening');
+        activeMic = rec;
+        rec.onresult = (ev) => {
+          const text = (ev.results[0] && ev.results[0][0] && ev.results[0][0].transcript) || '';
+          if (text) {
+            inputEl.value = text.trim();
+            inputEl.dispatchEvent(new Event('input', { bubbles: true }));
+            syncClearBtns();
+          }
+        };
+        rec.onerror = () => { btn.classList.remove('listening'); activeMic = null; };
+        rec.onend = () => { btn.classList.remove('listening'); activeMic = null; };
+        try { rec.start(); } catch (_) {
+          btn.classList.remove('listening');
+          activeMic = null;
+        }
+      });
+    }
+    setupVoice(micBook, bookInput);
+    setupVoice(micNum, numInput);
 
     let tokenDebounce;
     tokenInput.addEventListener('input', () => {
@@ -603,6 +1111,15 @@
         loadSetlist();
       }, 400);
     });
+
+    loadClickToOpenPref();
+    try {
+      const savedMode = localStorage.getItem(MODE_KEY);
+      if (savedMode === 'select') setInputMode('select');
+      else setInputMode('type');
+    } catch (_) {
+      setInputMode('type');
+    }
 
     loadSavedToken();
     refreshHealth();

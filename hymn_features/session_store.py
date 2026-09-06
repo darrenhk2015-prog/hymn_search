@@ -16,6 +16,7 @@ EXPORT_KEYS = (
     'enable_tunnel', 'enable_tunnel_fixed', 'enable_tunnel_quick', 'tunnel_mode',
     'qr_x', 'qr_y', 'qr_width', 'qr_height', 'qr_caption', 'qr_bg_color',
     'qr_text_color', 'qr_text_size', 'qr_bg_opacity',
+    'update_check_url', 'update_download_url',
 )
 
 
