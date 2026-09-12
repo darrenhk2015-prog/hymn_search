@@ -371,3 +371,8 @@
 [2026-09-06 17:05:07] [INFO] tunnel url assigned | mode=quick port=8758 url=https://volunteers-address-diagnostic-wrote.trycloudflare.com
 [2026-09-06 17:05:12] [INFO] tunnel ready | mode=quick port=8758 url=https://volunteers-address-diagnostic-wrote.trycloudflare.com local_dns_ok=False
 [2026-09-06 17:11:16] [INFO] tunnel stop | mode=quick port=8758
+[2026-09-06 17:16:45] [INFO] tunnel start | mode=quick port=8758 service_installed=False service_running=False use_https=False
+[2026-09-06 17:16:45] [INFO] cloudflared subprocess session | mode=quick port=8758 stderr_log=C:\python\hymn_search\cloudflared-tunnel.log
+[2026-09-06 17:16:48] [INFO] tunnel url assigned | mode=quick port=8758 url=https://connect-having-supplier-portrait.trycloudflare.com
+[2026-09-06 17:16:56] [INFO] tunnel ready | mode=quick port=8758 url=https://connect-having-supplier-portrait.trycloudflare.com local_dns_ok=False
+[2026-09-06 17:17:32] [INFO] tunnel stop | mode=quick port=8758
