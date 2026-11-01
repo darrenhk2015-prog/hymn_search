@@ -111,13 +111,16 @@ def tunnel_url_path_prefix(url: str) -> str:
 
 
 def tunnel_viewer_url(url: str) -> str:
-    """Public viewer page URL; path-prefix tunnels need a trailing slash."""
+    """Public audience page. Use /view?v= so browsers skip the old iframe cache."""
     base = normalize_tunnel_url(url)
     if not base:
         return ""
-    if tunnel_url_path_prefix(base):
-        return f"{base}/"
-    return base
+    try:
+        from version import APP_VERSION
+        q = f'?v={int(APP_VERSION or 0)}'
+    except Exception:
+        q = '?v=1'
+    return f"{base.rstrip('/')}/view{q}"
 
 
 def validate_run_token(token: str) -> tuple[bool, str]:

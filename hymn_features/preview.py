@@ -54,12 +54,19 @@ def _docx_snippet(path, max_len=200):
 def preview_for_payload(payload, max_len=200):
     """
     Return a short preview string for a hymn open payload or content-search hit.
-    Supports file, bookmark, content_pdf, content_word kinds.
     """
     if not payload:
         return ''
 
     kind = payload.get('kind')
+
+    if kind == 'hymn':
+        lyrics = payload.get('lyrics') or payload.get('snippet') or ''
+        name = payload.get('name') or payload.get('title') or payload.get('code') or ''
+        body = _collapse(lyrics, max_len)
+        if name and body:
+            return _collapse(f'{name} · {body}', max_len)
+        return _collapse(name or body, max_len)
 
     if kind == 'bookmark':
         title = payload.get('title', '')

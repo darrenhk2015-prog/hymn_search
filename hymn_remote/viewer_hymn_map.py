@@ -28,6 +28,8 @@ def _looks_like_pdf_open(
 ) -> bool:
     if payload:
         kind = payload.get('kind')
+        if kind == 'hymn':
+            return True
         if kind == 'bookmark':
             return True
         if kind == 'content_pdf':
@@ -71,6 +73,20 @@ def resolve_viewer_hymn(
     filename: str = '',
     payload: dict | None = None,
 ) -> dict:
+    if payload and payload.get('kind') == 'hymn':
+        url = str(payload.get('sourceUrl') or '').strip()
+        if url:
+            return {
+                'mapped': True,
+                'url': url,
+                'viewer_source': 'web',
+                'drive_file_id': '',
+                'drive_name': '',
+                'drive_rel': '',
+                'drive_folder_id': '',
+            }
+        book = book or payload.get('book', '')
+        num = num or payload.get('code') or payload.get('title') or num
     if not book and not num and label:
         parsed_book, parsed_num = _parse_label_parts(label)
         book = parsed_book or book

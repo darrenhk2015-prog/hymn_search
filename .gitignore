@@ -1,0 +1,28 @@
+# Build / packaging
+build/
+dist/
+*.exe
+*.zip
+*.pkg
+*.pyz
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# Logs
+*.log
+tunnel.log
+cloudflared-tunnel.log
+
+# Local / runtime data
+data/
+神家詩歌集/
+gdrive_hymn_index.json
+latest.json
+
+# IDE
+.idea/
+.vscode/

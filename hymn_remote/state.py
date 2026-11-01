@@ -1,5 +1,8 @@
 """Thread-safe remote control state shared between FastAPI and MainWindow."""
+import asyncio
+import os
 import threading
+import time
 import uuid
 from dataclasses import dataclass
 from typing import Callable, Optional
@@ -39,6 +42,7 @@ class RemoteControlState:
         self._handle_setlist_prepare_open: Optional[Callable] = None
         self._handle_setlist_add: Optional[Callable] = None
         self._handle_display: Optional[Callable] = None
+        self._handle_lyric: Optional[Callable] = None
         self._get_books: Optional[Callable] = None
         self._get_setlist_info: Optional[Callable] = None
         self.operation_log = RemoteOperationLog()
@@ -46,9 +50,41 @@ class RemoteControlState:
             'book': '', 'num': '', 'label': '',
             'code': '', 'web_url': '', 'title': '', 'mapped': False, 'ts': 0.0,
         }
+        self._lyric_preview: dict = {
+            'open': False, 'heading': '', 'text': '',
+            'bg': '#050505', 'bg_image': False, 'bg_image_rev': 0,
+            'text_color': '#ffffff',
+            'align': 'left', 'letter_spacing': 100, 'line_height': 135,
+            'margins': {'top': 56, 'right': 56, 'bottom': 56, 'left': 56},
+            'margin': 56,
+            'font_family': 'Microsoft YaHei UI',
+            'font_pt': 36.0, 'scroll_ratio': 0.0, 'blacked': False,
+            'fullscreen': False,
+            'stage_w': 1920, 'stage_h': 1080, 'book': '', 'name': '',
+            'rev': 0, 'view_rev': 0, 'overlay_ends_at': 0.0,
+        }
+        self._lyric_rev = 0
+        self._lyric_view_rev = 0
+        self._lyric_bg_image_path = ''
+        self._LYRIC_CONTENT_KEYS = (
+            'open', 'text', 'bg', 'bg_image', 'bg_image_rev', 'text_color',
+            'stage_w', 'stage_h', 'book', 'name', 'heading',
+            'overlay_ends_at',
+        )
+        self._LYRIC_VIEW_KEYS = (
+            'scroll_ratio', 'font_pt', 'letter_spacing', 'line_height', 'align',
+            'margins', 'margin', 'font_family',
+            'blacked', 'fullscreen',
+        )
+        self._ws_loop = None
+        self._ws_clients = set()
+        self._last_preview_get = 0.0
+        self._handle_preview_needed: Optional[Callable] = None
         self.hymn_num_mode = HYMN_NUM_MODE_CONTAINS
         self.viewer_show_debug = False
         self.click_to_open = False
+        self.overlay_auto_unblack = False
+        self._handle_prefs: Optional[Callable] = None
 
     def set_hymn_num_mode(self, mode):
         mode = str(mode or HYMN_NUM_MODE_CONTAINS).strip().lower()
@@ -72,6 +108,7 @@ class RemoteControlState:
         handle_setlist_prepare_open=None,
         handle_setlist_add=None,
         handle_display=None,
+        handle_lyric=None,
     ):
         self._get_books = get_books
         self._handle_open = handle_open
@@ -82,6 +119,7 @@ class RemoteControlState:
         self._handle_setlist_prepare_open = handle_setlist_prepare_open
         self._handle_setlist_add = handle_setlist_add
         self._handle_display = handle_display
+        self._handle_lyric = handle_lyric
 
     def get_books(self):
         if self._get_books:
@@ -104,6 +142,7 @@ class RemoteControlState:
                 'pending_count': len(self._pending),
                 'setlist': self.get_setlist_info(),
                 'click_to_open': bool(self.click_to_open),
+                'overlay_auto_unblack': bool(self.overlay_auto_unblack),
             }
 
     def set_click_to_open(self, enabled: bool):
@@ -113,6 +152,24 @@ class RemoteControlState:
     def get_click_to_open(self) -> bool:
         with self._lock:
             return bool(self.click_to_open)
+
+    def set_prefs_handler(self, handler):
+        self._handle_prefs = handler
+
+    def set_overlay_auto_unblack(self, enabled: bool, persist=False):
+        enabled = bool(enabled)
+        with self._lock:
+            changed = self.overlay_auto_unblack != enabled
+            self.overlay_auto_unblack = enabled
+        if persist and changed and self._handle_prefs:
+            try:
+                self._handle_prefs({'overlay_auto_unblack': enabled})
+            except Exception:
+                pass
+
+    def get_overlay_auto_unblack(self) -> bool:
+        with self._lock:
+            return bool(self.overlay_auto_unblack)
 
     def log(self, action, detail='', client=''):
         return self.operation_log.add(action, detail, client)
@@ -155,6 +212,140 @@ class RemoteControlState:
     def get_now_viewing(self) -> dict:
         with self._lock:
             return dict(self._now_viewing)
+
+    def set_preview_needed_handler(self, handler):
+        self._handle_preview_needed = handler
+
+    def _notify_preview_needed(self):
+        cb = self._handle_preview_needed
+        if cb:
+            try:
+                cb()
+            except Exception:
+                pass
+
+    def _has_preview_subscribers_locked(self) -> bool:
+        if self._ws_clients:
+            return True
+        if self._last_preview_get <= 0:
+            return False
+        return (time.monotonic() - self._last_preview_get) < 8.0
+
+    def has_preview_subscribers(self) -> bool:
+        with self._lock:
+            return self._has_preview_subscribers_locked()
+
+    def touch_preview_client(self):
+        needed = False
+        with self._lock:
+            needed = not self._has_preview_subscribers_locked()
+            self._last_preview_get = time.monotonic()
+        if needed:
+            self._notify_preview_needed()
+
+    def get_lyric_bg_image_path(self):
+        with self._lock:
+            return self._lyric_bg_image_path
+
+    def set_lyric_preview(self, info: dict):
+        info = dict(info or {})
+        image_path = str(info.pop('bg_image_path', '') or '').strip()
+        info['bg_image'] = bool(image_path and os.path.isfile(image_path))
+        if not info['bg_image']:
+            image_path = ''
+            info['bg_image_rev'] = 0
+        publish = False
+        with self._lock:
+            self._lyric_bg_image_path = image_path
+            prev = self._lyric_preview
+            content_changed = any(
+                prev.get(k) != info.get(k) for k in self._LYRIC_CONTENT_KEYS
+            )
+            view_changed = any(
+                prev.get(k) != info.get(k) for k in self._LYRIC_VIEW_KEYS
+            )
+            if content_changed:
+                self._lyric_rev += 1
+            if view_changed:
+                self._lyric_view_rev += 1
+            info['rev'] = self._lyric_rev
+            info['view_rev'] = self._lyric_view_rev
+            self._lyric_preview = info
+            publish = content_changed or view_changed
+        if publish and self._ws_clients:
+            self.publish_lyric_preview()
+
+    def get_lyric_preview(self, since_rev=None, since_view=None) -> dict:
+        self.touch_preview_client()
+        with self._lock:
+            rev = self._lyric_rev
+            view_rev = self._lyric_view_rev
+            snap = dict(self._lyric_preview)
+            snap['rev'] = rev
+            snap['view_rev'] = view_rev
+            same_content = True
+            same_view = True
+            if since_rev is not None:
+                try:
+                    same_content = int(since_rev) == rev
+                except (TypeError, ValueError):
+                    same_content = True
+            if since_view is not None:
+                try:
+                    same_view = int(since_view) == view_rev
+                except (TypeError, ValueError):
+                    same_view = True
+            if same_content and same_view and since_rev is not None:
+                return {'same': True, 'rev': rev, 'view_rev': view_rev}
+            if same_content and since_rev is not None and not same_view:
+                return {
+                    'view_only': True,
+                    'rev': rev,
+                    'view_rev': view_rev,
+                    'scroll_ratio': snap.get('scroll_ratio'),
+                    'font_pt': snap.get('font_pt'),
+                    'letter_spacing': snap.get('letter_spacing'),
+                    'line_height': snap.get('line_height'),
+                    'align': snap.get('align'),
+                    'margins': snap.get('margins'),
+                    'margin': snap.get('margin'),
+                    'font_family': snap.get('font_family'),
+                    'blacked': snap.get('blacked'),
+                    'fullscreen': snap.get('fullscreen'),
+                }
+            return snap
+
+    def register_preview_ws(self, websocket):
+        first = False
+        with self._lock:
+            first = not self._ws_clients
+            try:
+                self._ws_loop = asyncio.get_running_loop()
+            except RuntimeError:
+                pass
+            self._ws_clients.add(websocket)
+            self._last_preview_get = time.monotonic()
+        if first:
+            self._notify_preview_needed()
+
+    def unregister_preview_ws(self, websocket):
+        with self._lock:
+            self._ws_clients.discard(websocket)
+
+    def publish_lyric_preview(self):
+        with self._lock:
+            payload = dict(self._lyric_preview)
+            loop = self._ws_loop
+            clients = list(self._ws_clients)
+        if not loop or not clients:
+            return
+        msg = {'type': 'preview', **payload}
+        for ws in clients:
+            try:
+                asyncio.run_coroutine_threadsafe(ws.send_json(msg), loop)
+            except Exception:
+                with self._lock:
+                    self._ws_clients.discard(ws)
 
     def check_token(self, header_token: str) -> bool:
         with self._lock:
@@ -268,6 +459,23 @@ class RemoteControlState:
             return {'status': 'unsupported', 'message': '桌面端未支援顯示控制'}
         self._handle_display(action)
         return {'status': 'ok', 'action': action}
+
+    def dispatch_lyric_control(self, action, value=None, client=''):
+        action = str(action or '').strip().lower()
+        if action != 'scroll':
+            self.log('lyric', f'{action} {value}'.strip(), client)
+        if not self.is_accepting():
+            return {'status': 'not_accepting', 'message': '桌面端暫停接受請求，請聯絡操作員'}
+        allowed = (
+            'black', 'fit', 'fullscreen', 'align', 'spacing',
+            'scroll', 'nudge', 'zoom',
+        )
+        if action not in allowed:
+            return {'status': 'invalid', 'message': '不支援的預視控制'}
+        if not self._handle_lyric:
+            return {'status': 'unsupported', 'message': '桌面端未支援預視控制'}
+        self._handle_lyric({'action': action, 'value': value})
+        return {'status': 'ok', 'action': action, 'value': value}
 
     def dispatch_next(self, client=''):
         self.log('next', '', client)

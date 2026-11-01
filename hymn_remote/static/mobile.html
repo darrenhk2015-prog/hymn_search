@@ -3,18 +3,22 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="theme-color" content="#0c0e1a">
   <title>詩歌冊遙控</title>
   <style>
     * { box-sizing: border-box; }
-    body {
+    html, body {
       font-family: 'Segoe UI', 'PingFang TC', 'Microsoft YaHei', sans-serif;
-      margin: 0; padding: 0 0 28px;
+      margin: 0; padding: 0;
       background: #0c0e1a; color: #e4e8f5;
-      min-height: 100vh;
+      min-height: 100%;
     }
-    .page { padding: 14px 16px; }
-    h1 { font-size: 1.2rem; margin: 0 0 2px; }
-    .sub { color: #8892b8; font-size: 0.8rem; margin-bottom: 12px; }
+    body { padding-bottom: max(20px, env(safe-area-inset-bottom)); }
+    .page { padding: 12px 16px 28px; }
+    h1 { font-size: 1.15rem; margin: 0 0 2px; }
+    .sub { color: #8892b8; font-size: 0.8rem; margin: 0 0 10px; }
     label { display: block; font-size: 0.8rem; color: #8892b8; margin: 10px 0 5px; }
     input, select, button {
       width: 100%; font-size: 1.05rem; padding: 12px 14px;
@@ -39,9 +43,7 @@
     }
     button.main:disabled { opacity: 0.45; cursor: not-allowed; }
     .field { position: relative; }
-    .input-row {
-      display: flex; gap: 6px; align-items: stretch;
-    }
+    .input-row { display: flex; gap: 6px; align-items: stretch; }
     .input-row input, .input-row select { flex: 1; min-width: 0; }
     .icon-btn {
       width: 44px; flex: 0 0 44px; padding: 0;
@@ -49,9 +51,7 @@
       background: #1b1f36; border: 1.5px solid #2e3254; color: #e4e8f5;
     }
     .icon-btn.clear { color: #8892b8; font-size: 1.35rem; line-height: 1; }
-    .icon-btn.listening {
-      background: #7c6af7; border-color: #7c6af7; color: #fff;
-    }
+    .icon-btn.listening { background: #7c6af7; border-color: #7c6af7; color: #fff; }
     .icon-btn:disabled { opacity: 0.35; }
     .icon-btn.hidden { display: none; }
     .mode-row { display: flex; gap: 8px; margin-top: 4px; }
@@ -64,27 +64,27 @@
     }
     .opt-row {
       display: flex; align-items: center; gap: 10px;
-      margin-top: 12px; padding: 10px 12px;
+      margin-top: 10px; padding: 10px 12px;
       background: #13162a; border-radius: 10px; border: 1.5px solid #2e3254;
     }
     .opt-row input[type="checkbox"] {
       width: 20px; height: 20px; margin: 0; flex: 0 0 auto;
       accent-color: #7c6af7;
     }
-    .opt-row label {
-      margin: 0; flex: 1; color: #e4e8f5; font-size: 0.95rem;
-    }
+    .opt-row label { margin: 0; flex: 1; color: #e4e8f5; font-size: 0.95rem; }
     .chips {
-      display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px;
+      display: flex; flex-wrap: wrap; gap: 8px; margin-top: 6px;
     }
-    .chips.hidden { display: none; }
     .chip {
-      width: auto; margin: 0; padding: 7px 12px; font-size: 0.82rem;
+      width: auto; margin: 0; padding: 8px 13px; font-size: 0.88rem;
       border-radius: 999px; background: #13162a; color: #c8d0ef;
-      border: 1px solid #2e3254; white-space: nowrap; max-width: 100%;
-      overflow: hidden; text-overflow: ellipsis;
+      border: 1.5px solid #2e3254; white-space: nowrap;
+      min-height: 40px;
     }
-    .chip:active { background: #1b1f36; border-color: #7c6af7; }
+    .chip.on {
+      background: #7c6af7; border-color: #7c6af7; color: #fff; font-weight: 700;
+    }
+    .chip:active { border-color: #9d8fff; }
     .suggest {
       margin-top: 6px; max-height: 240px; overflow-y: auto;
       border: 1.5px solid #7c6af7; border-radius: 10px;
@@ -98,21 +98,37 @@
     }
     .suggest button:last-child { border-bottom: none; }
     .suggest button:active { background: #1b1f36; }
-    .suggest .tag {
+    .suggest .tag, .hymn-tag {
       display: inline-block; font-size: 0.72rem; color: #8892b8;
       margin-right: 6px;
     }
     .suggest .meta { color: #505870; font-size: 0.8rem; margin-left: 4px; }
+    .hymn-list {
+      margin-top: 8px; border: 1.5px solid #2e3254; border-radius: 12px;
+      background: #13162a; overflow: auto; -webkit-overflow-scrolling: touch;
+      max-height: min(52vh, 560px);
+    }
+    .hymn-item {
+      width: 100%; text-align: left; border: none; border-radius: 0;
+      border-bottom: 1px solid #252840; background: transparent;
+      color: #e4e8f5; padding: 13px 14px; font-size: 1rem;
+    }
+    .hymn-item:last-child { border-bottom: none; }
+    .hymn-item.on { background: #1e1a40; color: #fff; }
+    .hymn-item:active { background: #1b1f36; }
+    .hymn-empty {
+      padding: 28px 14px; text-align: center; color: #505870; font-size: 0.92rem;
+    }
     .action-row { display: flex; gap: 8px; margin-top: 12px; }
     .action-row button { flex: 1; margin-top: 0; }
-    #status, #openResult, #scheduleResult, #displayResult {
+    #status, #openResult, #scheduleResult {
       margin-top: 12px; padding: 11px 13px; border-radius: 10px;
       font-size: 0.9rem; line-height: 1.45;
     }
     #status { background: #13162a; color: #8892b8; }
     #status.ok { color: #34d399; }
     #status.warn { background: #1c1200; color: #fbbf24; }
-    #openResult, #scheduleResult, #displayResult {
+    #openResult, #scheduleResult {
       background: #13162a; white-space: pre-wrap; word-break: break-word;
     }
     .hidden { display: none !important; }
@@ -123,7 +139,8 @@
     }
     .tabs {
       display: flex; gap: 0; border-bottom: 1.5px solid #2e3254;
-      background: #13162a; position: sticky; top: 0; z-index: 10;
+      background: #13162a; position: sticky; top: 0; z-index: 20;
+      padding-top: env(safe-area-inset-top);
     }
     .tab-btn {
       flex: 1; border: none; border-radius: 0; background: transparent;
@@ -135,6 +152,95 @@
     }
     .panel { display: none; }
     .panel.active { display: block; }
+    .workspace {
+      display: flex; flex-direction: column; gap: 14px;
+    }
+    .preview-card {
+      background: #13162a; border: 1.5px solid #252840; border-radius: 14px;
+      padding: 10px;
+    }
+    .preview-head {
+      display: flex; align-items: center; gap: 8px;
+      margin-bottom: 8px; min-height: 22px;
+    }
+    .preview-title {
+      flex: 1; font-size: 0.82rem; color: #8892b8;
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+    .preview-badge {
+      font-size: 0.72rem; color: #fbbf24; background: #1c1200;
+      border: 1px solid #fbbf24; border-radius: 999px; padding: 2px 8px;
+      white-space: nowrap;
+    }
+    .preview-count {
+      font-size: 0.72rem; color: #c4b5fd; background: #1e1a40;
+      border: 1px solid #7c6af7; border-radius: 999px; padding: 2px 8px;
+      white-space: nowrap;
+    }
+    .preview-letterbox {
+      position: relative;
+      width: 100%;
+      height: auto;
+      aspect-ratio: 16 / 9;
+      margin: 0 auto;
+      background: #0a0c14;
+      border-radius: 10px;
+      overflow: hidden;
+      touch-action: none;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+    .preview-controls { margin-top: 10px; }
+    .preview-btns { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+    .preview-btns button {
+      width: auto; flex: 1 1 auto; margin: 0; padding: 9px 10px;
+      font-size: 0.88rem; font-weight: 700; min-height: 42px;
+      background: #191c30; color: #e4e8f5;
+    }
+    .preview-btns button.on {
+      background: #7c6af7; border-color: #7c6af7; color: #fff;
+    }
+    .preview-btns button.danger.on {
+      background: #7f1d1d; border-color: #f87171; color: #fff;
+    }
+    .preview-spacing {
+      display: flex; align-items: center; gap: 8px;
+      margin-top: 8px; color: #8892b8; font-size: 0.82rem;
+    }
+    .preview-spacing input[type="range"] { flex: 1; padding: 0; height: 28px; accent-color: #7c6af7; }
+    .preview-stage {
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      overflow: hidden;
+      transform-origin: center center;
+      background-color: #050505;
+      background-size: cover;
+      background-position: center;
+      background-repeat: no-repeat;
+    }
+    .preview-scroll {
+      position: absolute;
+      left: 0;
+      top: 0;
+      width: 100%;
+      box-sizing: border-box;
+      padding: 32px;
+      will-change: transform;
+    }
+    .preview-text {
+      margin: 0;
+      white-space: pre-wrap;
+      word-break: break-word;
+      line-height: 1.35;
+      font-family: 'PingFang TC', 'Microsoft YaHei UI', 'Microsoft YaHei', sans-serif;
+    }
+    .preview-empty {
+      position: absolute; inset: 0;
+      display: flex; align-items: center; justify-content: center;
+      color: #505870; font-size: 0.92rem; text-align: center;
+      padding: 16px; line-height: 1.5;
+    }
     .setlist {
       margin-top: 12px; border: 1.5px solid #2e3254; border-radius: 10px;
       overflow: hidden; background: #13162a;
@@ -154,82 +260,151 @@
     }
     .nav-row { display: flex; gap: 10px; margin-top: 14px; }
     .nav-row button { flex: 1; margin-top: 0; }
+    @media (min-width: 900px) and (orientation: landscape) {
+      .workspace {
+        display: grid;
+        grid-template-columns: minmax(380px, 1.1fr) minmax(360px, 0.9fr);
+        align-items: start;
+        gap: 16px;
+      }
+      .preview-col { position: sticky; top: 62px; }
+      .hymn-list { max-height: calc(100dvh - 320px); }
+    }
+    @media (max-width: 899px), (orientation: portrait) {
+      .preview-col { width: 100%; }
+    }
   </style>
 </head>
 <body>
   <div class="tabs">
-    <button type="button" class="tab-btn active" data-tab="open">開啟</button>
+    <button type="button" class="tab-btn active" data-tab="open">選歌</button>
     <button type="button" class="tab-btn hidden" id="tabSchedule" data-tab="schedule">排程</button>
   </div>
 
   <div class="page">
     <h1>詩歌冊遙控</h1>
-    <p class="sub">打字選歌如電腦版 · 開檔後自動清詩歌號再下一首</p>
+    <p class="sub">揀冊列出詩歌 · 亦可打字 · iPad 預視跟外屏比例</p>
     <div id="status">連線中…</div>
 
     <div id="panelOpen" class="panel active">
-      <div id="tokenSection">
-        <label for="apiToken">API Token</label>
-        <input id="apiToken" type="password" inputmode="text" placeholder="與桌面端設定相同" autocomplete="off">
-        <div id="tokenHint" class="hint">請輸入 API Token</div>
-      </div>
-
-      <label>輸入方式</label>
-      <div class="mode-row">
-        <button type="button" id="modeType" class="active">快速輸入</button>
-        <button type="button" id="modeSelect">選單</button>
-      </div>
-
-      <div class="opt-row">
-        <input type="checkbox" id="chkClickToOpen">
-        <label for="chkClickToOpen">一點即開（點建議即開啟）</label>
-      </div>
-
-      <div id="typeMode">
-        <label for="book">書冊（號或名）</label>
-        <div class="field">
-          <div class="input-row">
-            <input id="book" type="search" enterkeyhint="next" inputmode="search"
-              placeholder="輸入 1 / 書名…" autocomplete="off" autocorrect="off" spellcheck="false">
-            <button type="button" class="icon-btn clear hidden" id="clearBook" title="清空書冊">×</button>
-            <button type="button" class="icon-btn" id="micBook" title="語音輸入書冊（廣東話）">🎤</button>
+      <div class="workspace">
+        <div class="picker-col">
+          <div id="tokenSection">
+            <label for="apiToken">API Token</label>
+            <input id="apiToken" type="password" inputmode="text" placeholder="與桌面端設定相同" autocomplete="off">
+            <div id="tokenHint" class="hint">請輸入 API Token</div>
           </div>
-          <div id="bookSuggest" class="suggest hidden"></div>
-          <div id="recentBooks" class="chips hidden"></div>
+
+          <label>揀歌方式</label>
+          <div class="mode-row">
+            <button type="button" id="modeSelect" class="active">選單</button>
+            <button type="button" id="modeType">輸入</button>
+          </div>
+
+          <div class="opt-row">
+            <input type="checkbox" id="chkClickToOpen">
+            <label for="chkClickToOpen">一點即開</label>
+          </div>
+          <div class="opt-row">
+            <input type="checkbox" id="chkAutoUnblack">
+            <label for="chkAutoUnblack">倒數完自動取消黑畫面</label>
+          </div>
+
+          <div id="selectMode">
+            <div class="opt-row">
+              <input type="checkbox" id="chkMultiBook">
+              <label for="chkMultiBook">多選書冊</label>
+            </div>
+            <label id="bookLabel">書冊</label>
+            <div id="bookChips" class="chips"></div>
+            <div id="bookHint" class="hint">點標籤揀一冊。</div>
+
+            <label for="hymnFilter">過濾詩歌號 / 歌名</label>
+            <div class="input-row">
+              <input id="hymnFilter" type="search" enterkeyhint="search" inputmode="search"
+                placeholder="可選：輸入過濾清單" autocomplete="off" autocorrect="off" spellcheck="false">
+              <button type="button" class="icon-btn clear hidden" id="clearFilter" title="清空過濾">×</button>
+            </div>
+            <div id="listHint" class="hint">載入詩歌清單…</div>
+            <div id="hymnList" class="hymn-list"></div>
+          </div>
+
+          <div id="typeMode" class="hidden">
+            <label for="book">書冊（號或名）</label>
+            <div class="field">
+              <div class="input-row">
+                <input id="book" type="search" enterkeyhint="next" inputmode="search"
+                  placeholder="輸入 1 / 書名…" autocomplete="off" autocorrect="off" spellcheck="false">
+                <button type="button" class="icon-btn clear hidden" id="clearBook" title="清空書冊">×</button>
+                <button type="button" class="icon-btn" id="micBook" title="語音輸入書冊（廣東話）">🎤</button>
+              </div>
+              <div id="bookSuggest" class="suggest hidden"></div>
+              <div id="recentBooks" class="chips hidden"></div>
+            </div>
+
+            <label for="num">詩歌號 / 歌名</label>
+            <div class="field">
+              <div class="input-row">
+                <input id="num" type="search" enterkeyhint="go" inputmode="search"
+                  placeholder="詩歌號／歌名（無書冊＝全局搜索）" autocomplete="off" autocorrect="off" spellcheck="false">
+                <button type="button" class="icon-btn clear hidden" id="clearNum" title="清空詩歌號">×</button>
+                <button type="button" class="icon-btn" id="micNum" title="語音輸入詩歌（廣東話）">🎤</button>
+              </div>
+              <div id="numHint" class="hint">先輸入書冊，再打詩歌號</div>
+              <div id="numSuggest" class="suggest hidden"></div>
+            </div>
+          </div>
+
+          <div class="action-row">
+            <button id="openBtn" class="main" disabled>開啟</button>
+            <button id="clearAllBtn" class="main ghost" type="button">清空</button>
+          </div>
+          <button id="addBtn" class="main secondary" disabled>＋ 加入排程</button>
+          <div id="openResult" class="hidden"></div>
         </div>
 
-        <label for="num">詩歌號 / 歌名</label>
-        <div class="field">
-          <div class="input-row">
-            <input id="num" type="search" enterkeyhint="go" inputmode="search"
-              placeholder="詩歌號／歌名（無書冊＝全局搜索）" autocomplete="off" autocorrect="off" spellcheck="false">
-            <button type="button" class="icon-btn clear hidden" id="clearNum" title="清空詩歌號">×</button>
-            <button type="button" class="icon-btn" id="micNum" title="語音輸入詩歌（廣東話）">🎤</button>
+        <div class="preview-col">
+          <div class="preview-card">
+            <div class="preview-head">
+              <div id="previewTitle" class="preview-title">預視 · 尚未開啟</div>
+              <div id="overlayCount" class="preview-count hidden">提示</div>
+              <div id="previewBadge" class="preview-badge hidden">外屏已黑</div>
+            </div>
+            <div id="previewLetterbox" class="preview-letterbox">
+              <div id="previewEmpty" class="preview-empty">尚未開啟詩歌<br>揀一首開啟後，呢度跟外屏比例顯示，可拖曳控制</div>
+              <div id="previewStage" class="preview-stage hidden">
+                <div id="previewScroll" class="preview-scroll">
+                  <pre id="previewText" class="preview-text"></pre>
+                </div>
+              </div>
+            </div>
+            <div id="previewControls" class="preview-controls hidden">
+              <div class="preview-btns">
+                <button type="button" id="pvFit">重設大小</button>
+                <button type="button" id="pvRestore">還原</button>
+                <button type="button" id="pvSaveBest">保存預設</button>
+                <button type="button" id="pvFs">全螢幕</button>
+                <button type="button" id="pvBlack" class="danger">黑畫面</button>
+              </div>
+              <div class="preview-btns">
+                <button type="button" id="pvAlignLeft">左</button>
+                <button type="button" id="pvAlignJust">左右</button>
+                <button type="button" id="pvZoomOut">−</button>
+                <button type="button" id="pvZoomIn">＋</button>
+                <button type="button" id="pvUp">▲</button>
+                <button type="button" id="pvDown">▼</button>
+              </div>
+              <div class="preview-spacing">
+                <span>字距</span>
+                <input id="pvSpacing" type="range" min="50" max="250" step="5" value="100">
+                <span id="pvSpacingVal">100%</span>
+              </div>
+              <div class="hint">拖曳預視捲動 · 雙指放大 · 外屏即時跟住</div>
+            </div>
+            <div id="previewMeta" class="hint">等候桌面端畫面…</div>
           </div>
-          <div id="numHint" class="hint">先輸入書冊，再打詩歌號</div>
-          <div id="numSuggest" class="suggest hidden"></div>
         </div>
       </div>
-
-      <div id="selectMode" class="hidden">
-        <label for="bookSelect">書冊</label>
-        <select id="bookSelect"><option value="">— 請選擇 —</option></select>
-        <label for="numSelect">檔案 / 書籤</label>
-        <select id="numSelect"><option value="">— 先選書冊 —</option></select>
-      </div>
-
-      <div class="action-row">
-        <button id="openBtn" class="main" disabled>開啟</button>
-        <button id="clearAllBtn" class="main ghost" type="button">清空</button>
-      </div>
-      <button id="addBtn" class="main secondary" disabled>＋ 加入排程</button>
-      <div id="openResult" class="hidden"></div>
-
-      <div class="section-title">開檔後控制</div>
-      <button id="closeBtn" class="main danger" disabled>結束程式（Alt+F4）</button>
-      <button id="blackBtn" class="main danger alt" disabled>結束並全黑（等下一首）</button>
-      <div id="displayResult" class="hidden"></div>
-      <div class="hint">全黑畫面會保留直至再開下一首；操作員可按 Esc 取消</div>
     </div>
 
     <div id="panelSchedule" class="panel">
@@ -251,19 +426,14 @@
     const openBtn = document.getElementById('openBtn');
     const addBtn = document.getElementById('addBtn');
     const clearAllBtn = document.getElementById('clearAllBtn');
-    const closeBtn = document.getElementById('closeBtn');
-    const blackBtn = document.getElementById('blackBtn');
     const prevBtn = document.getElementById('prevBtn');
     const nextBtn = document.getElementById('nextBtn');
     const setlistBox = document.getElementById('setlistBox');
     const scheduleHint = document.getElementById('scheduleHint');
     const openResult = document.getElementById('openResult');
     const scheduleResult = document.getElementById('scheduleResult');
-    const displayResult = document.getElementById('displayResult');
     const bookInput = document.getElementById('book');
     const numInput = document.getElementById('num');
-    const bookSelect = document.getElementById('bookSelect');
-    const numSelect = document.getElementById('numSelect');
     const bookSuggest = document.getElementById('bookSuggest');
     const numSuggest = document.getElementById('numSuggest');
     const recentBooksEl = document.getElementById('recentBooks');
@@ -280,10 +450,44 @@
     const clearBookBtn = document.getElementById('clearBook');
     const clearNumBtn = document.getElementById('clearNum');
     const chkClickToOpen = document.getElementById('chkClickToOpen');
+    const chkAutoUnblack = document.getElementById('chkAutoUnblack');
+    const overlayCount = document.getElementById('overlayCount');
+    const chkMultiBook = document.getElementById('chkMultiBook');
+    const bookLabel = document.getElementById('bookLabel');
+    const bookChips = document.getElementById('bookChips');
+    const bookHint = document.getElementById('bookHint');
+    const hymnFilter = document.getElementById('hymnFilter');
+    const clearFilterBtn = document.getElementById('clearFilter');
+    const listHint = document.getElementById('listHint');
+    const hymnList = document.getElementById('hymnList');
+    const previewLetterbox = document.getElementById('previewLetterbox');
+    const previewStage = document.getElementById('previewStage');
+    const previewText = document.getElementById('previewText');
+    const previewScroll = document.getElementById('previewScroll');
+    const previewEmpty = document.getElementById('previewEmpty');
+    const previewTitle = document.getElementById('previewTitle');
+    const previewBadge = document.getElementById('previewBadge');
+    const previewMeta = document.getElementById('previewMeta');
+    const previewControls = document.getElementById('previewControls');
+    const pvFit = document.getElementById('pvFit');
+    const pvRestore = document.getElementById('pvRestore');
+    const pvSaveBest = document.getElementById('pvSaveBest');
+    const pvFs = document.getElementById('pvFs');
+    const pvBlack = document.getElementById('pvBlack');
+    const pvAlignLeft = document.getElementById('pvAlignLeft');
+    const pvAlignJust = document.getElementById('pvAlignJust');
+    const pvZoomOut = document.getElementById('pvZoomOut');
+    const pvZoomIn = document.getElementById('pvZoomIn');
+    const pvUp = document.getElementById('pvUp');
+    const pvDown = document.getElementById('pvDown');
+    const pvSpacing = document.getElementById('pvSpacing');
+    const pvSpacingVal = document.getElementById('pvSpacingVal');
     const TOKEN_KEY = 'hymn_remote_api_token';
     const MODE_KEY = 'hymn_remote_input_mode';
     const RECENT_KEY = 'hymn_remote_recent_books';
     const CLICK_OPEN_KEY = 'hymn_remote_click_to_open';
+    const BOOKS_KEY = 'hymn_remote_selected_books';
+    const MULTI_BOOK_KEY = 'hymn_remote_multi_book';
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
 
     function apiBasePath() {
@@ -299,13 +503,29 @@
     let allEntries = [];
     let entriesBook = '';
     let booksCache = [];
+    let catalog = [];
+    let catalogLoaded = false;
+    let catalogByBook = {};
+    let selectedBooks = [];
+    let showAllBooks = false;
+    let multiBook = false;
+    let selectedHymn = null;
     let setlistData = { entries: [], index: -1, total: 0 };
     let activeTab = 'open';
-    let inputMode = 'type';
+    let inputMode = 'select';
     let activeMic = null;
     let suppressSelectAll = false;
     let clickToOpen = false;
     let clickToOpenUserSet = false;
+    let lastPreviewKey = '';
+    let lastPreviewRev = -1;
+    let lastPreviewViewRev = -1;
+    let lastPreviewData = null;
+    let previewBoostUntil = 0;
+    let dragScroll = null;
+    let ignoreScrollUntil = 0;
+    let spacingDragging = false;
+    let localPreviewLock = 0;
 
     function isClickToOpen() {
       return !!clickToOpen;
@@ -336,6 +556,62 @@
     chkClickToOpen.addEventListener('change', () => {
       setClickToOpen(chkClickToOpen.checked, true);
     });
+
+    let autoUnblack = false;
+    let overlayEndsAt = 0;
+    let overlayTick = 0;
+
+    function setAutoUnblack(on, persist) {
+      autoUnblack = !!on;
+      chkAutoUnblack.checked = autoUnblack;
+      if (persist) {
+        api('/api/prefs', {
+          method: 'POST',
+          body: JSON.stringify({ overlay_auto_unblack: autoUnblack }),
+        }).catch(() => {});
+      }
+      updateOverlayCountdown();
+    }
+
+    chkAutoUnblack.addEventListener('change', () => {
+      setAutoUnblack(chkAutoUnblack.checked, true);
+    });
+
+    function setOverlayCountdown(endsAt) {
+      const next = (endsAt == null || endsAt === '') ? 0 : Number(endsAt);
+      overlayEndsAt = Number.isFinite(next) ? next : 0;
+      if (overlayTick) {
+        clearInterval(overlayTick);
+        overlayTick = 0;
+      }
+      updateOverlayCountdown();
+      if (overlayEndsAt > 0 || overlayEndsAt < 0) {
+        overlayTick = setInterval(updateOverlayCountdown, 250);
+      }
+    }
+
+    function updateOverlayCountdown() {
+      if (!overlayCount) return;
+      if (overlayEndsAt < 0) {
+        overlayCount.classList.add('hidden');
+        return;
+      }
+      const left = Math.ceil(overlayEndsAt - Date.now() / 1000);
+      if (left <= 0) {
+        overlayCount.classList.add('hidden');
+        if (overlayTick) {
+          clearInterval(overlayTick);
+          overlayTick = 0;
+        }
+        return;
+      }
+      let text = '轉移 ' + left + ' 秒';
+      if (autoUnblack && lastPreviewData && lastPreviewData.blacked) {
+        text += ' · 完咗取消全黑';
+      }
+      overlayCount.textContent = text;
+      overlayCount.classList.remove('hidden');
+    }
 
     function getToken() { return tokenInput.value.trim(); }
 
@@ -406,7 +682,7 @@
     });
 
     function setInputMode(mode) {
-      inputMode = mode === 'select' ? 'select' : 'type';
+      inputMode = mode === 'type' ? 'type' : 'select';
       selectModeEl.classList.toggle('hidden', inputMode !== 'select');
       typeModeEl.classList.toggle('hidden', inputMode !== 'type');
       modeSelectBtn.classList.toggle('active', inputMode === 'select');
@@ -416,25 +692,240 @@
         syncClearBtns();
         renderRecentBooks();
         if (bookInput.value.trim()) loadEntries();
+      } else {
+        loadHymnsForSelection();
       }
     }
 
     modeSelectBtn.addEventListener('click', () => setInputMode('select'));
     modeTypeBtn.addEventListener('click', () => setInputMode('type'));
 
+    function loadSelectedBooks() {
+      try { multiBook = localStorage.getItem(MULTI_BOOK_KEY) === '1'; } catch (_) { multiBook = false; }
+      chkMultiBook.checked = multiBook;
+      try {
+        const raw = JSON.parse(localStorage.getItem(BOOKS_KEY) || '[]');
+        selectedBooks = Array.isArray(raw) ? raw.map(String) : [];
+      } catch (_) {
+        selectedBooks = [];
+      }
+      if (!multiBook && selectedBooks.length > 1) {
+        selectedBooks = selectedBooks.slice(-1);
+      }
+    }
+
+    function saveSelectedBooks() {
+      try { localStorage.setItem(BOOKS_KEY, JSON.stringify(selectedBooks)); } catch (_) {}
+    }
+
+    function saveMultiBook() {
+      try { localStorage.setItem(MULTI_BOOK_KEY, multiBook ? '1' : '0'); } catch (_) {}
+    }
+
+    function toggleBook(ref) {
+      showAllBooks = false;
+      if (!multiBook) {
+        selectedBooks = (selectedBooks.length === 1 && selectedBooks[0] === ref) ? [] : [ref];
+      } else {
+        const i = selectedBooks.indexOf(ref);
+        if (i >= 0) selectedBooks.splice(i, 1);
+        else selectedBooks.push(ref);
+      }
+      saveSelectedBooks();
+      renderBookChips();
+      loadHymnsForSelection();
+    }
+
+    chkMultiBook.addEventListener('change', () => {
+      multiBook = !!chkMultiBook.checked;
+      saveMultiBook();
+      if (!multiBook) {
+        if (selectedBooks.length > 1) selectedBooks = selectedBooks.slice(-1);
+        saveSelectedBooks();
+      }
+      renderBookChips();
+      loadHymnsForSelection();
+    });
+
+    function renderBookChips() {
+      bookChips.innerHTML = '';
+      const allBtn = document.createElement('button');
+      allBtn.type = 'button';
+      allBtn.className = 'chip' + (showAllBooks ? ' on' : '');
+      allBtn.textContent = '全部';
+      allBtn.addEventListener('click', () => {
+        showAllBooks = !showAllBooks;
+        if (showAllBooks) selectedBooks = [];
+        saveSelectedBooks();
+        renderBookChips();
+        loadHymnsForSelection();
+      });
+      bookChips.appendChild(allBtn);
+      booksCache.forEach(b => {
+        const ref = String(b.index);
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'chip' + (!showAllBooks && selectedBooks.includes(ref) ? ' on' : '');
+        btn.textContent = b.name || ref;
+        btn.addEventListener('click', () => toggleBook(ref));
+        bookChips.appendChild(btn);
+      });
+      if (bookLabel) bookLabel.textContent = multiBook ? '書冊（可多選）' : '書冊';
+      if (showAllBooks) {
+        bookHint.textContent = '列出全部詩歌。再點「全部」可收起。';
+      } else if (!selectedBooks.length) {
+        bookHint.textContent = multiBook ? '點標籤揀一冊或多冊。' : '點標籤揀一冊。';
+      } else {
+        const names = selectedBooks.map(ref => {
+          const hit = booksCache.find(b => String(b.index) === ref);
+          return hit ? hit.name : ref;
+        });
+        bookHint.textContent = '已揀：' + names.join('、');
+      }
+    }
+
+    function visibleHymns() {
+      const q = hymnFilter.value.trim().toLowerCase();
+      const bookSet = new Set(selectedBooks);
+      if (!showAllBooks && !bookSet.size) return [];
+      let items = [];
+      if (showAllBooks) {
+        items = catalog;
+      } else {
+        selectedBooks.forEach(ref => {
+          items = items.concat(catalogByBook[ref] || []);
+        });
+      }
+      if (q) {
+        items = items.filter(i =>
+          String(i.value || '').toLowerCase().includes(q)
+          || String(i.label || '').toLowerCase().includes(q)
+          || String(i.book || '').toLowerCase().includes(q)
+        );
+      }
+      return items;
+    }
+
+    function hymnKey(item) {
+      return [item.book_ref || '', item.hymn_id || '', item.value || ''].join('|');
+    }
+
+    function renderHymnList() {
+      const items = visibleHymns();
+      hymnList.innerHTML = '';
+      clearFilterBtn.classList.toggle('hidden', !hymnFilter.value);
+      if (!showAllBooks && !selectedBooks.length) {
+        listHint.textContent = '先揀冊，或者轉去「輸入」';
+        hymnList.innerHTML = '<div class="hymn-empty">揀上面嘅冊標籤之後，呢度會列出該冊全部詩歌</div>';
+        return;
+      }
+      const waiting = showAllBooks
+        ? !catalogLoaded
+        : selectedBooks.some(ref => !catalogByBook[ref]);
+      if (waiting) {
+        listHint.textContent = '載入詩歌清單…';
+        hymnList.innerHTML = '<div class="hymn-empty">載入中…</div>';
+        return;
+      }
+      if (!items.length) {
+        listHint.textContent = hymnFilter.value.trim() ? '沒有符合' : '呢幾冊未有詩歌';
+        hymnList.innerHTML = '<div class="hymn-empty">沒有符合的詩歌</div>';
+        return;
+      }
+      const showBook = !selectedBooks.length || selectedBooks.length > 1;
+      listHint.textContent = `共 ${items.length} 首` + (hymnFilter.value.trim() ? ' · 已過濾' : '');
+      const frag = document.createDocumentFragment();
+      const selectedKey = selectedHymn ? hymnKey(selectedHymn) : '';
+      items.forEach(item => {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'hymn-item' + (hymnKey(item) === selectedKey ? ' on' : '');
+        const tag = showBook && item.book
+          ? `<span class="hymn-tag">${item.book}</span>`
+          : '';
+        btn.innerHTML = tag + (item.label || item.value);
+        btn.addEventListener('click', () => pickHymn(item));
+        frag.appendChild(btn);
+      });
+      hymnList.appendChild(frag);
+    }
+
+    function pickHymn(item) {
+      selectedHymn = item;
+      if (item.book_ref) {
+        bookInput.value = String(item.book_ref);
+        numInput.value = item.value || '';
+        syncClearBtns();
+      }
+      renderHymnList();
+      if (isClickToOpen()) doOpen();
+    }
+
+    async function loadHymnsForSelection() {
+      if (!showAllBooks && !selectedBooks.length) {
+        renderHymnList();
+        return;
+      }
+      if (showAllBooks) {
+        if (!catalogLoaded) {
+          listHint.textContent = '載入詩歌清單…';
+          hymnList.innerHTML = '<div class="hymn-empty">載入中…</div>';
+          try {
+            const { ok, status, data } = await api('/api/entries?book=');
+            if (status === 401) {
+              listHint.textContent = 'API Token 不正確';
+              return;
+            }
+            if (ok && Array.isArray(data)) {
+              catalog = data;
+              catalogLoaded = true;
+              catalogByBook = {};
+              data.forEach(e => {
+                const ref = String(e.book_ref || '');
+                if (!ref) return;
+                (catalogByBook[ref] || (catalogByBook[ref] = [])).push(e);
+              });
+            }
+          } catch (_) {
+            listHint.textContent = '無法載入詩歌清單';
+            return;
+          }
+        }
+        renderHymnList();
+        return;
+      }
+      const missing = selectedBooks.filter(ref => !catalogByBook[ref]);
+      if (missing.length) {
+        listHint.textContent = '載入詩歌清單…';
+        hymnList.innerHTML = '<div class="hymn-empty">載入中…</div>';
+        try {
+          await Promise.all(missing.map(async ref => {
+            const { ok, data } = await api('/api/entries?book=' + encodeURIComponent(ref));
+            if (ok && Array.isArray(data)) catalogByBook[ref] = data;
+          }));
+        } catch (_) {}
+      }
+      renderHymnList();
+    }
+
     function currentBook() {
-      if (inputMode === 'select') return bookSelect.value.trim();
+      if (inputMode === 'select' && selectedHymn) {
+        return String(selectedHymn.book_ref || selectedHymn.book || '').trim();
+      }
       return bookInput.value.trim();
     }
 
     function currentNum() {
-      if (inputMode === 'select') return numSelect.value.trim();
+      if (inputMode === 'select' && selectedHymn) {
+        return String(selectedHymn.value || '').trim();
+      }
       return numInput.value.trim();
     }
 
     function syncClearBtns() {
       clearBookBtn.classList.toggle('hidden', !bookInput.value);
       clearNumBtn.classList.toggle('hidden', !numInput.value);
+      clearFilterBtn.classList.toggle('hidden', !hymnFilter.value);
     }
 
     function selectAllOnFocus(el) {
@@ -447,6 +938,7 @@
     }
     selectAllOnFocus(bookInput);
     selectAllOnFocus(numInput);
+    selectAllOnFocus(hymnFilter);
 
     function getRecentBooks() {
       try {
@@ -535,21 +1027,6 @@
       });
     }
 
-    function fillNumSelect(items) {
-      numSelect.innerHTML = '';
-      const empty = document.createElement('option');
-      empty.value = '';
-      empty.textContent = items.length ? '— 請選擇 —' : '— 先選書冊 —';
-      numSelect.appendChild(empty);
-      items.forEach(item => {
-        const o = document.createElement('option');
-        o.value = item.value;
-        const tag = item.kind === 'bookmark' ? '書籤' : '檔案';
-        o.textContent = `[${tag}] ${item.label}`;
-        numSelect.appendChild(o);
-      });
-    }
-
     function renderNumSuggest(items) {
       numSuggest.innerHTML = '';
       const book = bookInput.value.trim();
@@ -586,7 +1063,7 @@
       shown.forEach(item => {
         const btn = document.createElement('button');
         btn.type = 'button';
-        const tag = item.kind === 'bookmark' ? '書籤' : (globalMode ? '全局' : '檔案');
+        const tag = item.kind === 'hymn' ? '詩歌' : (item.kind === 'bookmark' ? '書籤' : (globalMode ? '全局' : '檔案'));
         btn.innerHTML = `<span class="tag">${tag}</span>${item.label}`;
         btn.addEventListener('click', () => {
           if (item.book_ref) {
@@ -595,6 +1072,7 @@
             allEntries = [];
           }
           numInput.value = item.value;
+          selectedHymn = item;
           numSuggest.classList.add('hidden');
           syncClearBtns();
           if (isClickToOpen()) doOpen();
@@ -606,16 +1084,11 @@
     }
 
     async function loadEntries() {
-      const book = currentBook();
-      const numQ = (inputMode === 'type' ? numInput.value : '').trim();
-      // Global search when no book: need a query
+      const book = bookInput.value.trim();
+      const numQ = numInput.value.trim();
       if (!book) {
         allEntries = [];
         entriesBook = '';
-        fillNumSelect([]);
-        if (inputMode !== 'type') {
-          return;
-        }
         if (!numQ) {
           renderNumSuggest([]);
           return;
@@ -640,7 +1113,6 @@
         return;
       }
       if (book === entriesBook && allEntries.length) {
-        fillNumSelect(allEntries);
         if (inputMode === 'type') renderNumSuggest(allEntries);
         return;
       }
@@ -649,7 +1121,6 @@
         const { ok, status, data } = await api('/api/entries?book=' + encodeURIComponent(book));
         if (status === 401) {
           allEntries = [];
-          fillNumSelect([]);
           if (inputMode === 'type') {
             numHint.textContent = 'API Token 不正確';
             renderNumSuggest([]);
@@ -658,22 +1129,19 @@
         }
         if (!ok || !Array.isArray(data)) {
           allEntries = [];
-          fillNumSelect([]);
           if (inputMode === 'type') renderNumSuggest([]);
           return;
         }
         entriesBook = book;
         allEntries = data;
-        fillNumSelect(data);
         if (inputMode === 'type') renderNumSuggest(data);
       } catch (_) {
         allEntries = [];
-        fillNumSelect([]);
         if (inputMode === 'type') renderNumSuggest([]);
       }
     }
 
-    let bookDebounce, numDebounce;
+    let bookDebounce, numDebounce, filterDebounce;
     bookInput.addEventListener('input', () => {
       syncClearBtns();
       renderBookSuggest();
@@ -729,15 +1197,16 @@
       doOpen();
     });
 
-    bookSelect.addEventListener('change', () => {
-      entriesBook = '';
-      allEntries = [];
-      numSelect.value = '';
-      loadEntries();
+    hymnFilter.addEventListener('input', () => {
+      syncClearBtns();
+      clearTimeout(filterDebounce);
+      filterDebounce = setTimeout(renderHymnList, 80);
     });
-
-    numSelect.addEventListener('change', () => {
-      if (isClickToOpen() && numSelect.value.trim()) doOpen();
+    hymnFilter.addEventListener('keydown', (e) => {
+      if (e.key !== 'Enter') return;
+      e.preventDefault();
+      const items = visibleHymns();
+      if (items.length === 1) pickHymn(items[0]);
     });
 
     clearBookBtn.addEventListener('click', () => {
@@ -761,13 +1230,19 @@
       try { numInput.select(); } catch (_) {}
     });
 
+    clearFilterBtn.addEventListener('click', () => {
+      hymnFilter.value = '';
+      selectedHymn = null;
+      syncClearBtns();
+      renderHymnList();
+      hymnFilter.focus();
+    });
+
     clearAllBtn.addEventListener('click', () => {
+      selectedHymn = null;
+      hymnFilter.value = '';
       if (inputMode === 'select') {
-        bookSelect.value = '';
-        numSelect.value = '';
-        entriesBook = '';
-        allEntries = [];
-        fillNumSelect([]);
+        renderHymnList();
         return;
       }
       bookInput.value = '';
@@ -814,14 +1289,17 @@
       const canUse = apiEnabled && (!serverNeedsToken || getToken());
       openBtn.disabled = !canUse || !accepting;
       addBtn.disabled = !canUse;
-      closeBtn.disabled = !canUse || !accepting;
-      blackBtn.disabled = !canUse || !accepting;
       updateOpenBtn();
       updateAddBtn();
     }
 
     function readyForNextSong() {
-      if (inputMode !== 'type') return;
+      if (inputMode === 'select') {
+        selectedHymn = null;
+        hymnFilter.value = '';
+        renderHymnList();
+        return;
+      }
       numInput.value = '';
       syncClearBtns();
       numSuggest.classList.add('hidden');
@@ -832,6 +1310,324 @@
           try { numInput.select(); } catch (_) {}
         }, 50);
       }
+    }
+
+    let lyricWs = null;
+    let lyricWsTimer = null;
+
+    function wsReady() {
+      return lyricWs && lyricWs.readyState === WebSocket.OPEN;
+    }
+
+    function wsSend(payload) {
+      if (!wsReady()) return false;
+      try {
+        lyricWs.send(JSON.stringify(payload));
+        return true;
+      } catch (_) {
+        return false;
+      }
+    }
+
+    function connectLyricSocket() {
+      if (!accepting || document.hidden) return;
+      if (lyricWs && (lyricWs.readyState === WebSocket.OPEN || lyricWs.readyState === WebSocket.CONNECTING)) {
+        return;
+      }
+      const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+      const q = getToken() ? ('?token=' + encodeURIComponent(getToken())) : '';
+      const url = proto + '//' + location.host + API_BASE + '/api/preview/ws' + q;
+      try {
+        lyricWs = new WebSocket(url);
+      } catch (_) {
+        return;
+      }
+      lyricWs.onclose = () => {
+        lyricWs = null;
+        clearTimeout(lyricWsTimer);
+        if (!document.hidden && accepting) {
+          lyricWsTimer = setTimeout(connectLyricSocket, 1200);
+        }
+      };
+      lyricWs.onerror = () => {
+        try { lyricWs.close(); } catch (_) {}
+      };
+      lyricWs.onmessage = (ev) => {
+        let data;
+        try { data = JSON.parse(ev.data); } catch (_) { return; }
+        if (!data || typeof data !== 'object' || data.same) return;
+        applyPreviewPayload(data);
+      };
+    }
+
+    function sendLyric(action, value, live) {
+      if (!accepting) return { ok: false };
+      const payload = value === undefined ? { action } : { action, value };
+      if (lastPreviewData) {
+        if (action === 'black') lastPreviewData.blacked = value == null ? !lastPreviewData.blacked : !!value;
+        if (action === 'align') lastPreviewData.align = value;
+        if (action === 'spacing') lastPreviewData.letter_spacing = value;
+        if (action === 'scroll') lastPreviewData.scroll_ratio = value;
+        if (action === 'fullscreen') lastPreviewData.fullscreen = !lastPreviewData.fullscreen;
+        if (action === 'zoom' && typeof value === 'number' && value > 0) {
+          lastPreviewData.font_pt = Math.max(8, Math.min(200, (lastPreviewData.font_pt || 36) * value));
+          previewText.style.fontSize = lastPreviewData.font_pt + 'pt';
+          paintScroll(lastPreviewData.scroll_ratio || 0);
+        }
+        if (!live) syncPreviewControls(lastPreviewData);
+      }
+      if (wsSend(payload)) {
+        if (!live) {
+          boostPreviewPoll();
+          setTimeout(pollPreview, 220);
+        }
+        return { ok: true };
+      }
+      const body = JSON.stringify(payload);
+      api('/api/preview/control', { method: 'POST', body }).then(({ ok, status, data }) => {
+        if (status === 401 || status === 503) return;
+        if (ok && !live) {
+          boostPreviewPoll();
+          setTimeout(pollPreview, 220);
+        }
+      });
+      return { ok: true };
+    }
+
+    function boostPreviewPoll() {
+      previewBoostUntil = Date.now() + 2500;
+    }
+
+    function syncPreviewControls(data) {
+      const open = !!(data && data.open);
+      previewControls.classList.toggle('hidden', !open);
+      const can = open && accepting;
+      [pvFit, pvRestore, pvSaveBest, pvFs, pvBlack, pvAlignLeft, pvAlignJust, pvZoomOut, pvZoomIn, pvUp, pvDown, pvSpacing].forEach(el => {
+        el.disabled = !can;
+      });
+      if (!data) return;
+      pvBlack.classList.toggle('on', !!data.blacked);
+      pvBlack.textContent = data.blacked ? '取消全黑' : '黑畫面';
+      pvFs.classList.toggle('on', !!data.fullscreen);
+      pvFs.textContent = data.fullscreen ? '視窗化' : '全螢幕';
+      pvAlignLeft.classList.toggle('on', data.align !== 'justify');
+      pvAlignJust.classList.toggle('on', data.align === 'justify');
+      if (!spacingDragging) {
+        pvSpacing.value = String(data.letter_spacing || 100);
+        pvSpacingVal.textContent = (data.letter_spacing || 100) + '%';
+      }
+    }
+
+    function previewGesturing() {
+      return localPreviewLock > 0 || !!dragScroll || !!pinch;
+    }
+
+    function letterboxMaxWidth() {
+      const card = previewLetterbox.parentElement;
+      if (!card) return Math.max(160, window.innerWidth - 32);
+      const cs = getComputedStyle(card);
+      const pad = (parseFloat(cs.paddingLeft) || 0) + (parseFloat(cs.paddingRight) || 0);
+      return Math.max(80, card.clientWidth - pad);
+    }
+
+    function fitLetterbox(sw, sh) {
+      const maxW = letterboxMaxWidth();
+      const compact = window.matchMedia('(orientation: portrait), (max-width: 899px)').matches;
+      const maxH = compact
+        ? Math.min(window.innerHeight * 0.38, 420)
+        : Math.min(window.innerHeight * 0.62, 720);
+      const ratio = (sw > 0 && sh > 0) ? (sw / sh) : (16 / 9);
+      let w = maxW;
+      let h = w / ratio;
+      if (h > maxH) {
+        h = maxH;
+        w = h * ratio;
+      }
+      previewLetterbox.style.width = Math.max(80, Math.round(w)) + 'px';
+      previewLetterbox.style.height = Math.max(45, Math.round(h)) + 'px';
+      previewLetterbox.style.maxHeight = 'none';
+      previewLetterbox.style.aspectRatio = sw + ' / ' + sh;
+    }
+
+    function marginSides(data) {
+      const uni = Math.max(0, Math.min(320, parseInt(data && data.margin, 10) || 56));
+      const src = (data && data.margins) || {};
+      const side = (key) => Math.max(0, Math.min(320, parseInt(
+        src[key] != null ? src[key] : uni, 10
+      ) || uni));
+      return { top: side('top'), right: side('right'), bottom: side('bottom'), left: side('left') };
+    }
+
+    function cssFontFamily(name) {
+      const n = String(name || 'Microsoft YaHei UI').replace(/["'\\]/g, '');
+      return '"' + n + '", "Microsoft YaHei", "PingFang TC", sans-serif';
+    }
+
+    function applyRemoteView(data) {
+      if (!lastPreviewData || !data) return;
+      if (data.font_pt != null && !pinch) {
+        if (Math.abs((lastPreviewData.font_pt || 0) - data.font_pt) > 0.05) {
+          lastPreviewData.font_pt = data.font_pt;
+          previewText.style.fontSize = data.font_pt + 'pt';
+        }
+      }
+      if (data.font_family != null) {
+        lastPreviewData.font_family = data.font_family;
+        previewText.style.fontFamily = cssFontFamily(data.font_family);
+      }
+      if (data.letter_spacing != null && !spacingDragging) {
+        lastPreviewData.letter_spacing = data.letter_spacing;
+        previewText.style.letterSpacing = (((data.letter_spacing || 100) - 100) / 100) + 'em';
+      }
+      if (data.line_height != null) {
+        lastPreviewData.line_height = data.line_height;
+        previewText.style.lineHeight = String((data.line_height || 135) / 100);
+      }
+      if (data.margins != null || data.margin != null) {
+        if (data.margins != null) lastPreviewData.margins = data.margins;
+        if (data.margin != null) lastPreviewData.margin = data.margin;
+        const m = marginSides(lastPreviewData);
+        previewScroll.style.padding = m.top + 'px ' + m.right + 'px ' + m.bottom + 'px ' + m.left + 'px';
+      }
+      if (data.align) {
+        lastPreviewData.align = data.align;
+        previewText.style.textAlign = data.align === 'justify' ? 'justify' : 'left';
+      }
+      if (data.blacked != null) lastPreviewData.blacked = !!data.blacked;
+      if (data.fullscreen != null) lastPreviewData.fullscreen = !!data.fullscreen;
+      if (data.overlay_ends_at != null) setOverlayCountdown(data.overlay_ends_at);
+      if (typeof data.view_rev === 'number') lastPreviewViewRev = data.view_rev;
+      if (typeof data.rev === 'number') lastPreviewRev = data.rev;
+      syncPreviewControls(lastPreviewData);
+      previewBadge.classList.toggle('hidden', !lastPreviewData.blacked);
+      const skipScroll = previewGesturing() || Date.now() < ignoreScrollUntil;
+      if (data.scroll_ratio != null && !skipScroll) {
+        paintScroll(data.scroll_ratio);
+      } else if (data.font_pt != null && !pinch) {
+        paintScroll(lastPreviewData.scroll_ratio || 0);
+      }
+    }
+
+    function applyPreviewPayload(data) {
+      if (!data || data.same) return;
+      if (typeof data.rev === 'number') lastPreviewRev = data.rev;
+      if (typeof data.view_rev === 'number') lastPreviewViewRev = data.view_rev;
+      if (data.view_only) {
+        applyRemoteView(data);
+        return;
+      }
+      const key = [
+        data.open, data.book, data.name, data.heading, data.text,
+        data.stage_w, data.stage_h, data.bg, data.bg_image, data.bg_image_rev, data.text_color, data.rev,
+      ].join('|');
+      if (key === lastPreviewKey && lastPreviewData) {
+        applyRemoteView(data);
+        return;
+      }
+      lastPreviewKey = key;
+      layoutPreview(data);
+    }
+
+    function layoutPreview(data) {
+      const keepScroll = lastPreviewData
+        && lastPreviewData.text === (data && data.text)
+        && previewGesturing();
+      if (keepScroll) {
+        data = Object.assign({}, data, { scroll_ratio: lastPreviewData.scroll_ratio });
+      }
+      if (keepScroll && pinch && lastPreviewData) {
+        data = Object.assign({}, data, { font_pt: lastPreviewData.font_pt });
+      }
+      lastPreviewData = data;
+      if (typeof data.rev === 'number') lastPreviewRev = data.rev;
+      if (typeof data.view_rev === 'number') lastPreviewViewRev = data.view_rev;
+      if (data && data.overlay_ends_at != null) setOverlayCountdown(data.overlay_ends_at);
+      const open = !!(data && (data.open || data.text));
+      previewEmpty.classList.toggle('hidden', open);
+      previewStage.classList.toggle('hidden', !open);
+      previewBadge.classList.toggle('hidden', !(data && data.blacked));
+      syncPreviewControls(data);
+      const sw = (data && data.stage_w) || 1920;
+      const sh = (data && data.stage_h) || 1080;
+      fitLetterbox(sw, sh);
+      if (!open) {
+        previewTitle.textContent = '預視 · 尚未開啟';
+        previewMeta.textContent = '等候桌面端畫面…';
+        lastPreviewKey = '';
+        return;
+      }
+      const heading = data.name || data.heading || '詩歌';
+      const book = data.book ? data.book + ' · ' : '';
+      previewTitle.textContent = book + heading;
+      previewStage.style.width = sw + 'px';
+      previewStage.style.height = sh + 'px';
+      previewStage.style.backgroundColor = data.bg || '#050505';
+      if (data.bg_image) {
+        previewStage.style.backgroundImage = `url(${API_BASE}/api/view/bg?v=${data.bg_image_rev || 0})`;
+      } else {
+        previewStage.style.backgroundImage = 'none';
+      }
+      previewText.style.fontSize = (data.font_pt || 36) + 'pt';
+      previewText.style.fontFamily = cssFontFamily(data.font_family);
+      previewText.style.letterSpacing = (((data.letter_spacing || 100) - 100) / 100) + 'em';
+      previewText.style.lineHeight = String((data.line_height || 135) / 100);
+      previewText.style.textAlign = data.align === 'justify' ? 'justify' : 'left';
+      previewText.style.color = data.text_color || '#ffffff';
+      const m = marginSides(data);
+      previewScroll.style.padding = m.top + 'px ' + m.right + 'px ' + m.bottom + 'px ' + m.left + 'px';
+      if (previewText.textContent !== (data.text || '')) {
+        previewText.textContent = data.text || '';
+      }
+      scalePreviewStage();
+      paintScroll(data.scroll_ratio || 0);
+      previewMeta.textContent = `外屏 ${sw}×${sh}` + (data.blacked ? ' · 外屏已黑（預視仍顯示）' : '') + ' · 可控制';
+    }
+
+    function scalePreviewStage() {
+      const data = lastPreviewData || {};
+      const sw = data.stage_w || 1920;
+      const sh = data.stage_h || 1080;
+      fitLetterbox(sw, sh);
+      const vw = previewLetterbox.clientWidth || 1;
+      const vh = previewLetterbox.clientHeight || Math.max(1, vw * sh / sw);
+      const scale = Math.min(vw / sw, vh / sh);
+      previewStage.style.transform = `translate(-50%, -50%) scale(${scale})`;
+    }
+
+    function scalePreview() {
+      const data = lastPreviewData || {};
+      const sw = data.stage_w || 1920;
+      const sh = data.stage_h || 1080;
+      fitLetterbox(sw, sh);
+      if (!data.open) return;
+      scalePreviewStage();
+      paintScroll(data.scroll_ratio || 0);
+    }
+
+    function forcePreviewRefresh() {
+      lastPreviewRev = -1;
+      lastPreviewViewRev = -1;
+      lastPreviewKey = '';
+      boostPreviewPoll();
+      pollPreview();
+    }
+
+    async function pollPreview() {
+      try {
+        const { ok, data } = await api(
+          '/api/preview?rev=' + lastPreviewRev + '&view=' + lastPreviewViewRev
+        );
+        if (!ok || !data) return;
+        applyPreviewPayload(data);
+      } catch (_) {}
+    }
+
+    function schedulePreviewLoop() {
+      const delay = Date.now() < previewBoostUntil ? 450 : 1600;
+      setTimeout(async () => {
+        await pollPreview();
+        schedulePreviewLoop();
+      }, delay);
     }
 
     function renderSetlist(data) {
@@ -893,6 +1689,9 @@
       }
       scheduleResult.textContent = formatOpenPolicyResult(data, '✅ 已開啟');
       if (data.setlist) renderSetlist(data.setlist);
+      forcePreviewRefresh();
+      setTimeout(forcePreviewRefresh, 250);
+      setTimeout(forcePreviewRefresh, 700);
     }
 
     async function refreshHealth() {
@@ -903,6 +1702,9 @@
         serverNeedsToken = !!data.has_token;
         if (!clickToOpenUserSet && typeof data.click_to_open === 'boolean') {
           setClickToOpen(data.click_to_open, false);
+        }
+        if (typeof data.overlay_auto_unblack === 'boolean') {
+          setAutoUnblack(data.overlay_auto_unblack, false);
         }
         updateTokenSection();
         if (!data.api_enabled) {
@@ -924,6 +1726,8 @@
           accepting ? 'ok' : 'warn',
         );
         updateActionButtons(true);
+        syncPreviewControls(lastPreviewData);
+        connectLyricSocket();
         if (data.setlist) renderSetlist(data.setlist);
         else loadSetlist();
       } catch (e) {
@@ -946,17 +1750,7 @@
         }
         if (!ok || !Array.isArray(data)) return;
         booksCache = data;
-        bookSelect.innerHTML = '';
-        const empty = document.createElement('option');
-        empty.value = '';
-        empty.textContent = '— 請選擇 —';
-        bookSelect.appendChild(empty);
-        data.forEach(b => {
-          const s = document.createElement('option');
-          s.value = String(b.index);
-          s.textContent = `${b.index}. ${b.name}`;
-          bookSelect.appendChild(s);
-        });
+        renderBookChips();
         renderRecentBooks();
       } catch (_) {}
     }
@@ -966,6 +1760,10 @@
       openResult.textContent = '發送中…';
       const book = currentBook();
       const num = currentNum();
+      if (!book && !num) {
+        openResult.textContent = '⚠ 請先揀一首詩歌';
+        return;
+      }
       const body = JSON.stringify({ book, num });
       const { status, data } = await api('/api/open', { method: 'POST', body });
       if (status === 401) {
@@ -983,6 +1781,9 @@
           pushRecentBook(book, hit ? `${hit.index}. ${hit.name}` : book);
         }
         readyForNextSong();
+        forcePreviewRefresh();
+        setTimeout(forcePreviewRefresh, 250);
+        setTimeout(forcePreviewRefresh, 700);
       }
     }
 
@@ -1005,37 +1806,10 @@
       }
       if (data.status === 'not_found') openResult.textContent = '⚠ 找不到書冊';
       else if (data.status === 'ambiguous') openResult.textContent = '⚠ ' + (data.message || '書冊不明確');
-      else if (data.status === 'invalid') openResult.textContent = '⚠ ' + (data.message || '請輸入書冊或詩歌號');
+      else if (data.status === 'invalid') openResult.textContent = '⚠ ' + (data.message || '請揀詩歌或輸入詩歌號');
       else if (data.status === 'disabled') openResult.textContent = data.message || '桌面端 API 未啟用';
       else openResult.textContent = data.message || '⚠ 無法加入排程';
     });
-
-    async function sendDisplay(action, label) {
-      displayResult.classList.remove('hidden');
-      displayResult.textContent = label + '…';
-      const { status, data } = await api('/api/display', {
-        method: 'POST',
-        body: JSON.stringify({ action }),
-      });
-      if (status === 401) {
-        displayResult.textContent = '⚠ API Token 不正確';
-        return;
-      }
-      if (status === 503 || data.status === 'not_accepting') {
-        displayResult.textContent = data.message || '桌面端暫停接受';
-        return;
-      }
-      if (data.status === 'ok') {
-        displayResult.textContent = action === 'black'
-          ? '✅ 已結束並全黑（Esc 可取消）'
-          : '✅ 已結束目前程式';
-        return;
-      }
-      displayResult.textContent = '⚠ ' + (data.message || '操作失敗');
-    }
-
-    closeBtn.addEventListener('click', () => sendDisplay('close', '結束程式'));
-    blackBtn.addEventListener('click', () => sendDisplay('black', '結束並全黑'));
 
     prevBtn.addEventListener('click', async () => {
       if (!setlistData.entries || !setlistData.entries.length) return;
@@ -1058,6 +1832,9 @@
       }
       scheduleResult.textContent = formatOpenPolicyResult(data, '✅ 已開啟下一首');
       if (data.setlist) renderSetlist(data.setlist);
+      forcePreviewRefresh();
+      setTimeout(forcePreviewRefresh, 250);
+      setTimeout(forcePreviewRefresh, 700);
     });
 
     function setupVoice(btn, inputEl) {
@@ -1105,25 +1882,237 @@
       tokenDebounce = setTimeout(() => {
         saveToken();
         updateTokenSection();
+        catalogLoaded = false;
+        catalogByBook = {};
+        catalog = [];
         entriesBook = '';
+        if (lyricWs) {
+          try { lyricWs.close(); } catch (_) {}
+          lyricWs = null;
+        }
         refreshHealth();
         loadBooks();
+        loadHymnsForSelection();
         loadSetlist();
+        pollPreview();
       }, 400);
     });
 
+    pvFit.addEventListener('click', () => sendLyric('fit'));
+    pvRestore.addEventListener('click', () => sendLyric('restore'));
+    pvSaveBest.addEventListener('click', () => sendLyric('save_best'));
+    pvFs.addEventListener('click', () => sendLyric('fullscreen'));
+    pvBlack.addEventListener('click', () => sendLyric('black'));
+    pvAlignLeft.addEventListener('click', () => sendLyric('align', 'left'));
+    pvAlignJust.addEventListener('click', () => sendLyric('align', 'justify'));
+    pvZoomOut.addEventListener('click', () => sendLyric('zoom', 1 / 1.12));
+    pvZoomIn.addEventListener('click', () => sendLyric('zoom', 1.12));
+    pvUp.addEventListener('click', () => {
+      const next = Math.max(0, (lastPreviewData && lastPreviewData.scroll_ratio || 0) - 0.12);
+      applyLocalScroll(next);
+    });
+    pvDown.addEventListener('click', () => {
+      const next = Math.min(1, (lastPreviewData && lastPreviewData.scroll_ratio || 0) + 0.12);
+      applyLocalScroll(next);
+    });
+    pvSpacing.addEventListener('pointerdown', () => { spacingDragging = true; });
+    pvSpacing.addEventListener('pointerup', () => { spacingDragging = false; });
+    pvSpacing.addEventListener('change', () => {
+      const n = parseInt(pvSpacing.value, 10);
+      pvSpacingVal.textContent = n + '%';
+      sendLyric('spacing', n);
+    });
+    pvSpacing.addEventListener('input', () => {
+      pvSpacingVal.textContent = pvSpacing.value + '%';
+    });
+
+    function previewScale() {
+      const data = lastPreviewData || {};
+      const sw = data.stage_w || 1920;
+      const sh = data.stage_h || 1080;
+      const vw = previewLetterbox.clientWidth || 1;
+      const vh = previewLetterbox.clientHeight || 1;
+      return Math.min(vw / sw, vh / sh) || 1;
+    }
+
+    function contentHeight() {
+      const scale = previewScale();
+      const rectH = previewScroll.getBoundingClientRect().height;
+      const fromScreen = scale > 0 ? rectH / scale : 0;
+      return Math.max(
+        fromScreen,
+        previewScroll.scrollHeight,
+        previewScroll.offsetHeight,
+        previewText.scrollHeight,
+      );
+    }
+
+    function previewOverflow() {
+      const sh = (lastPreviewData && lastPreviewData.stage_h) || 1080;
+      return Math.max(1, contentHeight() - sh + sh);
+    }
+
+    function paintScroll(ratio) {
+      if (!lastPreviewData) return;
+      lastPreviewData.scroll_ratio = Math.max(0, Math.min(1, ratio));
+      const overflow = previewOverflow();
+      previewScroll.style.transform = `translate3d(0, ${-lastPreviewData.scroll_ratio * overflow}px, 0)`;
+    }
+
+    let pinch = null;
+    let coastRaf = 0;
+    let scrollRaf = 0;
+    let pendingScroll = null;
+
+    function applyLocalScroll(ratio) {
+      const next = Math.max(0, Math.min(1, ratio));
+      paintScroll(next);
+      pendingScroll = next;
+      if (scrollRaf) return;
+      scrollRaf = requestAnimationFrame(() => {
+        scrollRaf = 0;
+        if (pendingScroll == null) return;
+        sendLyric('scroll', pendingScroll, true);
+        pendingScroll = null;
+      });
+    }
+
+    function stopCoast() {
+      if (coastRaf) {
+        cancelAnimationFrame(coastRaf);
+        coastRaf = 0;
+      }
+    }
+
+    function startCoast(ratioPerMs) {
+      stopCoast();
+      let v = ratioPerMs;
+      let last = performance.now();
+      localPreviewLock += 1;
+      function step(t) {
+        const dt = Math.min(32, t - last);
+        last = t;
+        v *= Math.pow(0.92, dt / 16);
+        if (!lastPreviewData || Math.abs(v * dt) < 0.00035) {
+          coastRaf = 0;
+          localPreviewLock = Math.max(0, localPreviewLock - 1);
+          ignoreScrollUntil = Date.now() + 400;
+          if (lastPreviewData) sendLyric('scroll', lastPreviewData.scroll_ratio, true);
+          return;
+        }
+        applyLocalScroll((lastPreviewData.scroll_ratio || 0) + v * dt);
+        coastRaf = requestAnimationFrame(step);
+      }
+      coastRaf = requestAnimationFrame(step);
+    }
+
+    previewLetterbox.addEventListener('pointerdown', (e) => {
+      if (!lastPreviewData || !lastPreviewData.open || e.button !== 0) return;
+      if (pinch) return;
+      stopCoast();
+      dragScroll = {
+        y: e.clientY,
+        ratio: lastPreviewData.scroll_ratio || 0,
+        id: e.pointerId,
+        lastY: e.clientY,
+        lastT: performance.now(),
+        vel: 0,
+      };
+      localPreviewLock += 1;
+      ignoreScrollUntil = Date.now() + 80;
+      try { previewLetterbox.setPointerCapture(e.pointerId); } catch (_) {}
+    });
+    previewLetterbox.addEventListener('pointermove', (e) => {
+      if (!dragScroll || e.pointerId !== dragScroll.id) return;
+      const now = performance.now();
+      const dt = Math.max(1, now - dragScroll.lastT);
+      const scale = previewScale();
+      const dy = (e.clientY - dragScroll.y) / scale;
+      const overflow = previewOverflow();
+      applyLocalScroll(dragScroll.ratio - dy / overflow);
+      dragScroll.vel = ((e.clientY - dragScroll.lastY) / scale) / overflow / dt;
+      dragScroll.lastY = e.clientY;
+      dragScroll.lastT = now;
+    });
+    function endDrag(e) {
+      if (!dragScroll || (e && e.pointerId !== dragScroll.id)) return;
+      const vel = dragScroll.vel || 0;
+      dragScroll = null;
+      localPreviewLock = Math.max(0, localPreviewLock - 1);
+      ignoreScrollUntil = Date.now() + 400;
+      if (Math.abs(vel) > 0.00025) startCoast(-vel);
+      else if (lastPreviewData) sendLyric('scroll', lastPreviewData.scroll_ratio, true);
+    }
+    previewLetterbox.addEventListener('pointerup', endDrag);
+    previewLetterbox.addEventListener('pointercancel', endDrag);
+
+    previewLetterbox.addEventListener('touchstart', (e) => {
+      if (!lastPreviewData || !lastPreviewData.open) return;
+      if (e.touches.length === 2) {
+        const a = e.touches[0], b = e.touches[1];
+        pinch = { dist: Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY) };
+        if (dragScroll) {
+          dragScroll = null;
+          localPreviewLock = Math.max(0, localPreviewLock - 1);
+        }
+        localPreviewLock += 1;
+      }
+    }, { passive: true });
+    previewLetterbox.addEventListener('touchmove', (e) => {
+      if (!pinch || e.touches.length !== 2) return;
+      e.preventDefault();
+      const a = e.touches[0], b = e.touches[1];
+      const dist = Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY);
+      const factor = dist / Math.max(1, pinch.dist);
+      if (Math.abs(factor - 1) >= 0.02) {
+        pinch.dist = dist;
+        sendLyric('zoom', factor, true);
+      }
+    }, { passive: false });
+    previewLetterbox.addEventListener('touchend', (e) => {
+      if (pinch && e.touches.length < 2) {
+        pinch = null;
+        localPreviewLock = Math.max(0, localPreviewLock - 1);
+        ignoreScrollUntil = Date.now() + 400;
+      }
+    });
+
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden) {
+        clearTimeout(lyricWsTimer);
+        lyricWsTimer = null;
+        if (lyricWs) {
+          try { lyricWs.close(); } catch (_) {}
+          lyricWs = null;
+        }
+        return;
+      }
+      connectLyricSocket();
+      pollPreview();
+    });
+
+    window.addEventListener('resize', scalePreview);
+    if (window.ResizeObserver && previewLetterbox.parentElement) {
+      new ResizeObserver(scalePreview).observe(previewLetterbox.parentElement);
+    }
+
     loadClickToOpenPref();
+    loadSelectedBooks();
     try {
       const savedMode = localStorage.getItem(MODE_KEY);
-      if (savedMode === 'select') setInputMode('select');
-      else setInputMode('type');
+      if (savedMode === 'type') setInputMode('type');
+      else setInputMode('select');
     } catch (_) {
-      setInputMode('type');
+      setInputMode('select');
     }
 
     loadSavedToken();
     refreshHealth();
     loadBooks();
+    loadHymnsForSelection();
+    scalePreview();
+    pollPreview();
+    schedulePreviewLoop();
     setInterval(refreshHealth, 5000);
   </script>
 </body>

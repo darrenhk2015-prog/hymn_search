@@ -61,12 +61,12 @@ class RemoteServer:
     def set_handlers(self, get_books, handle_open, handle_populate, handle_pending,
                      handle_setlist_prepare_next=None, get_setlist_info=None,
                      handle_setlist_prepare_open=None, handle_setlist_add=None,
-                     handle_display=None):
+                     handle_display=None, handle_lyric=None):
         self.state.set_handlers(
             get_books, handle_open, handle_populate, handle_pending,
             handle_setlist_prepare_next, get_setlist_info,
             handle_setlist_prepare_open, handle_setlist_add,
-            handle_display,
+            handle_display, handle_lyric,
         )
 
     @property
