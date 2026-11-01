@@ -3,6 +3,7 @@
 PyQt6
 PyMuPDF
 python-docx
+pywin32
 pyinstaller
 fastapi
 uvicorn[standard]

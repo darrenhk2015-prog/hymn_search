@@ -5,6 +5,7 @@ MAX_SESSION_HISTORY = 50
 
 EXPORT_KEYS = (
     'theme', 'font_size', 'senior_mode', 'senior_snapshot', 'search_mode', 'open_overlay', 'overlay_duration',
+    'overlay_center_secs',
     'overlay_mode', 'display_duplicate', 'display_switch_mode',
     'word_auto_fullscreen', 'pdf_auto_fullscreen', 'keyword_instant', 'book_auto_focus_hymn',
     'hymn_num_mode',
@@ -16,7 +17,9 @@ EXPORT_KEYS = (
     'enable_tunnel', 'enable_tunnel_fixed', 'enable_tunnel_quick', 'tunnel_mode',
     'qr_x', 'qr_y', 'qr_width', 'qr_height', 'qr_caption', 'qr_bg_color',
     'qr_text_color', 'qr_text_size', 'qr_bg_opacity',
-    'update_check_url', 'update_download_url',
+    'lyric_bg_color', 'lyric_bg_image', 'lyric_text_color', 'lyric_align', 'lyric_letter_spacing',
+    'lyric_line_height', 'lyric_margins', 'lyric_font_family', 'lyric_font_pt', 'lyric_best_defaults',
+    'lyric_control_placement', 'lyric_start_blacked', 'lyric_preview_mode', 'overlay_auto_unblack',
 )
 
 

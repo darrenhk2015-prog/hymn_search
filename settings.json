@@ -1,13 +1,14 @@
 {
   "version": 5,
-  "hymn_folder": "",
+  "hymn_folder": "C:\\python\\hymn_live\\data\\hymns.json",
   "theme": "light",
-  "font_size": 12,
+  "font_size": 14,
   "senior_mode": false,
   "senior_snapshot": null,
-  "search_mode": "book",
+  "search_mode": "standard",
   "open_overlay": true,
   "overlay_duration": 10,
+  "overlay_center_secs": 5,
   "overlay_mode": "center_then_corner",
   "overlay_bg_color": "#000000",
   "overlay_text_color": "#ffffff",
@@ -26,17 +27,14 @@
   "remote_policy": "auto_single",
   "remote_token": "",
   "enable_tunnel": true,
-  "enable_tunnel_fixed": false,
+  "enable_tunnel_fixed": true,
   "enable_tunnel_quick": true,
   "cloudflared_path": "",
-  "tunnel_mode": "quick",
+  "tunnel_mode": "service",
   "cloudflared_token": "eyJhIjoiY2M5NGFhNzkzZWI5MDlmYTJiNGQwYjRkMzJiZDllYmMiLCJ0IjoiOWJlNjdlODYtZGNiMS00ZDc4LWJhOWItZTFkNjAwYmI3NzBmIiwicyI6Ik5URXdNRGhoTmpNdE56RmxOaTAwWVRCbUxXSmhNR010TW1GbU1XSm1OVFEwTnpFdyJ9",
   "named_tunnel_url": "https://live.churchofgodtm.com/hymn_search/",
   "remote_path_prefix": "/hymn_search",
-  "viewer_show_debug": true,
-  "gdrive_folder_id": "18uMCSYNDgipvGzHwlhyMcxrBaAcjChSZ",
-  "gdrive_s1_folder_id": "1lfLpXlPE5CX-RaGcchEOOAzSnoG-_f4Z",
-  "gdrive_s2_folder_id": "1_KLEv2ERzail3ZQ-aNEr4Ygh6K-T8AwV",
+  "viewer_show_debug": false,
   "operator_mode": true,
   "pinned_books": [],
   "setlist": [
@@ -68,276 +66,305 @@
   "setlist_index": 0,
   "session_history": [
     {
-      "book": "05 神家詩歌",
-      "num": "P02  耶和華尼西.doc",
-      "label": "05 神家詩歌 · P02  耶和華尼西.doc"
+      "book": "1冊",
+      "num": "H1-005",
+      "label": "1冊 · H1-005  006 與父相親"
     },
     {
-      "book": "01 神家詩歌",
-      "num": "P003  004 哈哈歌.doc",
-      "label": "01 神家詩歌 · "
+      "book": "1冊",
+      "num": "H1-012",
+      "label": "1冊 · H1-012  010 主真美好"
     },
     {
-      "book": "22 神家詩歌",
-      "num": "H22-65 神是我們的避難所、力量、隨時的幫助",
-      "label": "22 神家詩歌 · H22-65 神是我們的避難所、力量、隨時的幫助 · P.66"
+      "book": "1冊",
+      "num": "H1-008",
+      "label": "1冊 · H1-008  009 生愛的路程"
     },
     {
-      "book": "S1神家詩歌合訂本1大字拍子版",
-      "num": "2\t祢這份愛",
-      "label": "S1神家詩歌合訂本1大字拍子版 · 2\t祢這份愛 · P.21"
+      "book": "1冊",
+      "num": "H1-004",
+      "label": "1冊 · H1-004  005 天父愛我"
     },
     {
-      "book": "S1神家詩歌合訂本1大字拍子版",
-      "num": "1\t祢這份愛",
-      "label": "S1神家詩歌合訂本1大字拍子版 · 1\t祢這份愛 · P.18"
+      "book": "1冊",
+      "num": "H1-053",
+      "label": "1冊 · H1-053  050 全路程祂伴我"
     },
     {
-      "book": "S2神家詩歌合訂本2大字拍子版",
-      "num": "22\t天父的心曲",
-      "label": "S2神家詩歌合訂本2大字拍子版 · 22\t天父的心曲 · P.46"
+      "book": "1冊",
+      "num": "H1-002",
+      "label": "1冊 · H1-002  可敬可親紳 003 宇宙講故事"
     },
     {
-      "book": "S2神家詩歌合訂本2大字拍子版",
-      "num": "119\t得勝者的信心",
-      "label": "S2神家詩歌合訂本2大字拍子版 · 119\t得勝者的信心 · P.208"
+      "book": "1冊",
+      "num": "H1-046",
+      "label": "1冊 · H1-046  044 我的家鄉"
     },
     {
-      "book": "S2神家詩歌合訂本2大字拍子版",
-      "num": "119 得勝者的信心_P.208.pdf",
-      "label": "S2神家詩歌合訂本2大字拍子版 · 119 得勝者的信心_P.208.pdf"
+      "book": "1冊",
+      "num": "H1-024",
+      "label": "1冊 · H1-024  022 主對我個人的愛"
     },
     {
-      "book": "S2神家詩歌合訂本2大字拍子版",
-      "num": "10 超奇愛的神蹟_P.25.pdf",
-      "label": "S2神家詩歌合訂本2大字拍子版 · 10 超奇愛的神蹟_P.25.pdf"
+      "book": "1冊",
+      "num": "H1-199",
+      "label": "1冊 · H1-199  240 儆醒"
     },
     {
-      "book": "S2神家詩歌合訂本2大字拍子版",
-      "num": "179 珍貴親弟兄的神蹟_P.306.pdf",
-      "label": "S2神家詩歌合訂本2大字拍子版 · 179 珍貴親弟兄的神蹟_P.306.pdf"
+      "book": "1冊",
+      "num": "H1-126",
+      "label": "1冊 · H1-126  143 柔細之愛"
     },
     {
-      "book": "03 神家詩歌",
-      "num": "P33  親近主的甜美.doc",
-      "label": "03 神家詩歌 · P33  親近主的甜美.doc"
+      "book": "1冊",
+      "num": "H1-127",
+      "label": "1冊 · H1-127  146 良牧與迷羊"
     },
     {
-      "book": "03 神家詩歌",
-      "num": "P31  勝過仇敵.doc",
-      "label": "03 神家詩歌 · P31  勝過仇敵.doc"
+      "book": "1冊",
+      "num": "H1-064",
+      "label": "1冊 · H1-064  063 得著基督"
     },
     {
-      "book": "03 神家詩歌",
-      "num": "P30  喜樂之源.doc",
-      "label": "03 神家詩歌 · P30  喜樂之源.doc"
+      "book": "1冊",
+      "num": "H1-062",
+      "label": "1冊 · H1-062  061 在你面前"
     },
     {
-      "book": "03 神家詩歌",
-      "num": "P29  歸到源頭.doc",
-      "label": "03 神家詩歌 · P29  歸到源頭.doc"
+      "book": "1冊",
+      "num": "H1-080",
+      "label": "1冊 · H1-080  席散何速"
     },
     {
-      "book": "03 神家詩歌",
-      "num": "P28  恩典的教訓.doc",
-      "label": "03 神家詩歌 · P28  恩典的教訓.doc"
+      "book": "1冊",
+      "num": "H1-085",
+      "label": "1冊 · H1-085  086 叫我抬起頭的主"
     },
     {
-      "book": "03 神家詩歌",
-      "num": "P20  萬古之先的恩典.doc",
-      "label": "03 神家詩歌 · P20  萬古之先的恩典.doc"
+      "book": "1冊",
+      "num": "H1-084",
+      "label": "1冊 · H1-084  破斧沉舟歌"
     },
     {
-      "book": "03 神家詩歌",
-      "num": "P19  慈愛憐憫每晨新.doc",
-      "label": "03 神家詩歌 · P19  慈愛憐憫每晨新.doc"
+      "book": "1冊",
+      "num": "H1-037",
+      "label": "1冊 · H1-037  034 沒藥山 、 乳香崗"
     },
     {
-      "book": "03 神家詩歌",
-      "num": "P02  神得榮耀人蒙恩.doc",
-      "label": "03 神家詩歌 · P02  神得榮耀人蒙恩.doc"
+      "book": "1冊",
+      "num": "H1-032",
+      "label": "1冊 · H1-032  031 高天上的主"
     },
     {
-      "book": "04 神家詩歌",
-      "num": "P40 此愛難忘.doc",
-      "label": "04 神家詩歌 · P40 此愛難忘.doc"
+      "book": "1冊",
+      "num": "H1-017",
+      "label": "1冊 · H1-017  016 我與主成為一靈"
     },
     {
-      "book": "04 神家詩歌",
-      "num": "P25 這就是愛了.doc",
-      "label": "04 神家詩歌 · P25 這就是愛了.doc"
+      "book": "1冊",
+      "num": "H1-014",
+      "label": "1冊 · H1-014  012 耶穌是主"
     },
     {
-      "book": "15 神家詩歌",
-      "num": "16.無限者，祢「無限」奇妙.docx",
-      "label": "15 神家詩歌 · 16.無限者，祢「無限」奇妙.docx"
+      "book": "1冊",
+      "num": "H1-006",
+      "label": "1冊 · H1-006  007 父愛  008  寶貴的阿爸"
     },
     {
-      "book": "15 神家詩歌",
-      "num": "12.深哉，無限者的情愛.docx",
-      "label": "15 神家詩歌 · 12.深哉，無限者的情愛.docx"
+      "book": "5冊",
+      "num": "H5-05",
+      "label": "5冊 · H5-05  等候我前"
     },
     {
-      "book": "15 神家詩歌",
-      "num": "34.道成肉身感人、溫暖的表達.docx",
-      "label": "15 神家詩歌 · 34.道成肉身感人、溫暖的表達.docx"
+      "book": "19冊",
+      "num": "H19-69",
+      "label": "19冊 · H19-69  十架時刻太震撼"
     },
     {
-      "book": "02 神家詩歌",
-      "num": "P34  動人隱藏的愛.doc",
-      "label": "02 神家詩歌 · P34  動人隱藏的愛.doc"
+      "book": "19冊",
+      "num": "H19-16",
+      "label": "19冊 · H19-16  主用寶血所立的新約，是最美、恩典、平安、使人成聖、愛的永約"
     },
     {
-      "book": "02 神家詩歌",
-      "num": "P36  真榮耀.doc",
-      "label": "02 神家詩歌 · P36  真榮耀.doc"
+      "book": "19冊",
+      "num": "H19-14",
+      "label": "19冊 · H19-14  「成了」！ 主寶血與新約福杯！"
     },
     {
-      "book": "02 神家詩歌",
-      "num": "P11  榮耀的復活.doc",
-      "label": "02 神家詩歌 · P11  榮耀的復活.doc"
+      "book": "合訂本2（S2）",
+      "num": "S2-193",
+      "label": "合訂本2（S2） · S2-193  這流已出離幽谷"
     },
     {
-      "book": "02 神家詩歌",
-      "num": "P13  加利利海邊的温情.doc",
-      "label": "02 神家詩歌 · P13  加利利海邊的温情.doc"
+      "book": "1冊",
+      "num": "H1-098",
+      "label": "1冊 · H1-098  103 我的福份"
     },
     {
-      "book": "02 神家詩歌",
-      "num": "P09  與主同坐天上.doc",
-      "label": "02 神家詩歌 · "
+      "book": "1冊",
+      "num": "H1-048",
+      "label": "1冊 · H1-048  046 凡事謝恩"
     },
     {
-      "book": "02 神家詩歌",
-      "num": "P09  與主同坐天上.doc",
-      "label": "02 神家詩歌 · P09  與主同坐天上.doc"
+      "book": "合訂本1（S1）",
+      "num": "S1-155",
+      "label": "合訂本1（S1） · S1-155  愛河中的生活"
     },
     {
-      "book": "02 神家詩歌",
-      "num": "P07  幔子裂開.doc",
-      "label": "02 神家詩歌 · P07  幔子裂開.doc"
+      "book": "合訂本1（S1）",
+      "num": "S1-004",
+      "label": "合訂本1（S1） · S1-004  眷看"
     },
     {
-      "book": "02 神家詩歌",
-      "num": "P04  十架愛的震撼.doc",
-      "label": "02 神家詩歌 · P04  十架愛的震撼.doc"
+      "book": "1冊",
+      "num": "H1-013",
+      "label": "1冊 · H1-013  011 主是我一切"
     },
     {
-      "book": "02 神家詩歌",
-      "num": "P01  祂從天來到地上.doc",
-      "label": "02 神家詩歌 · P01  祂從天來到地上.doc"
+      "book": "合訂本1（S1）",
+      "num": "S1-006",
+      "label": "合訂本1（S1） · S1-006  無窮偉大的父神"
     },
     {
-      "book": "02 神家詩歌",
-      "num": "P23  最創意的約會.doc",
-      "label": "02 神家詩歌 · P23  最創意的約會.doc"
+      "book": "6冊",
+      "num": "H6-03",
+      "label": "6冊 · H6-03  要滿享神的安慰"
     },
     {
-      "book": "S2神家詩歌合訂本2大字拍子版",
-      "num": "100 十架大愛_P.173.pdf",
-      "label": "S2神家詩歌合訂本2大字拍子版 · 100 十架大愛_P.173.pdf"
+      "book": "3冊",
+      "num": "H3-05",
+      "label": "3冊 · H3-05  虛己與高升"
     },
     {
-      "book": "S2神家詩歌合訂本2大字拍子版",
-      "num": "1 齊來慶祝_P.12.pdf",
-      "label": "S2神家詩歌合訂本2大字拍子版 · 1 齊來慶祝_P.12.pdf"
+      "book": "4冊",
+      "num": "H4-08",
+      "label": "4冊 · H4-08  榮美的主對我的愛"
     },
     {
-      "book": "S2神家詩歌合訂本2大字拍子版",
-      "num": "139 當我思念耶穌_P.244.pdf",
-      "label": "S2神家詩歌合訂本2大字拍子版 · 139 當我思念耶穌_P.244.pdf"
+      "book": "4冊",
+      "num": "H4-03",
+      "label": "4冊 · H4-03  賜各樣安慰的神"
     },
     {
-      "book": "01 神家詩歌",
-      "num": "P004  005 天父愛我.doc",
-      "label": "01 神家詩歌 · "
+      "book": "7冊",
+      "num": "H7-66",
+      "label": "7冊 · H7-66  肩負託付為主環遊"
     },
     {
-      "book": "06 神家詩歌",
-      "num": "P03   賜各樣安慰的父神.doc",
-      "label": "06 神家詩歌 · "
+      "book": "10冊",
+      "num": "H10-086",
+      "label": "10冊 · H10-086  主的愛夢．深情的專注"
     },
     {
-      "book": "02 神家詩歌",
-      "num": "P24  歡呼 ！ 永恆的春天.doc",
-      "label": "02 神家詩歌 · "
+      "book": "1冊",
+      "num": "H1-066",
+      "label": "1冊 · H1-066  065 天程客旅"
     },
     {
-      "book": "",
-      "num": "H22-47 我的良人白而且紅，超乎萬人之上",
-      "label": " · H22-47 我的良人白而且紅，超乎萬人之上 · P.48"
+      "book": "13冊",
+      "num": "H13-77",
+      "label": "13冊 · H13-77  神的勝利進行曲"
     },
     {
-      "book": "01 神家詩歌",
-      "num": "P062  061 在你面前.doc",
-      "label": "01 神家詩歌 · "
+      "book": "7冊",
+      "num": "H7-64",
+      "label": "7冊 · H7-64  大時代的呼召"
     },
     {
-      "book": "S2神家詩歌合訂本2大字拍子版",
-      "num": "152 同走永生的道路_P.266.pdf",
-      "label": "S2神家詩歌合訂本2大字拍子版 · "
+      "book": "5冊",
+      "num": "H5-56",
+      "label": "5冊 · H5-56  主，我已成知己"
     },
     {
-      "book": "05 神家詩歌",
-      "num": "P68  永恆的主宰.doc",
-      "label": "05 神家詩歌 · "
+      "book": "5冊",
+      "num": "H5-06",
+      "label": "5冊 · H5-06  釋放、昂首"
     },
     {
-      "book": "",
-      "num": "H23-06 在活人之地，祢是我的福分",
-      "label": " · H23-06 在活人之地，祢是我的福分 · P.7"
+      "book": "11冊",
+      "num": "H11-067",
+      "label": "11冊 · H11-067  永恆、無限者雅威的心底為我存留"
     },
     {
-      "book": "01 神家詩歌",
-      "num": "P005  006 與父相親.doc",
-      "label": "01 神家詩歌 · "
+      "book": "14冊",
+      "num": "H14-73",
+      "label": "14冊 · H14-73  笑，因主對我個人的愛和託付"
     },
     {
-      "book": "01 神家詩歌",
-      "num": "P012  010 主真美好.doc",
-      "label": "01 神家詩歌 · "
+      "book": "14冊",
+      "num": "H14-73",
+      "label": "14冊 · H14-73  笑的美麗原因"
     },
     {
-      "book": "01 神家詩歌",
-      "num": "P105  111 稱讚前來.doc",
-      "label": "01 神家詩歌 · "
+      "book": "14冊",
+      "num": "H14-61",
+      "label": "14冊 · H14-61  轉眼舉目仰望耶穌"
     },
     {
-      "book": "01 神家詩歌",
-      "num": "P083  082 祝福.doc",
-      "label": "01 神家詩歌 · "
+      "book": "8冊",
+      "num": "H8-16",
+      "label": "8冊 · H8-16  父的親孩子"
     },
     {
-      "book": "01 神家詩歌",
-      "num": "P006  007 父愛  008  寶貴的阿爸.doc",
-      "label": "01 神家詩歌 · "
+      "book": "21冊",
+      "num": "H21-76",
+      "label": "21冊 · H21-76  在祂愛國永無警察、監獄、刑罰"
     },
     {
-      "book": "01 神家詩歌",
-      "num": "P014  012 耶穌是主.doc",
-      "label": "01 神家詩歌 · "
+      "book": "21冊",
+      "num": "H21-67",
+      "label": "21冊 · H21-67  我當時常Christ-conscious與義-conscious"
     }
   ],
   "session_cursor": 0,
-  "show_preview": true,
+  "show_preview": false,
   "auto_rescan": true,
   "startup_tray": false,
   "minimize_to_tray": false,
-  "last_opened": "05 神家詩歌 · P02  耶和華尼西.doc",
+  "last_opened": "1冊 · H1-005  006 與父相親",
   "show_qr_code": false,
-  "show_qr_lan": true,
+  "show_qr_lan": false,
   "show_qr_fixed": false,
   "show_qr_quick": true,
   "show_qr_wan": true,
   "qr_x": 1398,
-  "qr_y": 744,
+  "qr_y": 743,
   "qr_width": 180,
   "qr_height": 180,
   "qr_caption": "掃碼下載",
   "qr_bg_color": "#000000",
   "qr_text_color": "#ffffff",
-  "qr_text_size": 12,
+  "qr_text_size": 9,
   "qr_bg_opacity": 20,
-  "update_check_url": "https://api.github.com/repos/darrenhk2015-prog/hymn_search/releases/latest",
-  "update_download_url": "https://github.com/darrenhk2015-prog/hymn_search/releases/latest"
+  "lyric_bg_color": "#ffffff",
+  "lyric_bg_image": "",
+  "lyric_text_color": "#000000",
+  "lyric_align": "justify",
+  "lyric_letter_spacing": 100,
+  "lyric_line_height": 105,
+  "lyric_margins": {
+    "top": 60,
+    "right": 72,
+    "bottom": 40,
+    "left": 80
+  },
+  "lyric_font_family": "新細明體",
+  "lyric_font_pt": 55,
+  "lyric_best_defaults": {
+    "align": "justify",
+    "letter_spacing": 100,
+    "line_height": 105,
+    "margins": {
+      "top": 60,
+      "right": 72,
+      "bottom": 40,
+      "left": 80
+    },
+    "font_family": "新細明體",
+    "font_pt": 55
+  },
+  "lyric_control_placement": "docked",
+  "lyric_start_blacked": false,
+  "lyric_preview_mode": true,
+  "overlay_auto_unblack": true
 }

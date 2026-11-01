@@ -2,16 +2,18 @@
 <html lang="zh-Hant">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <title>詩歌</title>
+  <!-- viewer-text-v2 -->
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
     html, body {
       height: 100%;
-      background: #0a0c14;
-      color: #e8ecf8;
-      font-family: 'Segoe UI', 'PingFang TC', 'Microsoft YaHei', sans-serif;
+      background: #050505;
+      color: #ffffff;
+      font-family: 'PingFang TC', 'Microsoft YaHei UI', 'Microsoft YaHei', 'Segoe UI', sans-serif;
       overflow: hidden;
     }
     #bar {
@@ -19,55 +21,69 @@
       align-items: center;
       gap: 10px;
       min-height: 52px;
-      padding: 10px 14px;
+      padding: 10px 16px;
       padding-top: max(10px, env(safe-area-inset-top));
-      background: #121528;
-      border-bottom: 1px solid #2a2f4a;
+      background: rgba(10, 12, 20, 0.92);
+      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
     }
     #title {
       flex: 1;
-      font-size: 0.95rem;
-      font-weight: 600;
+      font-size: 1rem;
+      font-weight: 700;
       line-height: 1.35;
       word-break: break-word;
     }
     #badge {
       font-size: 0.72rem;
-      color: #7c86a8;
+      color: #fbbf24;
+      background: #1c1200;
+      border: 1px solid #fbbf24;
+      border-radius: 999px;
+      padding: 2px 8px;
       white-space: nowrap;
     }
-    #frameWrap {
+    #badge.hidden { display: none; }
+    #stage {
       position: absolute;
       left: 0;
       right: 0;
       top: 52px;
       bottom: 0;
-      background: #fff;
+      overflow: auto;
+      -webkit-overflow-scrolling: touch;
+      background-color: #050505;
+      background-size: cover;
+      background-position: center;
+      background-repeat: no-repeat;
     }
-    #frameWrap.with-safe {
+    #stage.with-safe {
       top: calc(52px + env(safe-area-inset-top));
       bottom: env(safe-area-inset-bottom);
     }
-    iframe {
-      width: 100%;
-      height: 100%;
-      border: none;
-      background: #fff;
+    #stage.with-debug {
+      bottom: calc(110px + env(safe-area-inset-bottom));
+    }
+    #lyrics {
+      margin: 0;
+      padding: 28px 22px 80vh;
+      white-space: pre-wrap;
+      word-break: break-word;
+      line-height: 1.55;
+      font-size: clamp(1.2rem, 4.6vw, 1.85rem);
+      font-weight: 500;
     }
     #placeholder {
       display: flex;
       align-items: center;
       justify-content: center;
-      height: 100%;
-      padding: 24px;
+      min-height: 70%;
+      padding: 32px 24px;
       text-align: center;
       color: #6b7394;
-      font-size: 1rem;
-      line-height: 1.6;
-      background: #0a0c14;
+      font-size: 1.05rem;
+      line-height: 1.7;
     }
-    #placeholder.hidden { display: none; }
-    .hidden { display: none !important; }
+    #placeholder.hidden, #lyrics.hidden { display: none; }
     .dot {
       display: inline-block;
       width: 8px;
@@ -76,6 +92,7 @@
       border-radius: 50%;
       background: #34d399;
       vertical-align: middle;
+      flex: 0 0 auto;
     }
     .dot.off { background: #505870; }
     #debugBar {
@@ -97,28 +114,26 @@
       word-break: break-all;
     }
     #debugBar b { color: #c4caf0; font-weight: 600; }
-    #frameWrap.with-debug {
-      bottom: calc(110px + env(safe-area-inset-bottom));
-    }
+    .hidden { display: none !important; }
   </style>
 </head>
 <body>
   <div id="bar">
     <span id="liveDot" class="dot off"></span>
     <div id="title">連線中…</div>
-    <div id="badge"></div>
+    <div id="badge" class="hidden">外屏已黑</div>
   </div>
-  <div id="frameWrap" class="with-safe">
+  <div id="stage" class="with-safe">
     <div id="placeholder">等待詩歌開始…</div>
-    <iframe id="frame" class="hidden" title="詩歌內容"></iframe>
+    <pre id="lyrics" class="hidden"></pre>
   </div>
   <div id="debugBar" class="hidden">debug: 等待資料…</div>
 
   <script>
-    const POLL_MS = 2000;
+    const POLL_MS = 1600;
     function apiBasePath() {
       const p = window.location.pathname;
-      const m = p.match(/^(.*)\/(admin|view)\/?$/);
+      const m = p.match(/^(.*)\/(admin|view)(?:\/.*)?\/?$/);
       if (m) return m[1];
       if (p.endsWith('/')) return p.slice(0, -1);
       return p === '/' ? '' : p;
@@ -126,13 +141,13 @@
     const API_BASE = apiBasePath();
     const titleEl = document.getElementById('title');
     const badgeEl = document.getElementById('badge');
-    const frameEl = document.getElementById('frame');
-    const frameWrapEl = document.getElementById('frameWrap');
+    const stageEl = document.getElementById('stage');
+    const lyricsEl = document.getElementById('lyrics');
     const placeholderEl = document.getElementById('placeholder');
     const liveDot = document.getElementById('liveDot');
     const debugEl = document.getElementById('debugBar');
+    let last = null;
     let lastKey = '';
-    let lastUrl = '';
     let showDebug = false;
 
     function esc(s) {
@@ -141,7 +156,7 @@
 
     function applyDebugVisibility() {
       debugEl.classList.toggle('hidden', !showDebug);
-      frameWrapEl.classList.toggle('with-debug', showDebug);
+      stageEl.classList.toggle('with-debug', showDebug);
     }
 
     function updateDebug(data, err) {
@@ -154,22 +169,23 @@
         debugEl.innerHTML = '<b>debug</b> (no data)';
         return;
       }
+      const src = last || data;
       const lines = [
-        ['viewer_source', data.viewer_source || '—'],
-        ['match_source', data.code_source || '—'],
-        ['query_title', data.query_title || '—'],
-        ['matched_title', data.matched_title || '—'],
-        ['match_score', data.match_score != null ? data.match_score : '—'],
-        ['source', data.url_source || '—'],
-        ['mapped', data.mapped ? 'yes' : 'no'],
-        ['code', data.code || '—'],
-        ['drive_file_id', data.drive_file_id || '—'],
-        ['drive_name', data.drive_name || '—'],
-        ['drive_rel', data.drive_rel || '—'],
-        ['iframe_url', data.web_url || '—'],
-        ['book', data.book || '—'],
-        ['num', data.num || '—'],
-        ['label', data.label || '—'],
+        ['open', src.open ? 'yes' : 'no'],
+        ['heading', src.heading || '—'],
+        ['book', src.book || '—'],
+        ['name', src.name || '—'],
+        ['align', src.align || '—'],
+        ['letter_spacing', src.letter_spacing != null ? src.letter_spacing : '—'],
+        ['line_height', src.line_height != null ? src.line_height : '—'],
+        ['margins', src.margins
+          ? `${src.margins.top}/${src.margins.right}/${src.margins.bottom}/${src.margins.left}`
+          : (src.margin != null ? src.margin : '—')],
+        ['font_family', src.font_family || '—'],
+        ['font_pt', src.font_pt != null ? src.font_pt : '—'],
+        ['blacked', src.blacked ? 'yes' : 'no'],
+        ['rev', src.rev != null ? src.rev : '—'],
+        ['view_rev', src.view_rev != null ? src.view_rev : '—'],
       ];
       debugEl.innerHTML = '<b>debug</b><br>' + lines.map(
         ([k, v]) => esc(k) + ': ' + esc(v)
@@ -180,27 +196,74 @@
       liveDot.classList.toggle('off', !on);
     }
 
+    function applyBg(el, data, forceSolid) {
+      const bg = (data && !forceSolid) ? (data.bg || '#050505') : '#050505';
+      const useImage = !!(data && data.bg_image && !forceSolid);
+      el.style.backgroundColor = bg;
+      el.style.backgroundImage = useImage
+        ? `url(${API_BASE}/api/view/bg?v=${data.bg_image_rev || 0})`
+        : 'none';
+      el.style.backgroundSize = 'cover';
+      el.style.backgroundPosition = 'center';
+    }
+
     function showPlaceholder(msg) {
       placeholderEl.textContent = msg;
       placeholderEl.classList.remove('hidden');
-      frameEl.classList.add('hidden');
-      frameEl.removeAttribute('src');
-      lastUrl = '';
+      lyricsEl.classList.add('hidden');
+      lyricsEl.textContent = '';
+      applyBg(document.body, null, true);
+      applyBg(stageEl, null, true);
+      last = null;
     }
 
-    function showFrame(url, heading) {
-      titleEl.textContent = heading || '詩歌';
-      placeholderEl.classList.add('hidden');
-      frameEl.classList.remove('hidden');
-      if (url !== lastUrl) {
-        lastUrl = url;
-        frameEl.src = url;
+    function marginSides(data) {
+      const uni = Math.max(0, Math.min(320, parseInt(data && data.margin, 10) || 56));
+      const src = (data && data.margins) || {};
+      const side = (key) => Math.max(0, Math.min(320, parseInt(
+        src[key] != null ? src[key] : uni, 10
+      ) || uni));
+      return { top: side('top'), right: side('right'), bottom: side('bottom'), left: side('left') };
+    }
+
+    function cssFontFamily(name) {
+      const n = String(name || 'Microsoft YaHei UI').replace(/["'\\]/g, '');
+      return '"' + n + '", "Microsoft YaHei", "PingFang TC", sans-serif';
+    }
+
+    function applyStyle(data) {
+      const fg = data.text_color || '#ffffff';
+      applyBg(document.body, data, false);
+      applyBg(stageEl, data, false);
+      lyricsEl.style.color = fg;
+      lyricsEl.style.fontFamily = cssFontFamily(data.font_family);
+      lyricsEl.style.textAlign = data.align === 'justify' ? 'justify' : 'left';
+      lyricsEl.style.letterSpacing = (((data.letter_spacing || 100) - 100) / 100) + 'em';
+      lyricsEl.style.lineHeight = String((data.line_height || 135) / 100);
+      const m = marginSides(data);
+      lyricsEl.style.padding = m.top + 'px ' + m.right + 'px calc(80vh + ' + m.bottom + 'px) ' + m.left + 'px';
+    }
+
+    function showLyrics(data) {
+      const heading = data.heading || data.name || '詩歌';
+      titleEl.textContent = heading;
+      badgeEl.classList.toggle('hidden', !data.blacked);
+      applyStyle(data);
+      const text = data.text || '';
+      if (lyricsEl.textContent !== text) {
+        lyricsEl.textContent = text;
+        stageEl.scrollTop = 0;
       }
+      placeholderEl.classList.add('hidden');
+      lyricsEl.classList.remove('hidden');
     }
 
     async function poll() {
       try {
-        const res = await fetch(API_BASE + '/api/view/now', { cache: 'no-store' });
+        const res = await fetch(
+          API_BASE + '/api/view/now?_=' + Date.now(),
+          { cache: 'no-store', headers: { 'Cache-Control': 'no-cache' } },
+        );
         if (!res.ok) {
           setLive(false);
           updateDebug(null, 'HTTP ' + res.status);
@@ -209,7 +272,8 @@
           } else {
             showPlaceholder('無法連線');
           }
-          badgeEl.textContent = '';
+          titleEl.textContent = '詩歌';
+          badgeEl.classList.add('hidden');
           return;
         }
         const data = await res.json();
@@ -217,36 +281,29 @@
           showDebug = data.show_debug;
           applyDebugVisibility();
         }
-        updateDebug(data);
         setLive(true);
-        const key = [data.ts, data.drive_file_id, data.label, data.web_url].join('|');
-        if (key === lastKey) return;
-        lastKey = key;
-
-        if (!data.label && !data.web_url) {
-          badgeEl.textContent = '';
-          showPlaceholder('等待詩歌開始…');
-          titleEl.textContent = '詩歌';
+        const text = String(data.text || '').trim();
+        const heading = String(data.heading || data.name || data.label || '').trim();
+        const key = [data.rev, data.view_rev, heading, text.length, data.blacked].join('|');
+        last = data;
+        updateDebug(data);
+        if (!text && !heading) {
+          if (key !== lastKey) {
+            lastKey = key;
+            titleEl.textContent = '詩歌';
+            badgeEl.classList.add('hidden');
+            showPlaceholder('等待詩歌開始…');
+          }
           return;
         }
-
-        const heading = data.title || data.label || '詩歌';
-        badgeEl.textContent = data.viewer_source === 'web'
-          ? (data.code ? data.code.toUpperCase() : 'Web')
-          : (data.mapped ? 'Drive' : '');
-
-        if (data.web_url) {
-          showFrame(data.web_url, heading);
-        } else {
-          titleEl.textContent = heading;
-          badgeEl.textContent = '';
-          showPlaceholder('此詩歌暫無網頁內容\n（僅本地檔案）');
-        }
+        if (key === lastKey) return;
+        lastKey = key;
+        showLyrics(Object.assign({}, data, { text: text || heading, heading: heading || '詩歌' }));
       } catch (e) {
         setLive(false);
         updateDebug(null, e.message || String(e));
         titleEl.textContent = '詩歌';
-        badgeEl.textContent = '';
+        badgeEl.classList.add('hidden');
         showPlaceholder('無法連線');
       }
     }

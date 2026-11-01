@@ -214,7 +214,7 @@ hymn_search/
 HymnSearch.exe
 ```
 
-詩歌資料讀取 exe 旁的 `神家詩歌集`（或 `settings.json` 中設定的 `hymn_folder`）。
+詩歌資料讀取 exe 旁的 `data/hymns.json`（或設定裡指定的 JSON 路徑）。建置時會把 `data/hymns.json` 複製到 `dist/data/`。
 
 ### 7.2 可選一併提供
 

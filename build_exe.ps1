@@ -27,13 +27,6 @@ if (-not (Test-Path 'assets\app.ico')) {
     & $Python scripts\make_icon.py
 }
 
-$GdriveIndex = Join-Path $Root 'hymn_remote\data\gdrive_hymn_index.json'
-if (-not (Test-Path $GdriveIndex)) {
-    Write-Host "Building Google Drive hymn index (first time)..."
-    & $Python -m pip install gdown -q
-    & $Python scripts\build_gdrive_hymn_map.py
-}
-
 $VersionPath = Join-Path $Root 'version.py'
 if (-not (Test-Path $VersionPath)) {
     @'
@@ -78,7 +71,13 @@ if ($versionContent -match 'APP_VERSION\s*=\s*(\d+)') {
     --hidden-import hymn_features.session_store `
     --hidden-import hymn_features.preview `
     --hidden-import hymn_features.mixin `
+    --hidden-import hymn_features.hymn_catalog `
+    --hidden-import hymn_features.lyric_session `
+    --hidden-import hymn_features.lyric_windows `
     --hidden-import hymn_features.voice_input `
+    --hidden-import hymn_features.phone_control_wizard `
+    --hidden-import hymn_features.display_flow `
+    --hidden-import hymn_features.win_display `
     --hidden-import speech_recognition `
     --hidden-import sounddevice `
     --hidden-import numpy `
@@ -93,12 +92,7 @@ if ($versionContent -match 'APP_VERSION\s*=\s*(\d+)') {
     --collect-all pillow `
     --hidden-import pypinyin `
     --hidden-import hymn_remote.api `
-    --hidden-import hymn_remote.web_hymn_map `
-    --hidden-import hymn_remote.gdrive_hymn_map `
-    --hidden-import hymn_remote.gdrive_index_build `
-    --hidden-import hymn_remote.viewer_hymn_map `
-    --hidden-import hymn_features.gdrive_map_dialog `
-    --hidden-import gdown `
+    --hidden-import hymn_features.hymn_editor `
     --hidden-import hymn_remote.server `
     --hidden-import hymn_remote.tunnel `
     --hidden-import uvicorn.logging `
@@ -111,5 +105,20 @@ if ($versionContent -match 'APP_VERSION\s*=\s*(\d+)') {
     --collect-submodules starlette `
     hymn_search.py
 
+$DistDir = Join-Path $Root 'dist'
+$HymnsJson = Join-Path $Root 'data\hymns.json'
+if (Test-Path $HymnsJson) {
+    $DistData = Join-Path $DistDir 'data'
+    New-Item -ItemType Directory -Force -Path $DistData | Out-Null
+    Copy-Item -Force $HymnsJson (Join-Path $DistData 'hymns.json')
+    Write-Host "Copied data\hymns.json -> dist\data\hymns.json"
+}
+
 Write-Host ""
 Write-Host "Done: dist\HymnSearch.exe"
+
+$Installer = Join-Path $Root 'build_installer.ps1'
+if (Test-Path $Installer) {
+    Write-Host "Building installer..."
+    & $Installer
+}

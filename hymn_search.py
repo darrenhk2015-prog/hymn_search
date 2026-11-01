@@ -6,7 +6,7 @@
 
 【程式簡介】
     本程式為 PyQt6 桌面應用，用於在本地詩歌資料夾中快速搜尋、瀏覽及開啟
-    Word / PDF 詩歌檔案。支援多種搜尋模式（標準 / 書本 / 全局 / 關鍵字 / 排程）、
+    Word / PDF 詩歌檔案。支援多種搜尋模式（標準 / 全局 / 關鍵字 / 排程）、
     PDF 書籤跳頁、全文索引、開啟檔案時的置頂書名提示、多螢幕延伸顯示，以及可選的
     同步畫面切換（Windows）。
 
@@ -40,8 +40,7 @@
     docs/USER_GUIDE.md   — 使用手冊
 """
 
-import os, sys, re, subprocess, zipfile, json, gzip, time, threading
-from pathlib import Path
+import os, sys, re, subprocess, zipfile, json, gzip, time, threading, shutil
 import fitz  # PyMuPDF
 
 from PyQt6.QtWidgets import (
@@ -50,20 +49,69 @@ from PyQt6.QtWidgets import (
     QLineEdit, QLabel, QListWidget, QListWidgetItem,
     QComboBox, QSlider, QFrame, QScrollArea, QCheckBox, QSpinBox,
     QGroupBox, QFileDialog, QTabWidget, QPlainTextEdit, QMenu, QDialog,
-    QSystemTrayIcon, QColorDialog, QMessageBox,
+    QSystemTrayIcon, QColorDialog, QMessageBox, QSplitter, QFontComboBox,
 )
 from PyQt6.QtCore import (
     Qt, QTimer, QPoint, pyqtSignal, pyqtSlot, QEvent, QThread, QRectF, QRect,
-    QPropertyAnimation, QEasingCurve, QFileSystemWatcher, QUrl,
+    QPropertyAnimation, QEasingCurve, QFileSystemWatcher,
 )
 from PyQt6.QtGui import (
     QColor, QPalette, QFont, QPainter, QPainterPath, QIcon, QShortcut, QKeySequence,
-    QAction, QImage, QPixmap, QDesktopServices,
+    QAction, QImage, QPixmap,
 )
 
 from hymn_features.mixin import EnhancementMixin
 from hymn_features.fuzzy import fuzzy_match_score
 from hymn_features.preview import preview_for_payload, preview_lines
+from hymn_features.hymn_catalog import (
+    default_hymns_json_path,
+    find_hymn_in_books,
+    hymn_payload,
+    load_books,
+    payload_from_legacy,
+    resolve_hymns_json_path,
+    search_hymn_lyrics,
+)
+from hymn_features.lyric_session import (
+    ALIGN_JUSTIFY,
+    ALIGN_LEFT,
+    DEFAULT_LETTER_SPACING,
+    DEFAULT_LINE_HEIGHT,
+    DEFAULT_LYRIC_ALIGN,
+    DEFAULT_LYRIC_BG,
+    DEFAULT_LYRIC_FONT_FAMILY,
+    DEFAULT_LYRIC_FONT_PT,
+    DEFAULT_LYRIC_MARGINS,
+    DEFAULT_LYRIC_TEXT,
+    LETTER_SPACING_MAX,
+    LETTER_SPACING_MIN,
+    LINE_HEIGHT_MAX,
+    LINE_HEIGHT_MIN,
+    LYRIC_BG_IMAGE_EXTS,
+    LYRIC_BG_IMAGE_STEM,
+    LYRIC_FONT_PT_MAX,
+    LYRIC_FONT_PT_MIN,
+    LYRIC_MARGIN_MAX,
+    LYRIC_MARGIN_MIN,
+    MARGIN_SIDES,
+    ZOOM_STEP,
+    factory_lyric_best_defaults,
+    lyric_best_from_session,
+    lyric_best_from_values,
+    normalize_letter_spacing,
+    normalize_line_height,
+    normalize_lyric_align,
+    normalize_lyric_best_defaults,
+    normalize_lyric_bg_image,
+    normalize_lyric_font_family,
+    normalize_lyric_font_pt,
+    normalize_lyric_margins,
+)
+from hymn_features.lyric_windows import (
+    PLACEMENT_DOCKED,
+    PLACEMENT_WINDOW,
+    LyricWindowPair,
+)
 from hymn_features.session_store import (
     add_setlist_entry, advance_setlist_index, clear_setlist, clamp_setlist, move_setlist_entry,
     parse_setlist, remove_setlist_at, session_history_list, setlist_index,
@@ -82,12 +130,6 @@ from hymn_features.win_display import (
 )
 from hymn_features.phone_control_wizard import PhoneControlWizard
 from hymn_features.voice_input import VoiceInputController, voice_input_available
-from hymn_features.update_check import (
-    DEFAULT_UPDATE_CHECK_URL,
-    DEFAULT_UPDATE_DOWNLOAD_URL,
-    UpdateCheckWorker,
-    normalize_fetch_url,
-)
 
 from hymn_remote.server import RemoteServer
 from hymn_remote.tunnel import (
@@ -105,11 +147,6 @@ from hymn_remote.tunnel import (
 from hymn_remote.state import (
     DEFAULT_PORT, OPEN_POLICY_AUTO, OPEN_POLICY_CONFIRM, OPEN_POLICY_UI,
 )
-from hymn_remote.gdrive_index_build import (
-    DEFAULT_FOLDER_ID as GDRIVE_DEFAULT_FOLDER_ID,
-    SPLIT_BOOK_FOLDERS as GDRIVE_SPLIT_BOOK_FOLDERS,
-)
-from hymn_remote.gdrive_hymn_map import ensure_external_index, get_index_info
 from hymn_remote.resolver import (
     HYMN_NUM_MODE_CONTAINS, HYMN_NUM_MODE_EXACT, HYMN_NUM_MODES,
     resolve_books, resolve_targets, resolve_open_request,
@@ -225,6 +262,23 @@ QComboBox QAbstractItemView {{
     selection-background-color: {t['accent']};
     selection-color: {t['a_text']};
 }}
+/* Font list uses a custom delegate that ignores dark item colors — keep popup light. */
+QFontComboBox {{
+    background: {t['in_bg']}; border: 1.5px solid {t['in_bd']};
+    border-radius: 8px; padding: 5px 10px; color: {t['text']};
+    font-size: {fs - 1}px; min-width: 160px;
+}}
+QFontComboBox:focus {{ border-color: {t['accent']}; }}
+QFontComboBox QAbstractItemView {{
+    background: #ffffff; color: #1a1e40;
+    border: 1.5px solid {t['border']}; outline: none;
+    selection-background-color: {t['accent']};
+    selection-color: #ffffff;
+}}
+QFontComboBox QLineEdit {{
+    background: transparent; border: none; color: {t['text']};
+    padding: 0; selection-background-color: {t['accent']};
+}}
 QSlider::groove:horizontal {{ height: 4px; background: {t['border']}; border-radius: 2px; }}
 QSlider::sub-page:horizontal {{ background: {t['accent']}; border-radius: 2px; }}
 QSlider::handle:horizontal {{
@@ -314,73 +368,11 @@ class HSep(QFrame):
 
 
 # ══════════════════════════════════════════════════════════════
-#  SCANNER — 掃描詩歌資料夾與 PDF 書籤
+#  SCANNER — 由 hymns.json 組成詩歌冊
 # ══════════════════════════════════════════════════════════════
-# scan_books：遍歷 HYMN_FOLDER，建立書冊清單（含檔案列表、PDF 頁數、TOC 書籤）。
-# find_page_in_toc：依詩歌編號在 PDF 目錄中查找對應頁碼。
-def scan_books(folder):
-    books = []
-    if not os.path.isdir(folder):
-        return books
-
-    def build_entry(entry_path, entry_name):
-        pdf_path = word_path = None
-        files = []
-
-        if os.path.isfile(entry_path):
-            if not os.path.basename(entry_path).startswith('~$'):
-                ext = os.path.splitext(entry_path)[1].lower()
-                files.append({'name': os.path.basename(entry_path), 'path': entry_path, 'ext': ext})
-                if ext == '.pdf': pdf_path = entry_path
-                if ext in ('.doc', '.docx', '.odt'): word_path = entry_path
-        else:
-            for f in sorted(os.listdir(entry_path)):
-                if f.startswith('~$'): continue
-                fp = os.path.join(entry_path, f)
-                if os.path.isdir(fp): continue
-                ext = os.path.splitext(f)[1].lower()
-                files.append({'name': f, 'path': fp, 'ext': ext})
-                if ext == '.pdf' and pdf_path is None: pdf_path = fp
-                if ext in ('.doc', '.docx', '.odt') and word_path is None: word_path = fp
-
-        toc_list = []
-        total_pages = 0
-        if pdf_path:
-            try:
-                doc = fitz.open(pdf_path)
-                total_pages = doc.page_count
-                toc = doc.get_toc()
-                doc.close()
-                if len(toc) > 5:
-                    for lvl, title, page in toc:
-                        if lvl in (1, 2):
-                            toc_list.append((lvl, title.strip(), page))
-            except Exception as e:
-                print(f"[WARN] {pdf_path}: {e}")
-
-        lvl2 = [e for e in toc_list if e[0] == 2]
-        is_bm = len(toc_list) > 5
-        books.append({
-            'name': entry_name, 'pdf': pdf_path, 'docx': word_path,
-            'toc': toc_list, 'bookmark': is_bm,
-            'pages': total_pages,
-            'hymn_count': (len(lvl2) if lvl2 else len(toc_list)) if is_bm else total_pages,
-            'files': files,
-        })
-
-    for name in sorted(os.listdir(folder)):
-        fp = os.path.join(folder, name)
-        if os.path.isdir(fp):
-            build_entry(fp, name)
-
-    for f in sorted(os.listdir(folder)):
-        fp = os.path.join(folder, f)
-        if os.path.isdir(fp) or f.startswith('~$'): continue
-        ext = os.path.splitext(f)[1].lower()
-        if ext not in ('.pdf', '.doc', '.docx', '.odt'): continue
-        build_entry(fp, os.path.splitext(f)[0])
-
-    return books
+def scan_books(folder=None):
+    """Load volumes + hymns from hymns.json (folder may be a json path or data dir)."""
+    return load_books(folder)
 
 
 def find_page_in_toc(toc_list, hymn_num, raw=''):
@@ -867,9 +859,10 @@ def open_pdf_presentation(path):
 # 關閉 Word/PDF 視窗時自動隱藏（document_viewer_is_open 輪詢）。
 WORD_EXTS = {'.doc', '.docx'}
 DEFAULT_OVERLAY_SECS = 10
-MAX_OVERLAY_SECS = 10
+MAX_OVERLAY_SECS = 600
 OVERLAY_DURATION_ALWAYS = -1
 CENTER_OVERLAY_SECS = 5
+MAX_OVERLAY_CENTER_SECS = 600
 OVERLAY_MODE_CORNER = 'corner'
 OVERLAY_MODE_CENTER = 'center_then_corner'
 DEFAULT_OVERLAY_BG_COLOR = '#f59e0b'
@@ -888,8 +881,9 @@ DEFAULT_QR_STACK_GAP = 12
 
 SETTINGS_VERSION = 5
 
-SEARCH_MODES = ('standard', 'book', 'global', 'keyword', 'schedule')
-BOOK_UI_MODES = ('standard', 'book')
+SEARCH_MODES = ('standard', 'global', 'keyword', 'schedule')
+LEGACY_SEARCH_MODES = {'book': 'standard'}
+BOOK_UI_MODES = ('standard',)
 
 
 def default_settings():
@@ -903,6 +897,7 @@ def default_settings():
         'search_mode': 'standard',
         'open_overlay': True,
         'overlay_duration': DEFAULT_OVERLAY_SECS,
+        'overlay_center_secs': CENTER_OVERLAY_SECS,
         'overlay_mode': OVERLAY_MODE_CORNER,
         'overlay_bg_color': DEFAULT_OVERLAY_BG_COLOR,
         'overlay_text_color': DEFAULT_OVERLAY_TEXT_COLOR,
@@ -933,9 +928,6 @@ def default_settings():
         'named_tunnel_url': 'https://live.churchofgodtm.com/hymn_search/',
         'remote_path_prefix': '/hymn_search',
         'viewer_show_debug': False,
-        'gdrive_folder_id': GDRIVE_DEFAULT_FOLDER_ID,
-        'gdrive_s1_folder_id': GDRIVE_SPLIT_BOOK_FOLDERS[0][1],
-        'gdrive_s2_folder_id': GDRIVE_SPLIT_BOOK_FOLDERS[1][1],
         'operator_mode': False,
         'pinned_books': [],
         'setlist': [],
@@ -961,8 +953,20 @@ def default_settings():
         'qr_text_color': DEFAULT_QR_TEXT_COLOR,
         'qr_text_size': DEFAULT_QR_TEXT_SIZE,
         'qr_bg_opacity': DEFAULT_QR_BG_OPACITY,
-        'update_check_url': DEFAULT_UPDATE_CHECK_URL,
-        'update_download_url': DEFAULT_UPDATE_DOWNLOAD_URL,
+        'lyric_bg_color': DEFAULT_LYRIC_BG,
+        'lyric_bg_image': '',
+        'lyric_text_color': DEFAULT_LYRIC_TEXT,
+        'lyric_align': DEFAULT_LYRIC_ALIGN,
+        'lyric_letter_spacing': DEFAULT_LETTER_SPACING,
+        'lyric_line_height': DEFAULT_LINE_HEIGHT,
+        'lyric_margins': dict(DEFAULT_LYRIC_MARGINS),
+        'lyric_font_family': DEFAULT_LYRIC_FONT_FAMILY,
+        'lyric_font_pt': DEFAULT_LYRIC_FONT_PT,
+        'lyric_best_defaults': factory_lyric_best_defaults(),
+        'lyric_control_placement': PLACEMENT_WINDOW,
+        'lyric_start_blacked': True,
+        'lyric_preview_mode': False,
+        'overlay_auto_unblack': False,
     }
 
 
@@ -988,8 +992,9 @@ def normalize_settings(raw):
             pass
         if 'click_to_open' in snap:
             clean['click_to_open'] = bool(snap['click_to_open'])
-        if snap.get('search_mode') in SEARCH_MODES:
-            clean['search_mode'] = snap['search_mode']
+        snap_mode = LEGACY_SEARCH_MODES.get(snap.get('search_mode'), snap.get('search_mode'))
+        if snap_mode in SEARCH_MODES:
+            clean['search_mode'] = snap_mode
         merged['senior_snapshot'] = clean or None
     else:
         merged['senior_snapshot'] = None
@@ -997,18 +1002,55 @@ def normalize_settings(raw):
         merged['font_size'] = max(FONT_SIZE_MIN, min(FONT_SIZE_MAX, int(merged['font_size'])))
     except (TypeError, ValueError):
         merged['font_size'] = SENIOR_FONT_SIZE if merged['senior_mode'] else 13
+    merged['search_mode'] = LEGACY_SEARCH_MODES.get(merged['search_mode'], merged['search_mode'])
     if merged['search_mode'] not in SEARCH_MODES:
         merged['search_mode'] = 'standard'
     merged['open_overlay'] = bool(merged['open_overlay'])
     try:
         dur = int(merged['overlay_duration'])
-        if dur != OVERLAY_DURATION_ALWAYS and not (1 <= dur <= MAX_OVERLAY_SECS):
-            dur = DEFAULT_OVERLAY_SECS
+        if dur != OVERLAY_DURATION_ALWAYS:
+            dur = max(1, min(MAX_OVERLAY_SECS, dur))
         merged['overlay_duration'] = dur
     except (TypeError, ValueError):
         merged['overlay_duration'] = DEFAULT_OVERLAY_SECS
+    try:
+        merged['overlay_center_secs'] = max(
+            1, min(MAX_OVERLAY_CENTER_SECS, int(merged.get('overlay_center_secs', CENTER_OVERLAY_SECS))),
+        )
+    except (TypeError, ValueError):
+        merged['overlay_center_secs'] = CENTER_OVERLAY_SECS
     if merged['overlay_mode'] not in (OVERLAY_MODE_CORNER, OVERLAY_MODE_CENTER):
         merged['overlay_mode'] = OVERLAY_MODE_CORNER
+    merged['lyric_bg_color'] = _normalize_hex_color(
+        merged.get('lyric_bg_color'), DEFAULT_LYRIC_BG,
+    )
+    merged['lyric_bg_image'] = normalize_lyric_bg_image(
+        merged.get('lyric_bg_image'), app_dir(),
+    )
+    merged['lyric_text_color'] = _normalize_hex_color(
+        merged.get('lyric_text_color'), DEFAULT_LYRIC_TEXT,
+    )
+    merged['lyric_align'] = normalize_lyric_align(merged.get('lyric_align'))
+    merged['lyric_letter_spacing'] = normalize_letter_spacing(merged.get('lyric_letter_spacing'))
+    merged['lyric_line_height'] = normalize_line_height(merged.get('lyric_line_height'))
+    margins_src = merged.get('lyric_margins')
+    if isinstance(raw, dict):
+        if 'lyric_margins' in raw:
+            margins_src = raw.get('lyric_margins')
+        elif 'lyric_margin' in raw:
+            margins_src = raw.get('lyric_margin')
+    merged['lyric_margins'] = normalize_lyric_margins(margins_src)
+    merged.pop('lyric_margin', None)
+    merged['lyric_font_family'] = normalize_lyric_font_family(merged.get('lyric_font_family'))
+    merged['lyric_font_pt'] = normalize_lyric_font_pt(merged.get('lyric_font_pt'))
+    merged['lyric_best_defaults'] = normalize_lyric_best_defaults(merged.get('lyric_best_defaults'))
+    placement = str(merged.get('lyric_control_placement') or PLACEMENT_WINDOW).strip().lower()
+    merged['lyric_control_placement'] = (
+        placement if placement in (PLACEMENT_WINDOW, PLACEMENT_DOCKED) else PLACEMENT_WINDOW
+    )
+    merged['lyric_start_blacked'] = bool(merged.get('lyric_start_blacked', True))
+    merged['lyric_preview_mode'] = bool(merged.get('lyric_preview_mode', False))
+    merged['overlay_auto_unblack'] = bool(merged.get('overlay_auto_unblack', False))
     merged['overlay_bg_color'] = _normalize_hex_color(
         merged.get('overlay_bg_color'), DEFAULT_OVERLAY_BG_COLOR,
     )
@@ -1076,15 +1118,6 @@ def normalize_settings(raw):
     if prefix and merged['named_tunnel_url']:
         merged['named_tunnel_url'] = normalize_tunnel_url(merged['named_tunnel_url']) + '/'
     merged['viewer_show_debug'] = bool(merged.get('viewer_show_debug'))
-    merged['gdrive_folder_id'] = str(merged.get('gdrive_folder_id') or GDRIVE_DEFAULT_FOLDER_ID).strip() or GDRIVE_DEFAULT_FOLDER_ID
-    merged['gdrive_s1_folder_id'] = (
-        str(merged.get('gdrive_s1_folder_id') or GDRIVE_SPLIT_BOOK_FOLDERS[0][1]).strip()
-        or GDRIVE_SPLIT_BOOK_FOLDERS[0][1]
-    )
-    merged['gdrive_s2_folder_id'] = (
-        str(merged.get('gdrive_s2_folder_id') or GDRIVE_SPLIT_BOOK_FOLDERS[1][1]).strip()
-        or GDRIVE_SPLIT_BOOK_FOLDERS[1][1]
-    )
     folder = str(merged.get('hymn_folder') or '').strip()
     merged['hymn_folder'] = os.path.abspath(folder) if folder else ''
     merged['operator_mode'] = bool(merged.get('operator_mode'))
@@ -1176,13 +1209,6 @@ def normalize_settings(raw):
         merged['qr_bg_opacity'] = max(0, min(100, int(opacity)))
     except (TypeError, ValueError):
         merged['qr_bg_opacity'] = DEFAULT_QR_BG_OPACITY
-    check_url = str(
-        merged.get('update_check_url') or DEFAULT_UPDATE_CHECK_URL
-    ).strip() or DEFAULT_UPDATE_CHECK_URL
-    merged['update_check_url'] = normalize_fetch_url(check_url) or DEFAULT_UPDATE_CHECK_URL
-    merged['update_download_url'] = str(
-        merged.get('update_download_url') or DEFAULT_UPDATE_DOWNLOAD_URL
-    ).strip() or DEFAULT_UPDATE_DOWNLOAD_URL
     merged = clamp_setlist(merged)
     merged['version'] = SETTINGS_VERSION
     return merged
@@ -1217,14 +1243,27 @@ def resolve_hymn_folder(settings):
     return os.path.abspath(default_hymn_folder())
 
 
-def _overlay_duration_index(duration):
-    if duration == OVERLAY_DURATION_ALWAYS:
-        return MAX_OVERLAY_SECS
-    return max(0, min(MAX_OVERLAY_SECS - 1, int(duration) - 1))
+def _normalize_overlay_duration(value):
+    if value == OVERLAY_DURATION_ALWAYS:
+        return OVERLAY_DURATION_ALWAYS
+    try:
+        n = int(value)
+    except (TypeError, ValueError):
+        return DEFAULT_OVERLAY_SECS
+    if n == OVERLAY_DURATION_ALWAYS:
+        return OVERLAY_DURATION_ALWAYS
+    return max(1, min(MAX_OVERLAY_SECS, n))
 
 
 def _overlay_mode_index(mode):
     return 1 if mode == OVERLAY_MODE_CENTER else 0
+
+
+def _normalize_center_secs(value):
+    try:
+        return max(1, min(MAX_OVERLAY_CENTER_SECS, int(value)))
+    except (TypeError, ValueError):
+        return CENTER_OVERLAY_SECS
 
 
 def _remote_policy_index(policy):
@@ -1285,7 +1324,10 @@ def _win_ps_bool(script):
 
 
 def document_viewer_is_open(path):
-    """Return True if the given file still appears open in Word or a PDF viewer."""
+    """Return True if lyric windows (or a legacy Word/PDF viewer) are still open."""
+    check = getattr(document_viewer_is_open, '_lyric_open_check', None)
+    if callable(check):
+        return bool(check())
     if sys.platform != 'win32':
         return True
     if not path:
@@ -1352,6 +1394,7 @@ class _BookNameOverlayPanel(QWidget):
         self._placement = 'corner'
         self._mode = OVERLAY_MODE_CORNER
         self._corner_duration = DEFAULT_OVERLAY_SECS
+        self._center_secs = CENTER_OVERLAY_SECS
         self._animating = False
         self._anim_start_rect = None
         self._anim_end_rect = None
@@ -1546,9 +1589,10 @@ class _BookNameOverlayPanel(QWidget):
         self._hide_timer.start(self._corner_duration * 1000)
 
     def _activate(self, book_name, watch_path, item_name='', duration_sec=DEFAULT_OVERLAY_SECS,
-                  mode=OVERLAY_MODE_CORNER, style=None):
+                  mode=OVERLAY_MODE_CORNER, style=None, center_secs=CENTER_OVERLAY_SECS):
         self._apply_style(style)
         self._corner_duration = self._normalize_duration(duration_sec)
+        self._center_secs = _normalize_center_secs(center_secs)
         self._watch_path = watch_path or ''
         self._mode = mode
         self._book_label.setText(book_name)
@@ -1579,11 +1623,12 @@ class _BookNameOverlayPanel(QWidget):
         self._raise_timer.start()
 
         if mode == OVERLAY_MODE_CENTER:
-            self._phase_timer.start(CENTER_OVERLAY_SECS * 1000)
+            self._phase_timer.start(self._center_secs * 1000)
         else:
             self._start_corner_hide_timer()
 
     def _switch_to_corner(self):
+        BookNameOverlay._on_center_elapsed()
         self._phase_timer.stop()
         self._hide_timer.stop()
         start_rect = self.geometry()
@@ -1689,6 +1734,38 @@ class BookNameOverlay:
     _watch_path = ''
     _watch_timer = None
     _watch_busy = False
+    _ends_at = 0.0
+    _ends_at_unix = 0.0
+    _on_finished = None
+    _center_notified = False
+
+    @classmethod
+    def _set_ends_at(cls, duration_sec, mode, center_secs=CENTER_OVERLAY_SECS):
+        cls._center_notified = False
+        if mode != OVERLAY_MODE_CENTER:
+            cls._ends_at = 0.0
+            cls._ends_at_unix = 0.0
+            return
+        hold = _normalize_center_secs(center_secs)
+        cls._ends_at = time.monotonic() + hold
+        cls._ends_at_unix = time.time() + hold
+
+    @classmethod
+    def ends_at_unix(cls):
+        return cls._ends_at_unix
+
+    @classmethod
+    def _on_center_elapsed(cls):
+        if cls._center_notified:
+            return
+        cls._center_notified = True
+        cls._ends_at = 0.0
+        cls._ends_at_unix = 0.0
+        if cls._on_finished:
+            try:
+                cls._on_finished()
+            except Exception:
+                pass
 
     @classmethod
     def _visible_panels(cls):
@@ -1805,18 +1882,23 @@ class BookNameOverlay:
 
     @classmethod
     def show_book(cls, book_name, watch_path='', item_name='', duration_sec=DEFAULT_OVERLAY_SECS,
-                  mode=OVERLAY_MODE_CORNER, style=None):
+                  mode=OVERLAY_MODE_CORNER, style=None, center_secs=CENTER_OVERLAY_SECS):
         if not book_name:
             return
         cls._sync_panels()
         if not cls._panels:
             return
+        cls._set_ends_at(duration_sec, mode, center_secs)
         for panel in cls._panels:
-            panel._activate(book_name, watch_path, item_name, duration_sec, mode, style)
+            panel._activate(
+                book_name, watch_path, item_name, duration_sec, mode, style, center_secs,
+            )
         cls._start_document_watch(watch_path)
 
     @classmethod
-    def hide_overlay(cls):
+    def hide_overlay(cls, finished=False):
+        cls._ends_at = 0.0
+        cls._ends_at_unix = 0.0
         cls._stop_document_watch()
         for panel in cls._panels:
             panel._deactivate()
@@ -2372,6 +2454,8 @@ class MainWindow(QMainWindow, EnhancementMixin):
     remote_populate_ui = pyqtSignal(str, str, list)
     remote_pending_request = pyqtSignal(object)
     remote_display_action = pyqtSignal(str)  # close | black
+    remote_lyric_control = pyqtSignal(dict)
+    remote_prefs = pyqtSignal(dict)
     tunnel_url_signal = pyqtSignal(str, str)  # role, url
     tunnel_ready_signal = pyqtSignal(str, str)
     tunnel_error_signal = pyqtSignal(str, str)
@@ -2386,6 +2470,35 @@ class MainWindow(QMainWindow, EnhancementMixin):
         self._loading_settings = True
         self._settings    = load_settings()
         self.hymn_folder  = resolve_hymn_folder(self._settings)
+        self.hymns_json_path = resolve_hymns_json_path(self.hymn_folder)
+        self._lyric_pair = LyricWindowPair()
+        self._lyric_pair.save_defaults_cb = self._save_lyric_best_defaults
+        self._lyric_pair.restore_defaults_cb = self._restore_lyric_best_defaults
+        self._lyric_pair.go_live_cb = self._on_lyric_go_live
+        self._lyric_pair.session.style_changed.connect(self._on_lyric_style_changed)
+        self._preview_sync_timer = QTimer(self)
+        self._preview_sync_timer.setSingleShot(True)
+        self._preview_sync_timer.setInterval(80)
+        self._preview_sync_timer.timeout.connect(self._sync_lyric_preview)
+        self._lyric_layout_debounce = QTimer(self)
+        self._lyric_layout_debounce.setSingleShot(True)
+        self._lyric_layout_debounce.setInterval(120)
+        self._lyric_layout_debounce.timeout.connect(self._apply_lyric_layout_from_settings)
+        self._lyric_appearance_debounce = QTimer(self)
+        self._lyric_appearance_debounce.setSingleShot(True)
+        self._lyric_appearance_debounce.setInterval(120)
+        self._lyric_appearance_debounce.timeout.connect(self._apply_lyric_appearance_from_settings)
+        self._lyric_style_persist_debounce = QTimer(self)
+        self._lyric_style_persist_debounce.setSingleShot(True)
+        self._lyric_style_persist_debounce.setInterval(250)
+        self._lyric_style_persist_debounce.timeout.connect(self._persist_lyric_style_from_session)
+        self._lyric_ui_applying = False
+        self._overlay_count_timer = QTimer(self)
+        self._overlay_count_timer.setInterval(250)
+        self._overlay_count_timer.timeout.connect(self._tick_overlay_countdown)
+        self._lyric_pair.session.content_changed.connect(self._schedule_lyric_preview)
+        self._lyric_pair.session.view_changed.connect(self._schedule_lyric_preview)
+        document_viewer_is_open._lyric_open_check = self._lyric_pair.is_open
         self.search_mode  = self._settings['search_mode']
         self.theme_name   = self._settings['theme']
         self.font_size    = self._settings['font_size']
@@ -2440,6 +2553,9 @@ class MainWindow(QMainWindow, EnhancementMixin):
         self.remote_populate_ui.connect(self._on_remote_populate_ui)
         self.remote_pending_request.connect(self._on_remote_pending_request)
         self.remote_display_action.connect(self._on_remote_display_action)
+        self.remote_lyric_control.connect(self._on_remote_lyric_control)
+        self.remote_prefs.connect(self._on_remote_prefs)
+        BookNameOverlay._on_finished = self._on_overlay_countdown_finished
         self.tunnel_url_signal.connect(self._on_tunnel_url)
         self.tunnel_ready_signal.connect(self._on_tunnel_ready)
         self.tunnel_error_signal.connect(self._on_tunnel_error)
@@ -2456,7 +2572,16 @@ class MainWindow(QMainWindow, EnhancementMixin):
             self._remote_prepare_setlist_open,
             self._remote_handle_setlist_add,
             lambda action: self.remote_display_action.emit(action),
+            lambda payload: self.remote_lyric_control.emit(payload),
         )
+        if hasattr(self._remote.state, 'set_preview_needed_handler'):
+            self._remote.state.set_preview_needed_handler(
+                lambda: self._main_invoke.emit(self._schedule_lyric_preview)
+            )
+        if hasattr(self._remote.state, 'set_prefs_handler'):
+            self._remote.state.set_prefs_handler(
+                lambda payload: self.remote_prefs.emit(payload)
+            )
 
         self._build_ui()
         self._setup_focus_shortcuts()
@@ -2467,11 +2592,6 @@ class MainWindow(QMainWindow, EnhancementMixin):
             self._app.installEventFilter(self)
         self._apply_theme()
         self._restore_saved_settings()
-        try:
-            ensure_external_index()
-        except Exception:
-            pass
-        self._refresh_gdrive_map_status()
         self._scan_all()
         self._apply_setlist_from_settings()
         self._update_footer_status()
@@ -2493,10 +2613,9 @@ class MainWindow(QMainWindow, EnhancementMixin):
         sc.activated.connect(self._show_shortcuts_dialog)
         for key, mode in (
             (Qt.Key.Key_F1, 'standard'),
-            (Qt.Key.Key_F2, 'book'),
-            (Qt.Key.Key_F3, 'global'),
-            (Qt.Key.Key_F4, 'keyword'),
-            (Qt.Key.Key_F5, 'schedule'),
+            (Qt.Key.Key_F2, 'global'),
+            (Qt.Key.Key_F3, 'keyword'),
+            (Qt.Key.Key_F4, 'schedule'),
         ):
             sc = QShortcut(QKeySequence(key), self)
             sc.setContext(Qt.ShortcutContext.WindowShortcut)
@@ -2523,6 +2642,10 @@ class MainWindow(QMainWindow, EnhancementMixin):
         if BlackScreenOverlay.is_visible():
             BlackScreenOverlay.hide()
             self._show_toast('已取消全黑', 'ok')
+            return
+        pair = getattr(self, '_lyric_pair', None)
+        if pair is not None and pair.exit_display_fullscreen():
+            return
 
     def _focus_book_input(self):
         if self.search_mode not in BOOK_UI_MODES:
@@ -2584,7 +2707,22 @@ class MainWindow(QMainWindow, EnhancementMixin):
         body_lay.addWidget(self._build_sidebar())
         body_lay.addWidget(self._build_content(), 1)
         self.body = body_widget
-        container_lay.addWidget(body_widget, 1)
+
+        self.lyric_dock = QWidget()
+        self.lyric_dock.setMinimumWidth(320)
+        self.lyric_dock_lay = QVBoxLayout(self.lyric_dock)
+        self.lyric_dock_lay.setContentsMargins(0, 0, 0, 0)
+        self.lyric_dock_lay.setSpacing(0)
+        self.lyric_dock.hide()
+
+        self.main_splitter = QSplitter(Qt.Orientation.Horizontal)
+        self.main_splitter.addWidget(body_widget)
+        self.main_splitter.addWidget(self.lyric_dock)
+        self.main_splitter.setStretchFactor(0, 3)
+        self.main_splitter.setStretchFactor(1, 2)
+        self.body_container_splitter = self.main_splitter
+        container_lay.addWidget(self.main_splitter, 1)
+        self._lyric_pair.dock_host = self.lyric_dock
 
         self._setup_settings_overlay()
         root.addWidget(self.body_container, 1)
@@ -2641,7 +2779,7 @@ class MainWindow(QMainWindow, EnhancementMixin):
         self.btn_phone_control = QPushButton("手機控制")
         self.btn_phone_control.setFixedHeight(30)
         self.btn_phone_control.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.btn_phone_control.setToolTip("教學：開啟外網隨機並用手機 Admin 遙控")
+        self.btn_phone_control.setToolTip("內網／外網 QR，用手機遙控")
         self.btn_phone_control.clicked.connect(self._show_phone_control_wizard)
         h.addWidget(self.btn_phone_control)
 
@@ -2659,33 +2797,11 @@ class MainWindow(QMainWindow, EnhancementMixin):
         self.chk_open_overlay_hdr.toggled.connect(self._on_open_overlay_hdr_toggled)
         opts.addWidget(self.chk_open_overlay_hdr)
 
-        self.chk_display_duplicate_hdr = QCheckBox("同步畫面")
-        self.chk_display_duplicate_hdr.setToolTip(
-            "開檔進入全螢幕後自動切換為同步（複製）畫面；"
-            "只儲存設定，勾選時唔會即時切換"
-        )
-        self.chk_display_duplicate_hdr.setChecked(self._settings['display_duplicate'])
-        self.chk_display_duplicate_hdr.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.chk_display_duplicate_hdr.toggled.connect(self._on_display_duplicate_hdr_toggled)
-        if sys.platform != 'win32':
-            self.chk_display_duplicate_hdr.setEnabled(False)
-            self.chk_display_duplicate_hdr.setToolTip("僅支援 Windows")
-        opts.addWidget(self.chk_display_duplicate_hdr)
-
         self.chk_click_to_open_hdr = QCheckBox("一點即開")
         self.chk_click_to_open_hdr.setChecked(self._settings['click_to_open'])
         self.chk_click_to_open_hdr.setCursor(Qt.CursorShape.PointingHandCursor)
         self.chk_click_to_open_hdr.toggled.connect(self._on_click_to_open_hdr_toggled)
         opts.addWidget(self.chk_click_to_open_hdr)
-
-        self.chk_show_qr_hdr = QCheckBox("顯示 QR")
-        self.chk_show_qr_hdr.setChecked(self._settings['show_qr_code'])
-        self.chk_show_qr_hdr.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.chk_show_qr_hdr.setToolTip(
-            "在桌面同時顯示內網／固定外網／隨機外網 QR（各含連結；細節見設定 → Mobile）"
-        )
-        self.chk_show_qr_hdr.toggled.connect(self._on_show_qr_code_toggled)
-        opts.addWidget(self.chk_show_qr_hdr)
         h.addWidget(self.header_opts)
 
         h.addSpacing(14)
@@ -2708,7 +2824,7 @@ class MainWindow(QMainWindow, EnhancementMixin):
 
     def _build_footer_bar(self):
         self.footer_frame = QFrame()
-        self.footer_frame.setFixedHeight(30)
+        self.footer_frame.setFixedHeight(34)
         fl = QHBoxLayout(self.footer_frame)
         fl.setContentsMargins(14, 0, 14, 0)
         fl.setSpacing(10)
@@ -2739,6 +2855,15 @@ class MainWindow(QMainWindow, EnhancementMixin):
             Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter
         )
         fl.addWidget(self.footer_remote_lbl)
+
+        self.chk_lyric_preview_mode = QCheckBox('預覽模式')
+        self.chk_lyric_preview_mode.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.chk_lyric_preview_mode.setToolTip(
+            '開啟後，揀詩歌先進右邊預覽（唔出街）；調好先按「轉出現場」'
+        )
+        self.chk_lyric_preview_mode.setChecked(bool(self._settings.get('lyric_preview_mode', False)))
+        self.chk_lyric_preview_mode.toggled.connect(self._on_lyric_preview_mode_toggled)
+        fl.addWidget(self.chk_lyric_preview_mode)
 
         return self.footer_frame
 
@@ -2833,28 +2958,27 @@ class MainWindow(QMainWindow, EnhancementMixin):
         lay.setContentsMargins(20, 16, 20, 14)
         lay.setSpacing(12)
 
-        # ── 模式切換：標準 / 書本 / 全局 / 關鍵字 / 排程 ────────
+        # ── 模式切換：標準 / 全局 / 關鍵字 / 排程 ────────
         self.mode_row_widget = QWidget()
         mode_row = QHBoxLayout(self.mode_row_widget)
         mode_row.setContentsMargins(0, 0, 0, 0)
         mode_row.setSpacing(8)
         self.btn_standard = QPushButton("⭐  標準模式 (F1)")
-        self.btn_book     = QPushButton("📖  書本模式 (F2)")
-        self.btn_global   = QPushButton("🌐  全局模式 (F3)")
-        self.btn_keyword  = QPushButton("🔤  關鍵字模式 (F4)")
-        self.btn_schedule = QPushButton("📋  排程模式 (F5)")
-        for btn in (self.btn_standard, self.btn_book, self.btn_global,
+        self.btn_book     = QPushButton("📖  書本模式")
+        self.btn_book.setVisible(False)
+        self.btn_global   = QPushButton("🌐  全局模式 (F2)")
+        self.btn_keyword  = QPushButton("🔤  關鍵字模式 (F3)")
+        self.btn_schedule = QPushButton("📋  排程模式 (F4)")
+        for btn in (self.btn_standard, self.btn_global,
                     self.btn_keyword, self.btn_schedule):
             btn.setCheckable(True)
             btn.setFixedHeight(30)
             btn.setCursor(Qt.CursorShape.PointingHandCursor)
         self.btn_standard.clicked.connect(lambda: self._set_search_mode('standard'))
-        self.btn_book.clicked.connect(lambda: self._set_search_mode('book'))
         self.btn_global.clicked.connect(lambda: self._set_search_mode('global'))
         self.btn_keyword.clicked.connect(lambda: self._set_search_mode('keyword'))
         self.btn_schedule.clicked.connect(lambda: self._set_search_mode('schedule'))
         mode_row.addWidget(self.btn_standard)
-        mode_row.addWidget(self.btn_book)
         mode_row.addWidget(self.btn_global)
         mode_row.addWidget(self.btn_keyword)
         mode_row.addWidget(self.btn_schedule)
@@ -3058,7 +3182,7 @@ class MainWindow(QMainWindow, EnhancementMixin):
 
         self.inp_keyword = QLineEdit()
         self.inp_keyword.setFixedHeight(40)
-        self.inp_keyword.setPlaceholderText("🔍  輸入關鍵字  e.g. 恩典  —  搜索 PDF / Word 內容")
+        self.inp_keyword.setPlaceholderText("🔍  輸入關鍵字  e.g. 恩典  —  搜索歌詞")
         self.inp_keyword.returnPressed.connect(self._on_keyword_search_action)
         self.inp_keyword.textChanged.connect(self._on_keyword_text_changed)
 
@@ -3122,7 +3246,7 @@ class MainWindow(QMainWindow, EnhancementMixin):
         label_min_w = 80
         grid_margins = (18, 18, 16, 14)
 
-        self.grp_data = QGroupBox("詩歌資料夾")
+        self.grp_data = QGroupBox("詩歌資料")
         data_grid = QGridLayout(self.grp_data)
         data_grid.setContentsMargins(*grid_margins)
         data_grid.setHorizontalSpacing(14)
@@ -3133,8 +3257,8 @@ class MainWindow(QMainWindow, EnhancementMixin):
         self.lbl_hymn_folder = QLabel("路徑")
         self.lbl_hymn_folder.setMinimumWidth(label_min_w)
         self.lbl_hymn_folder.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
-        self.inp_hymn_folder = QLineEdit(self.hymn_folder)
-        self.inp_hymn_folder.setPlaceholderText(default_hymn_folder())
+        self.inp_hymn_folder = QLineEdit(self.hymns_json_path)
+        self.inp_hymn_folder.setPlaceholderText(default_hymns_json_path())
         self.btn_browse_hymn_folder = QPushButton("瀏覽…")
         self.btn_browse_hymn_folder.setFixedWidth(72)
         self.btn_browse_hymn_folder.setCursor(Qt.CursorShape.PointingHandCursor)
@@ -3147,10 +3271,19 @@ class MainWindow(QMainWindow, EnhancementMixin):
         self.btn_apply_hymn_folder = QPushButton("套用並重新掃描")
         self.btn_apply_hymn_folder.setCursor(Qt.CursorShape.PointingHandCursor)
         self.btn_apply_hymn_folder.clicked.connect(self._apply_hymn_folder)
+        self.btn_edit_hymns = QPushButton("管理詩歌庫")
+        self.btn_edit_hymns.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_edit_hymns.setToolTip("用介面新增、修改、刪除 hymns.json 裡的詩歌")
+        self.btn_edit_hymns.clicked.connect(lambda: self._open_hymn_editor())
+        data_btn_row = QHBoxLayout()
+        data_btn_row.setSpacing(8)
+        data_btn_row.addWidget(self.btn_apply_hymn_folder)
+        data_btn_row.addWidget(self.btn_edit_hymns)
+        data_btn_row.addStretch()
 
         data_grid.addWidget(self.lbl_hymn_folder, 0, 0)
         data_grid.addLayout(folder_row, 0, 1)
-        data_grid.addWidget(self.btn_apply_hymn_folder, 1, 1, Qt.AlignmentFlag.AlignLeft)
+        data_grid.addLayout(data_btn_row, 1, 1)
 
         self.grp_appearance = QGroupBox("外觀")
         appearance_grid = QGridLayout(self.grp_appearance)
@@ -3252,6 +3385,224 @@ class MainWindow(QMainWindow, EnhancementMixin):
         self.chk_minimize_tray.toggled.connect(self._on_minimize_tray_toggled)
         appearance_grid.addWidget(self.chk_minimize_tray, 8, 0, 1, 2)
 
+        self.lbl_lyric_bg = QLabel("歌詞背景")
+        self.lbl_lyric_bg.setMinimumWidth(label_min_w)
+        self.overlay_lyric_bg_row, self.inp_lyric_bg_color, self.lbl_lyric_bg_preview, self.btn_lyric_bg = (
+            self._make_qr_color_row(
+                self._settings.get('lyric_bg_color', DEFAULT_LYRIC_BG),
+                DEFAULT_LYRIC_BG, '展示／控制歌詞背景色',
+            )
+        )
+        self.inp_lyric_bg_color.textChanged.connect(self._on_lyric_appearance_changed)
+        self.btn_lyric_bg.clicked.connect(lambda: self._pick_qr_color(
+            self.inp_lyric_bg_color, self.lbl_lyric_bg_preview, self._on_lyric_appearance_changed,
+        ))
+        lyric_bg_box = QWidget()
+        lyric_bg_box_lay = QVBoxLayout(lyric_bg_box)
+        lyric_bg_box_lay.setContentsMargins(0, 0, 0, 0)
+        lyric_bg_box_lay.setSpacing(6)
+        lyric_bg_box_lay.addWidget(self.overlay_lyric_bg_row)
+        lyric_bg_img_row = QHBoxLayout()
+        lyric_bg_img_row.setSpacing(8)
+        self.btn_lyric_bg_image = QPushButton('上傳圖片')
+        self.btn_lyric_bg_image.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_lyric_bg_image.setToolTip('用圖片代替純色背景')
+        self.btn_lyric_bg_image.clicked.connect(self._on_lyric_bg_image_upload)
+        self.btn_lyric_bg_image_clear = QPushButton('刪除圖片')
+        self.btn_lyric_bg_image_clear.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_lyric_bg_image_clear.setToolTip('刪除背景圖，改回純色')
+        self.btn_lyric_bg_image_clear.clicked.connect(self._on_lyric_bg_image_clear)
+        self.lbl_lyric_bg_image = QLabel('純色')
+        lyric_bg_img_row.addWidget(self.btn_lyric_bg_image)
+        lyric_bg_img_row.addWidget(self.btn_lyric_bg_image_clear)
+        lyric_bg_img_row.addWidget(self.lbl_lyric_bg_image, 1)
+        lyric_bg_box_lay.addLayout(lyric_bg_img_row)
+        appearance_grid.addWidget(self.lbl_lyric_bg, 9, 0)
+        appearance_grid.addWidget(lyric_bg_box, 9, 1)
+
+        self.lbl_lyric_text = QLabel("歌詞文字")
+        self.lbl_lyric_text.setMinimumWidth(label_min_w)
+        self.overlay_lyric_text_row, self.inp_lyric_text_color, self.lbl_lyric_text_preview, self.btn_lyric_text = (
+            self._make_qr_color_row(
+                self._settings.get('lyric_text_color', DEFAULT_LYRIC_TEXT),
+                DEFAULT_LYRIC_TEXT, '展示／控制歌詞文字色',
+            )
+        )
+        self.inp_lyric_text_color.textChanged.connect(self._on_lyric_appearance_changed)
+        self.btn_lyric_text.clicked.connect(lambda: self._pick_qr_color(
+            self.inp_lyric_text_color, self.lbl_lyric_text_preview, self._on_lyric_appearance_changed,
+        ))
+        appearance_grid.addWidget(self.lbl_lyric_text, 10, 0)
+        appearance_grid.addWidget(self.overlay_lyric_text_row, 10, 1)
+
+        self.lbl_lyric_align = QLabel("歌詞對齊")
+        self.lbl_lyric_align.setMinimumWidth(label_min_w)
+        self.combo_lyric_align = QComboBox()
+        self.combo_lyric_align.addItem('靠左', ALIGN_LEFT)
+        self.combo_lyric_align.addItem('左右對齊', ALIGN_JUSTIFY)
+        idx = self.combo_lyric_align.findData(
+            self._settings.get('lyric_align', DEFAULT_LYRIC_ALIGN)
+        )
+        self.combo_lyric_align.setCurrentIndex(idx if idx >= 0 else 0)
+        self.combo_lyric_align.currentIndexChanged.connect(self._on_lyric_layout_settings_changed)
+        appearance_grid.addWidget(self.lbl_lyric_align, 11, 0)
+        appearance_grid.addWidget(self.combo_lyric_align, 11, 1, Qt.AlignmentFlag.AlignLeft)
+
+        self.lbl_lyric_spacing = QLabel("歌詞字距")
+        self.lbl_lyric_spacing.setMinimumWidth(label_min_w)
+        spacing_row = QWidget()
+        spacing_lay = QHBoxLayout(spacing_row)
+        spacing_lay.setContentsMargins(0, 0, 0, 0)
+        spacing_lay.setSpacing(8)
+        self.slider_lyric_spacing = QSlider(Qt.Orientation.Horizontal)
+        self.slider_lyric_spacing.setRange(LETTER_SPACING_MIN, LETTER_SPACING_MAX)
+        self.slider_lyric_spacing.setSingleStep(5)
+        self.slider_lyric_spacing.setPageStep(10)
+        self.slider_lyric_spacing.setValue(
+            normalize_letter_spacing(self._settings.get('lyric_letter_spacing'))
+        )
+        self.slider_lyric_spacing.valueChanged.connect(self._on_lyric_layout_settings_changed)
+        self.lbl_lyric_spacing_val = QLabel(f'{self.slider_lyric_spacing.value()}%')
+        self.lbl_lyric_spacing_val.setMinimumWidth(44)
+        spacing_lay.addWidget(self.slider_lyric_spacing, 1)
+        spacing_lay.addWidget(self.lbl_lyric_spacing_val)
+        appearance_grid.addWidget(self.lbl_lyric_spacing, 12, 0)
+        appearance_grid.addWidget(spacing_row, 12, 1)
+
+        self.lbl_lyric_line_height = QLabel("歌詞行距")
+        self.lbl_lyric_line_height.setMinimumWidth(label_min_w)
+        line_height_row = QWidget()
+        line_height_lay = QHBoxLayout(line_height_row)
+        line_height_lay.setContentsMargins(0, 0, 0, 0)
+        line_height_lay.setSpacing(8)
+        self.slider_lyric_line_height = QSlider(Qt.Orientation.Horizontal)
+        self.slider_lyric_line_height.setRange(LINE_HEIGHT_MIN, LINE_HEIGHT_MAX)
+        self.slider_lyric_line_height.setSingleStep(5)
+        self.slider_lyric_line_height.setPageStep(10)
+        self.slider_lyric_line_height.setValue(
+            normalize_line_height(self._settings.get('lyric_line_height'))
+        )
+        self.slider_lyric_line_height.setToolTip('行與行之間的距離（100% = 單倍行距）')
+        self.slider_lyric_line_height.valueChanged.connect(self._on_lyric_layout_settings_changed)
+        self.lbl_lyric_line_height_val = QLabel(f'{self.slider_lyric_line_height.value()}%')
+        self.lbl_lyric_line_height_val.setMinimumWidth(52)
+        line_height_lay.addWidget(self.slider_lyric_line_height, 1)
+        line_height_lay.addWidget(self.lbl_lyric_line_height_val)
+        appearance_grid.addWidget(self.lbl_lyric_line_height, 13, 0)
+        appearance_grid.addWidget(line_height_row, 13, 1)
+
+        self.lbl_lyric_margin = QLabel("歌詞邊距")
+        self.lbl_lyric_margin.setMinimumWidth(label_min_w)
+        margin_row = QWidget()
+        margin_grid = QGridLayout(margin_row)
+        margin_grid.setContentsMargins(0, 0, 0, 0)
+        margin_grid.setHorizontalSpacing(10)
+        margin_grid.setVerticalSpacing(6)
+        saved_margins = normalize_lyric_margins(self._settings.get('lyric_margins'))
+        self.spin_lyric_margins = {}
+        side_labels = (
+            ('top', '上', 0, 0),
+            ('bottom', '下', 0, 2),
+            ('left', '左', 1, 0),
+            ('right', '右', 1, 2),
+        )
+        for side, label, row, col in side_labels:
+            lbl = QLabel(label)
+            lbl.setMinimumWidth(18)
+            spin = QSpinBox()
+            spin.setRange(LYRIC_MARGIN_MIN, LYRIC_MARGIN_MAX)
+            spin.setSuffix(' px')
+            spin.setSingleStep(4)
+            spin.setValue(saved_margins[side])
+            spin.setToolTip(f'歌詞與螢幕{label}邊的距離')
+            spin.valueChanged.connect(self._on_lyric_layout_settings_changed)
+            self.spin_lyric_margins[side] = spin
+            margin_grid.addWidget(lbl, row, col)
+            margin_grid.addWidget(spin, row, col + 1)
+        appearance_grid.addWidget(self.lbl_lyric_margin, 14, 0)
+        appearance_grid.addWidget(margin_row, 14, 1)
+
+        self.lbl_lyric_font_family = QLabel("歌詞字體")
+        self.lbl_lyric_font_family.setMinimumWidth(label_min_w)
+        self.combo_lyric_font_family = QFontComboBox()
+        self.combo_lyric_font_family.setMinimumWidth(220)
+        self.combo_lyric_font_family.setCurrentFont(
+            QFont(normalize_lyric_font_family(self._settings.get('lyric_font_family')))
+        )
+        self.combo_lyric_font_family.setToolTip('歌詞顯示用字體（需電腦已安裝）')
+        self.combo_lyric_font_family.currentFontChanged.connect(
+            self._on_lyric_layout_settings_changed
+        )
+        appearance_grid.addWidget(self.lbl_lyric_font_family, 15, 0)
+        appearance_grid.addWidget(self.combo_lyric_font_family, 15, 1)
+
+        self.lbl_lyric_font = QLabel("預設字級")
+        self.lbl_lyric_font.setMinimumWidth(label_min_w)
+        font_row = QWidget()
+        font_lay = QHBoxLayout(font_row)
+        font_lay.setContentsMargins(0, 0, 0, 0)
+        font_lay.setSpacing(8)
+        saved_font_pt = normalize_lyric_font_pt(self._settings.get('lyric_font_pt'))
+        self.chk_lyric_font_auto = QCheckBox('自動填滿')
+        self.chk_lyric_font_auto.setChecked(saved_font_pt <= 0)
+        self.chk_lyric_font_auto.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.chk_lyric_font_auto.setToolTip('開啟時自動調字級填滿螢幕；關閉則用右邊預設字級')
+        self.chk_lyric_font_auto.toggled.connect(self._on_lyric_font_auto_toggled)
+        self.spin_lyric_font = QSpinBox()
+        self.spin_lyric_font.setRange(LYRIC_FONT_PT_MIN, LYRIC_FONT_PT_MAX)
+        self.spin_lyric_font.setSuffix(' pt')
+        self.spin_lyric_font.setValue(saved_font_pt if saved_font_pt > 0 else 48)
+        self.spin_lyric_font.setEnabled(saved_font_pt > 0)
+        self.spin_lyric_font.setToolTip('開啟詩歌時用呢個字級（仍可用 Ctrl+滾輪臨時放大縮小）')
+        self.spin_lyric_font.valueChanged.connect(self._on_lyric_layout_settings_changed)
+        font_lay.addWidget(self.chk_lyric_font_auto)
+        font_lay.addWidget(self.spin_lyric_font)
+        font_lay.addStretch(1)
+        appearance_grid.addWidget(self.lbl_lyric_font, 16, 0)
+        appearance_grid.addWidget(font_row, 16, 1)
+
+        self.lbl_lyric_best = QLabel("最佳預設")
+        self.lbl_lyric_best.setMinimumWidth(label_min_w)
+        best_row = QWidget()
+        best_lay = QHBoxLayout(best_row)
+        best_lay.setContentsMargins(0, 0, 0, 0)
+        best_lay.setSpacing(8)
+        self.btn_lyric_save_best = QPushButton('保存目前為最佳')
+        self.btn_lyric_save_best.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_lyric_save_best.setToolTip('將而家歌詞畫面存做一鍵還原用嘅最佳預設')
+        self.btn_lyric_save_best.clicked.connect(self._save_lyric_best_defaults)
+        self.btn_lyric_restore_best = QPushButton('還原最佳預設')
+        self.btn_lyric_restore_best.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_lyric_restore_best.setToolTip('有問題時一鍵返去已保存嘅最佳預設')
+        self.btn_lyric_restore_best.clicked.connect(self._restore_lyric_best_defaults)
+        best_lay.addWidget(self.btn_lyric_save_best)
+        best_lay.addWidget(self.btn_lyric_restore_best)
+        best_lay.addStretch(1)
+        appearance_grid.addWidget(self.lbl_lyric_best, 17, 0)
+        appearance_grid.addWidget(best_row, 17, 1)
+
+        self.lbl_lyric_placement = QLabel("控制畫面")
+        self.lbl_lyric_placement.setMinimumWidth(label_min_w)
+        self.combo_lyric_placement = QComboBox()
+        self.combo_lyric_placement.addItem('獨立視窗', PLACEMENT_WINDOW)
+        self.combo_lyric_placement.addItem('主視窗右邊', PLACEMENT_DOCKED)
+        idx = self.combo_lyric_placement.findData(
+            self._settings.get('lyric_control_placement', PLACEMENT_WINDOW)
+        )
+        self.combo_lyric_placement.setCurrentIndex(idx if idx >= 0 else 0)
+        self.combo_lyric_placement.currentIndexChanged.connect(self._on_lyric_placement_changed)
+        appearance_grid.addWidget(self.lbl_lyric_placement, 18, 0)
+        appearance_grid.addWidget(self.combo_lyric_placement, 18, 1, Qt.AlignmentFlag.AlignLeft)
+
+        self.chk_lyric_start_blacked = QCheckBox("開啟詩歌時先黑畫面（只外屏）")
+        self.chk_lyric_start_blacked.setChecked(self._settings.get('lyric_start_blacked', True))
+        self.chk_lyric_start_blacked.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.chk_lyric_start_blacked.setToolTip(
+            "主展示先全黑，預覽仍可見歌詞；調好字距／對齊後再按「取消全黑」"
+        )
+        self.chk_lyric_start_blacked.toggled.connect(self._on_lyric_start_blacked_toggled)
+        appearance_grid.addWidget(self.chk_lyric_start_blacked, 19, 0, 1, 2)
+
         self.grp_open = QGroupBox("開啟 Word / PDF 時")
         open_grid = QGridLayout(self.grp_open)
         open_grid.setContentsMargins(*grid_margins)
@@ -3268,16 +3619,50 @@ class MainWindow(QMainWindow, EnhancementMixin):
         self.lbl_overlay_secs = QLabel("提示顯示")
         self.lbl_overlay_secs.setMinimumWidth(label_min_w)
         self.lbl_overlay_secs.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
-        self.combo_overlay_duration = QComboBox()
-        for sec in range(1, MAX_OVERLAY_SECS + 1):
-            self.combo_overlay_duration.addItem(f"{sec} 秒", sec)
-        self.combo_overlay_duration.addItem("一直顯示", OVERLAY_DURATION_ALWAYS)
-        self.combo_overlay_duration.setCurrentIndex(
-            _overlay_duration_index(self._settings['overlay_duration'])
+        overlay_dur = _normalize_overlay_duration(self._settings['overlay_duration'])
+        self.spin_overlay_duration = QSpinBox()
+        self.spin_overlay_duration.setRange(1, MAX_OVERLAY_SECS)
+        self.spin_overlay_duration.setSuffix(' 秒')
+        self.spin_overlay_duration.setMinimumWidth(108)
+        self.spin_overlay_duration.setValue(
+            DEFAULT_OVERLAY_SECS if overlay_dur == OVERLAY_DURATION_ALWAYS else overlay_dur
         )
-        self.combo_overlay_duration.setMinimumWidth(108)
-        self.combo_overlay_duration.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.combo_overlay_duration.currentIndexChanged.connect(self._on_overlay_duration_changed)
+        self.spin_overlay_duration.setToolTip('提示顯示幾耐（秒），可用加減自行調校')
+        self.spin_overlay_duration.valueChanged.connect(self._on_overlay_duration_changed)
+        self.chk_overlay_always = QCheckBox('一直顯示')
+        self.chk_overlay_always.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.chk_overlay_always.setChecked(overlay_dur == OVERLAY_DURATION_ALWAYS)
+        self.chk_overlay_always.toggled.connect(self._on_overlay_always_toggled)
+        self.spin_overlay_duration.setEnabled(overlay_dur != OVERLAY_DURATION_ALWAYS)
+        self.overlay_duration_row = QWidget()
+        overlay_dur_lay = QHBoxLayout(self.overlay_duration_row)
+        overlay_dur_lay.setContentsMargins(0, 0, 0, 0)
+        overlay_dur_lay.setSpacing(8)
+        overlay_dur_lay.addWidget(self.spin_overlay_duration)
+        overlay_dur_lay.addWidget(self.chk_overlay_always)
+        overlay_dur_lay.addStretch()
+
+        self.lbl_overlay_center = QLabel("轉移時間")
+        self.lbl_overlay_center.setMinimumWidth(label_min_w)
+        self.lbl_overlay_center.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
+        self.spin_overlay_center = QSpinBox()
+        self.spin_overlay_center.setRange(1, MAX_OVERLAY_CENTER_SECS)
+        self.spin_overlay_center.setSuffix(' 秒')
+        self.spin_overlay_center.setMinimumWidth(108)
+        self.spin_overlay_center.setValue(
+            _normalize_center_secs(self._settings.get('overlay_center_secs', CENTER_OVERLAY_SECS))
+        )
+        self.spin_overlay_center.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.spin_overlay_center.setToolTip("置中提示停留幾耐先移去右下角")
+        self.spin_overlay_center.valueChanged.connect(self._on_overlay_center_changed)
+
+        self.chk_overlay_auto_unblack = QCheckBox("倒數完自動取消黑畫面")
+        self.chk_overlay_auto_unblack.setChecked(self._settings.get('overlay_auto_unblack', False))
+        self.chk_overlay_auto_unblack.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.chk_overlay_auto_unblack.setToolTip(
+            "置中提示轉移去右下角之後自動取消外屏全黑。唔剔則維持全黑，要手動取消。"
+        )
+        self.chk_overlay_auto_unblack.toggled.connect(self._on_overlay_auto_unblack_toggled)
 
         self.lbl_overlay_pos = QLabel("提示位置")
         self.lbl_overlay_pos.setMinimumWidth(label_min_w)
@@ -3390,18 +3775,21 @@ class MainWindow(QMainWindow, EnhancementMixin):
 
         open_grid.addWidget(self.chk_open_overlay, 0, 0, 1, 2)
         open_grid.addWidget(self.lbl_overlay_secs, 1, 0)
-        open_grid.addWidget(self.combo_overlay_duration, 1, 1, Qt.AlignmentFlag.AlignLeft)
+        open_grid.addWidget(self.overlay_duration_row, 1, 1, Qt.AlignmentFlag.AlignLeft)
         open_grid.addWidget(self.lbl_overlay_pos, 2, 0)
         open_grid.addWidget(self.combo_overlay_pos, 2, 1, Qt.AlignmentFlag.AlignLeft)
-        open_grid.addWidget(self.lbl_overlay_bg, 3, 0)
-        open_grid.addWidget(self.overlay_bg_row, 3, 1)
-        open_grid.addWidget(self.lbl_overlay_text_color, 4, 0)
-        open_grid.addWidget(self.overlay_text_color_row, 4, 1)
-        open_grid.addWidget(self.chk_display_duplicate, 5, 0, 1, 2)
-        open_grid.addWidget(self.lbl_display_switch_mode, 6, 0)
-        open_grid.addWidget(self.combo_display_switch_mode, 6, 1, Qt.AlignmentFlag.AlignLeft)
-        open_grid.addWidget(self.chk_word_auto_fullscreen, 7, 0, 1, 2)
-        open_grid.addWidget(self.chk_pdf_auto_fullscreen, 8, 0, 1, 2)
+        open_grid.addWidget(self.lbl_overlay_center, 3, 0)
+        open_grid.addWidget(self.spin_overlay_center, 3, 1, Qt.AlignmentFlag.AlignLeft)
+        open_grid.addWidget(self.chk_overlay_auto_unblack, 4, 0, 1, 2)
+        open_grid.addWidget(self.lbl_overlay_bg, 5, 0)
+        open_grid.addWidget(self.overlay_bg_row, 5, 1)
+        open_grid.addWidget(self.lbl_overlay_text_color, 6, 0)
+        open_grid.addWidget(self.overlay_text_color_row, 6, 1)
+        open_grid.addWidget(self.chk_display_duplicate, 7, 0, 1, 2)
+        open_grid.addWidget(self.lbl_display_switch_mode, 8, 0)
+        open_grid.addWidget(self.combo_display_switch_mode, 8, 1, Qt.AlignmentFlag.AlignLeft)
+        open_grid.addWidget(self.chk_word_auto_fullscreen, 9, 0, 1, 2)
+        open_grid.addWidget(self.chk_pdf_auto_fullscreen, 10, 0, 1, 2)
 
         self.grp_remote = QGroupBox("Mobile 遙控")
         remote_outer = QVBoxLayout(self.grp_remote)
@@ -3582,7 +3970,7 @@ class MainWindow(QMainWindow, EnhancementMixin):
         self.chk_viewer_show_debug.setChecked(self._settings['viewer_show_debug'])
         self.chk_viewer_show_debug.setCursor(Qt.CursorShape.PointingHandCursor)
         self.chk_viewer_show_debug.setToolTip(
-            "開啟後，手機 /view 頁面底部會顯示 mapping 除錯資訊"
+            "開啟後，手機會眾頁底部會顯示歌詞同步除錯資訊"
         )
         self.chk_viewer_show_debug.toggled.connect(self._on_viewer_show_debug_toggled)
 
@@ -3913,30 +4301,6 @@ class MainWindow(QMainWindow, EnhancementMixin):
         about_design.setAlignment(Qt.AlignmentFlag.AlignLeft)
         tab_about_lay.addWidget(about_design)
 
-        grp_update = QGroupBox("更新")
-        update_lay = QVBoxLayout(grp_update)
-        update_lay.setSpacing(8)
-        self.lbl_update_status = QLabel("按「檢查更新」查詢是否有新版本")
-        self.lbl_update_status.setWordWrap(True)
-        update_lay.addWidget(self.lbl_update_status)
-        update_btn_row = QHBoxLayout()
-        update_btn_row.setSpacing(8)
-        self.btn_check_update = QPushButton("檢查更新")
-        self.btn_check_update.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.btn_check_update.setToolTip(
-            "查詢 GitHub Release／latest.json，比較版本號"
-        )
-        self.btn_check_update.clicked.connect(self._on_check_update)
-        self.btn_open_download = QPushButton("前往下載")
-        self.btn_open_download.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.btn_open_download.setToolTip("用瀏覽器開啟下載頁")
-        self.btn_open_download.clicked.connect(self._on_open_download_page)
-        update_btn_row.addWidget(self.btn_check_update)
-        update_btn_row.addWidget(self.btn_open_download)
-        update_btn_row.addStretch()
-        update_lay.addLayout(update_btn_row)
-        tab_about_lay.addWidget(grp_update)
-
         about_btn_row = QHBoxLayout()
         about_btn_row.setSpacing(8)
         self.btn_export_settings = QPushButton("匯出設定")
@@ -3955,81 +4319,11 @@ class MainWindow(QMainWindow, EnhancementMixin):
         )
         tab_about_lay.addWidget(self.settings_credit)
         tab_about_lay.addStretch()
-        self._update_check_worker = None
-
-        # ── 會眾 Drive Mapping（外置 gdrive_hymn_index.json）────────
-        tab_mapping = QWidget()
-        tab_mapping_lay = QVBoxLayout(tab_mapping)
-        tab_mapping_lay.setContentsMargins(4, 8, 4, 4)
-        tab_mapping_lay.setSpacing(10)
-
-        self.grp_gdrive_map = QGroupBox("會眾 Drive Mapping")
-        map_grid = QGridLayout(self.grp_gdrive_map)
-        map_grid.setContentsMargins(12, 14, 12, 12)
-        map_grid.setHorizontalSpacing(10)
-        map_grid.setVerticalSpacing(8)
-
-        self.gdrive_map_status_lbl = QLabel("—")
-        self.gdrive_map_status_lbl.setWordWrap(True)
-        map_grid.addWidget(self.gdrive_map_status_lbl, 0, 0, 1, 2)
-
-        self.lbl_gdrive_folder = QLabel("主資料夾 ID")
-        self.inp_gdrive_folder = QLineEdit(self._settings['gdrive_folder_id'])
-        self.inp_gdrive_folder.setPlaceholderText(GDRIVE_DEFAULT_FOLDER_ID)
-        self.inp_gdrive_folder.editingFinished.connect(self._on_gdrive_folder_ids_changed)
-        map_grid.addWidget(self.lbl_gdrive_folder, 1, 0)
-        map_grid.addWidget(self.inp_gdrive_folder, 1, 1)
-
-        self.lbl_gdrive_s1 = QLabel("S1 資料夾 ID")
-        self.inp_gdrive_s1 = QLineEdit(self._settings['gdrive_s1_folder_id'])
-        self.inp_gdrive_s1.setPlaceholderText(GDRIVE_SPLIT_BOOK_FOLDERS[0][1])
-        self.inp_gdrive_s1.editingFinished.connect(self._on_gdrive_folder_ids_changed)
-        map_grid.addWidget(self.lbl_gdrive_s1, 2, 0)
-        map_grid.addWidget(self.inp_gdrive_s1, 2, 1)
-
-        self.lbl_gdrive_s2 = QLabel("S2 資料夾 ID")
-        self.inp_gdrive_s2 = QLineEdit(self._settings['gdrive_s2_folder_id'])
-        self.inp_gdrive_s2.setPlaceholderText(GDRIVE_SPLIT_BOOK_FOLDERS[1][1])
-        self.inp_gdrive_s2.editingFinished.connect(self._on_gdrive_folder_ids_changed)
-        map_grid.addWidget(self.lbl_gdrive_s2, 3, 0)
-        map_grid.addWidget(self.inp_gdrive_s2, 3, 1)
-
-        map_btn_row = QHBoxLayout()
-        self.btn_gdrive_rebuild = QPushButton("從 Drive 重建")
-        self.btn_gdrive_rebuild.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.btn_gdrive_rebuild.setToolTip("需要 gdown；會寫入 exe／專案旁 gdrive_hymn_index.json")
-        self.btn_gdrive_rebuild.clicked.connect(self._on_gdrive_rebuild_clicked)
-        self.btn_gdrive_edit = QPushButton("編輯對應表")
-        self.btn_gdrive_edit.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.btn_gdrive_edit.clicked.connect(self._on_gdrive_edit_clicked)
-        self.btn_gdrive_import = QPushButton("匯入 JSON")
-        self.btn_gdrive_import.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.btn_gdrive_import.clicked.connect(self._on_gdrive_import_clicked)
-        self.btn_gdrive_export = QPushButton("匯出 JSON")
-        self.btn_gdrive_export.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.btn_gdrive_export.clicked.connect(self._on_gdrive_export_clicked)
-        map_btn_row.addWidget(self.btn_gdrive_rebuild)
-        map_btn_row.addWidget(self.btn_gdrive_edit)
-        map_btn_row.addWidget(self.btn_gdrive_import)
-        map_btn_row.addWidget(self.btn_gdrive_export)
-        map_btn_row.addStretch()
-        map_grid.addLayout(map_btn_row, 4, 0, 1, 2)
-
-        self.gdrive_map_hint_lbl = QLabel(
-            "優先讀取程式旁 gdrive_hymn_index.json；首次啟動會從內嵌副本複製。"
-            "改完後無須重新打包 exe。"
-        )
-        self.gdrive_map_hint_lbl.setWordWrap(True)
-        map_grid.addWidget(self.gdrive_map_hint_lbl, 5, 0, 1, 2)
-
-        tab_mapping_lay.addWidget(self.grp_gdrive_map)
-        tab_mapping_lay.addStretch()
 
         self.settings_tabs = QTabWidget()
         self.settings_tabs.addTab(tab_general, "一般")
         self.settings_tabs.addTab(tab_open, "開檔")
         self.settings_tabs.addTab(tab_mobile, "Mobile")
-        self.settings_tabs.addTab(tab_mapping, "對應")
         self.settings_tabs.addTab(tab_about, "關於")
         self._settings_mobile_tab_index = 2
         self.settings_tabs.currentChanged.connect(self._on_settings_tab_changed)
@@ -4108,6 +4402,8 @@ class MainWindow(QMainWindow, EnhancementMixin):
         self.file_list.itemClicked.connect(self._file_clicked)
         self.file_list.itemDoubleClicked.connect(self._file_double_clicked)
         self.file_list.currentItemChanged.connect(self._on_file_selection_changed)
+        self.file_list.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        self.file_list.customContextMenuRequested.connect(self._file_list_context_menu)
         lay.addWidget(self.file_list, 1)
 
         self.hint_lbl = QLabel("選一個左邊書冊，右邊會列出該書的所有檔案")
@@ -4151,10 +4447,29 @@ class MainWindow(QMainWindow, EnhancementMixin):
         BookNameOverlay.show_book(
             book_name, path,
             _overlay_subtitle(item_name or os.path.basename(path)),
-            self.combo_overlay_duration.currentData(),
+            self._overlay_duration_value(),
             self.combo_overlay_pos.currentData(),
             self._settings,
+            center_secs=self._overlay_center_secs(),
         )
+        self._schedule_lyric_preview()
+        self._start_overlay_countdown_tick()
+
+    def _show_open_hymn_popup(self, book_name, item_name=''):
+        if not self.chk_open_overlay.isChecked():
+            return
+        if not book_name:
+            return
+        BookNameOverlay.show_book(
+            book_name, 'lyric',
+            item_name or '',
+            self._overlay_duration_value(),
+            self.combo_overlay_pos.currentData(),
+            self._settings,
+            center_secs=self._overlay_center_secs(),
+        )
+        self._schedule_lyric_preview()
+        self._start_overlay_countdown_tick()
 
     def _overlay_appearance_widgets(self):
         return (
@@ -4176,6 +4491,533 @@ class MainWindow(QMainWindow, EnhancementMixin):
                 if text_color else DEFAULT_OVERLAY_TEXT_COLOR
             ),
         }
+
+    def _on_lyric_appearance_changed(self, _value=''):
+        if getattr(self, '_loading_settings', False):
+            return
+        bg = _normalize_hex_color(
+            self.inp_lyric_bg_color.text() if hasattr(self, 'inp_lyric_bg_color') else '',
+            DEFAULT_LYRIC_BG,
+        )
+        text = _normalize_hex_color(
+            self.inp_lyric_text_color.text() if hasattr(self, 'inp_lyric_text_color') else '',
+            DEFAULT_LYRIC_TEXT,
+        )
+        self._update_qr_color_preview(self.lbl_lyric_bg_preview, bg, DEFAULT_LYRIC_BG)
+        self._update_qr_color_preview(self.lbl_lyric_text_preview, text, DEFAULT_LYRIC_TEXT)
+        timer = getattr(self, '_lyric_appearance_debounce', None)
+        if timer is not None:
+            timer.start()
+        else:
+            self._apply_lyric_appearance_from_settings()
+
+    def _apply_lyric_appearance_from_settings(self):
+        if getattr(self, '_loading_settings', False):
+            return
+        bg = _normalize_hex_color(
+            self.inp_lyric_bg_color.text() if hasattr(self, 'inp_lyric_bg_color') else '',
+            DEFAULT_LYRIC_BG,
+        )
+        text = _normalize_hex_color(
+            self.inp_lyric_text_color.text() if hasattr(self, 'inp_lyric_text_color') else '',
+            DEFAULT_LYRIC_TEXT,
+        )
+        self._persist_settings(lyric_bg_color=bg, lyric_text_color=text)
+        pair = getattr(self, '_lyric_pair', None)
+        if pair is None:
+            return
+        self._lyric_ui_applying = True
+        try:
+            pair.session.set_colors(bg, text)
+        finally:
+            self._lyric_ui_applying = False
+
+    def _stored_lyric_bg_paths(self):
+        folder = app_dir()
+        paths = []
+        try:
+            names = os.listdir(folder)
+        except OSError:
+            return paths
+        for name in names:
+            stem, ext = os.path.splitext(name)
+            if stem == LYRIC_BG_IMAGE_STEM and ext.lower() in LYRIC_BG_IMAGE_EXTS:
+                paths.append(os.path.join(folder, name))
+        return paths
+
+    def _remove_stored_lyric_bg_images(self):
+        for path in self._stored_lyric_bg_paths():
+            try:
+                os.remove(path)
+            except OSError:
+                pass
+
+    def _sync_lyric_bg_image_label(self):
+        path = normalize_lyric_bg_image(
+            self._settings.get('lyric_bg_image') if hasattr(self, '_settings') else '',
+            app_dir(),
+        )
+        if hasattr(self, 'lbl_lyric_bg_image'):
+            self.lbl_lyric_bg_image.setText(os.path.basename(path) if path else '純色')
+        if hasattr(self, 'btn_lyric_bg_image_clear'):
+            self.btn_lyric_bg_image_clear.setEnabled(bool(path))
+
+    def _on_lyric_bg_image_upload(self):
+        path, _ = QFileDialog.getOpenFileName(
+            self, '選擇背景圖片', '',
+            '圖片 (*.png *.jpg *.jpeg *.webp *.bmp *.gif)',
+        )
+        if not path:
+            return
+        if QPixmap(path).isNull():
+            QMessageBox.warning(self, '背景圖片', '無法讀取這張圖片。')
+            return
+        ext = os.path.splitext(path)[1].lower()
+        if ext not in LYRIC_BG_IMAGE_EXTS:
+            ext = '.png'
+        dest = os.path.join(app_dir(), f'{LYRIC_BG_IMAGE_STEM}{ext}')
+        self._remove_stored_lyric_bg_images()
+        try:
+            shutil.copy2(path, dest)
+        except OSError as exc:
+            QMessageBox.warning(self, '背景圖片', f'無法儲存圖片：{exc}')
+            return
+        self._persist_settings(lyric_bg_image=dest)
+        if getattr(self, '_lyric_pair', None) is not None:
+            self._lyric_pair.session.set_bg_image(dest)
+        self._sync_lyric_bg_image_label()
+
+    def _on_lyric_bg_image_clear(self):
+        self._remove_stored_lyric_bg_images()
+        self._persist_settings(lyric_bg_image='')
+        if getattr(self, '_lyric_pair', None) is not None:
+            self._lyric_pair.session.set_bg_image('')
+        self._sync_lyric_bg_image_label()
+
+    def _on_lyric_font_auto_toggled(self, checked):
+        if hasattr(self, 'spin_lyric_font'):
+            self.spin_lyric_font.setEnabled(not bool(checked))
+        self._on_lyric_layout_settings_changed()
+
+    def _lyric_font_family_from_ui(self):
+        if hasattr(self, 'combo_lyric_font_family'):
+            return normalize_lyric_font_family(self.combo_lyric_font_family.currentFont().family())
+        return normalize_lyric_font_family(self._settings.get('lyric_font_family'))
+
+    def _lyric_font_pt_from_ui(self):
+        if hasattr(self, 'chk_lyric_font_auto') and self.chk_lyric_font_auto.isChecked():
+            return 0
+        if hasattr(self, 'spin_lyric_font'):
+            return normalize_lyric_font_pt(self.spin_lyric_font.value())
+        return normalize_lyric_font_pt(self._settings.get('lyric_font_pt'))
+
+    def _lyric_margins_from_ui(self):
+        if hasattr(self, 'spin_lyric_margins') and self.spin_lyric_margins:
+            return normalize_lyric_margins({
+                side: self.spin_lyric_margins[side].value()
+                for side in MARGIN_SIDES
+                if side in self.spin_lyric_margins
+            })
+        return normalize_lyric_margins(self._settings.get('lyric_margins'))
+
+    def _lyric_layout_from_ui(self):
+        align = DEFAULT_LYRIC_ALIGN
+        if hasattr(self, 'combo_lyric_align'):
+            align = normalize_lyric_align(self.combo_lyric_align.currentData())
+        spacing = DEFAULT_LETTER_SPACING
+        if hasattr(self, 'slider_lyric_spacing'):
+            spacing = normalize_letter_spacing(self.slider_lyric_spacing.value())
+        line_height = DEFAULT_LINE_HEIGHT
+        if hasattr(self, 'slider_lyric_line_height'):
+            line_height = normalize_line_height(self.slider_lyric_line_height.value())
+        return lyric_best_from_values(
+            align=align,
+            letter_spacing=spacing,
+            line_height=line_height,
+            margins=self._lyric_margins_from_ui(),
+            font_family=self._lyric_font_family_from_ui(),
+            font_pt=self._lyric_font_pt_from_ui(),
+        )
+
+    def _sync_lyric_layout_widgets(self, layout):
+        layout = normalize_lyric_best_defaults(layout)
+        was_loading = getattr(self, '_loading_settings', False)
+        self._loading_settings = True
+        try:
+            if hasattr(self, 'combo_lyric_align'):
+                idx = self.combo_lyric_align.findData(layout['align'])
+                self.combo_lyric_align.setCurrentIndex(idx if idx >= 0 else 0)
+            if hasattr(self, 'slider_lyric_spacing'):
+                self.slider_lyric_spacing.setValue(layout['letter_spacing'])
+                if hasattr(self, 'lbl_lyric_spacing_val'):
+                    self.lbl_lyric_spacing_val.setText(f"{layout['letter_spacing']}%")
+            if hasattr(self, 'slider_lyric_line_height'):
+                self.slider_lyric_line_height.setValue(layout['line_height'])
+                if hasattr(self, 'lbl_lyric_line_height_val'):
+                    self.lbl_lyric_line_height_val.setText(f"{layout['line_height']}%")
+            if hasattr(self, 'spin_lyric_margins'):
+                margins = normalize_lyric_margins(layout.get('margins'))
+                for side, spin in self.spin_lyric_margins.items():
+                    spin.setValue(margins[side])
+            if hasattr(self, 'combo_lyric_font_family'):
+                self.combo_lyric_font_family.setCurrentFont(QFont(layout['font_family']))
+            if hasattr(self, 'chk_lyric_font_auto') and hasattr(self, 'spin_lyric_font'):
+                font_pt = layout['font_pt']
+                self.chk_lyric_font_auto.setChecked(font_pt <= 0)
+                self.spin_lyric_font.setValue(font_pt if font_pt > 0 else 48)
+                self.spin_lyric_font.setEnabled(font_pt > 0)
+        finally:
+            self._loading_settings = was_loading
+
+    def _apply_lyric_best_to_session(self, layout, *, refit=True):
+        layout = normalize_lyric_best_defaults(layout)
+        pair = getattr(self, '_lyric_pair', None)
+        if pair is None:
+            return layout
+        session = pair.session
+        self._lyric_ui_applying = True
+        try:
+            session.apply_layout(
+                align=layout['align'],
+                letter_spacing=layout['letter_spacing'],
+                line_height=layout['line_height'],
+                margins=layout['margins'],
+                font_family=layout['font_family'],
+                preferred_font_pt=layout['font_pt'],
+            )
+            session.user_zoomed = False
+            if refit and (session.hymn or pair.is_open()):
+                pair.fit_display()
+        finally:
+            self._lyric_ui_applying = False
+        return layout
+
+    def _persist_lyric_layout(self, layout, *, as_best=False):
+        layout = normalize_lyric_best_defaults(layout)
+        payload = {
+            'lyric_align': layout['align'],
+            'lyric_letter_spacing': layout['letter_spacing'],
+            'lyric_line_height': layout['line_height'],
+            'lyric_margins': layout['margins'],
+            'lyric_font_family': layout['font_family'],
+            'lyric_font_pt': layout['font_pt'],
+        }
+        if as_best:
+            payload['lyric_best_defaults'] = layout
+        self._persist_settings(**payload)
+        return layout
+
+    def _save_lyric_best_defaults(self):
+        pair = getattr(self, '_lyric_pair', None)
+        if pair is not None and (pair.session.hymn or pair.is_open()):
+            layout = lyric_best_from_session(pair.session)
+        else:
+            layout = self._lyric_layout_from_ui()
+        layout = self._persist_lyric_layout(layout, as_best=True)
+        self._apply_lyric_best_to_session(layout, refit=True)
+        self._sync_lyric_layout_widgets(layout)
+        self._schedule_lyric_preview()
+        if hasattr(self, 'statusBar'):
+            try:
+                self.statusBar().showMessage('已保存為最佳預設', 2500)
+            except Exception:
+                pass
+
+    def _restore_lyric_best_defaults(self):
+        layout = normalize_lyric_best_defaults(self._settings.get('lyric_best_defaults'))
+        layout = self._persist_lyric_layout(layout, as_best=False)
+        self._apply_lyric_best_to_session(layout, refit=True)
+        self._sync_lyric_layout_widgets(layout)
+        self._schedule_lyric_preview()
+        if hasattr(self, 'statusBar'):
+            try:
+                self.statusBar().showMessage('已還原最佳預設', 2500)
+            except Exception:
+                pass
+
+    def _on_lyric_layout_settings_changed(self, _value=None):
+        if getattr(self, '_loading_settings', False) or getattr(self, '_lyric_ui_applying', False):
+            return
+        layout = self._lyric_layout_from_ui()
+        if hasattr(self, 'lbl_lyric_spacing_val'):
+            self.lbl_lyric_spacing_val.setText(f"{layout['letter_spacing']}%")
+        if hasattr(self, 'lbl_lyric_line_height_val'):
+            self.lbl_lyric_line_height_val.setText(f"{layout['line_height']}%")
+        timer = getattr(self, '_lyric_layout_debounce', None)
+        if timer is not None:
+            timer.start()
+        else:
+            self._apply_lyric_layout_from_settings()
+
+    def _apply_lyric_layout_from_settings(self):
+        if getattr(self, '_loading_settings', False):
+            return
+        layout = self._lyric_layout_from_ui()
+        self._persist_lyric_layout(layout, as_best=False)
+        pair = getattr(self, '_lyric_pair', None)
+        if pair is None:
+            return
+        self._lyric_ui_applying = True
+        try:
+            pair.session.apply_layout(
+                align=layout['align'],
+                letter_spacing=layout['letter_spacing'],
+                line_height=layout['line_height'],
+                margins=layout['margins'],
+                font_family=layout['font_family'],
+                preferred_font_pt=layout['font_pt'],
+            )
+            if not pair.session.user_zoomed:
+                pair.fit_display()
+        finally:
+            self._lyric_ui_applying = False
+
+    def _persist_lyric_style_from_session(self):
+        if getattr(self, '_loading_settings', False) or getattr(self, '_lyric_ui_applying', False):
+            return
+        pair = getattr(self, '_lyric_pair', None)
+        if pair is None:
+            return
+        self._persist_settings(
+            lyric_align=normalize_lyric_align(pair.session.align),
+            lyric_letter_spacing=normalize_letter_spacing(pair.session.letter_spacing),
+            lyric_line_height=normalize_line_height(
+                getattr(pair.session, 'line_height', DEFAULT_LINE_HEIGHT)
+            ),
+            lyric_margins=normalize_lyric_margins(
+                getattr(pair.session, 'margins', DEFAULT_LYRIC_MARGINS)
+            ),
+            lyric_font_family=normalize_lyric_font_family(
+                getattr(pair.session, 'font_family', DEFAULT_LYRIC_FONT_FAMILY)
+            ),
+        )
+
+    def _on_lyric_style_changed(self):
+        if getattr(self, '_loading_settings', False) or getattr(self, '_lyric_ui_applying', False):
+            return
+        pair = getattr(self, '_lyric_pair', None)
+        if pair is None:
+            return
+        align = normalize_lyric_align(pair.session.align)
+        spacing = normalize_letter_spacing(pair.session.letter_spacing)
+        line_height = normalize_line_height(getattr(pair.session, 'line_height', DEFAULT_LINE_HEIGHT))
+        margins = normalize_lyric_margins(getattr(pair.session, 'margins', DEFAULT_LYRIC_MARGINS))
+        font_family = normalize_lyric_font_family(
+            getattr(pair.session, 'font_family', DEFAULT_LYRIC_FONT_FAMILY)
+        )
+        timer = getattr(self, '_lyric_style_persist_debounce', None)
+        if timer is not None:
+            timer.start()
+        else:
+            self._persist_lyric_style_from_session()
+        if hasattr(self, 'combo_lyric_align'):
+            idx = self.combo_lyric_align.findData(align)
+            self.combo_lyric_align.blockSignals(True)
+            self.combo_lyric_align.setCurrentIndex(idx if idx >= 0 else 0)
+            self.combo_lyric_align.blockSignals(False)
+        if hasattr(self, 'slider_lyric_spacing'):
+            self.slider_lyric_spacing.blockSignals(True)
+            self.slider_lyric_spacing.setValue(spacing)
+            self.slider_lyric_spacing.blockSignals(False)
+        if hasattr(self, 'lbl_lyric_spacing_val'):
+            self.lbl_lyric_spacing_val.setText(f'{spacing}%')
+        if hasattr(self, 'slider_lyric_line_height'):
+            self.slider_lyric_line_height.blockSignals(True)
+            self.slider_lyric_line_height.setValue(line_height)
+            self.slider_lyric_line_height.blockSignals(False)
+        if hasattr(self, 'lbl_lyric_line_height_val'):
+            self.lbl_lyric_line_height_val.setText(f'{line_height}%')
+        if hasattr(self, 'spin_lyric_margins'):
+            for side, spin in self.spin_lyric_margins.items():
+                spin.blockSignals(True)
+                spin.setValue(margins[side])
+                spin.blockSignals(False)
+        if hasattr(self, 'combo_lyric_font_family'):
+            self.combo_lyric_font_family.blockSignals(True)
+            self.combo_lyric_font_family.setCurrentFont(QFont(font_family))
+            self.combo_lyric_font_family.blockSignals(False)
+
+    def _on_lyric_placement_changed(self, _index=0):
+        placement = self.combo_lyric_placement.currentData() or PLACEMENT_WINDOW
+        self._persist_settings(lyric_control_placement=placement)
+        if getattr(self, '_lyric_pair', None) is not None:
+            self._lyric_pair.set_placement(placement, getattr(self, 'lyric_dock', None))
+
+    def _on_lyric_start_blacked_toggled(self, checked):
+        self._persist_settings(lyric_start_blacked=bool(checked))
+
+    def _on_lyric_preview_mode_toggled(self, checked):
+        checked = bool(checked)
+        self._persist_settings(lyric_preview_mode=checked)
+        pair = getattr(self, '_lyric_pair', None)
+        if pair is not None:
+            pair.set_preview_mode(checked)
+            self._schedule_lyric_preview()
+
+    def _on_lyric_go_live(self):
+        pair = getattr(self, '_lyric_pair', None)
+        if pair is None or not pair.session.hymn:
+            return
+        hymn = pair.session.hymn or {}
+        name = hymn.get('heading') or hymn.get('name') or hymn.get('title') or ''
+        self._show_open_hymn_popup(hymn.get('book', ''), name)
+        self._schedule_lyric_preview()
+        QTimer.singleShot(80, self._sync_lyric_preview)
+        self._show_toast(f'🎥  已轉出現場：{name}')
+
+
+    def _overlay_duration_value(self):
+        if hasattr(self, 'chk_overlay_always') and self.chk_overlay_always.isChecked():
+            return OVERLAY_DURATION_ALWAYS
+        if hasattr(self, 'spin_overlay_duration'):
+            return _normalize_overlay_duration(self.spin_overlay_duration.value())
+        return _normalize_overlay_duration(self._settings.get('overlay_duration', DEFAULT_OVERLAY_SECS))
+
+    def _overlay_center_secs(self):
+        if hasattr(self, 'spin_overlay_center'):
+            val = self.spin_overlay_center.value()
+            if val is not None:
+                return _normalize_center_secs(val)
+        return _normalize_center_secs(self._settings.get('overlay_center_secs', CENTER_OVERLAY_SECS))
+
+    def _sync_overlay_center_enabled(self):
+        overlay_on = bool(self.chk_open_overlay.isChecked()) if hasattr(self, 'chk_open_overlay') else True
+        center_mode = (
+            hasattr(self, 'combo_overlay_pos')
+            and self.combo_overlay_pos.currentData() == OVERLAY_MODE_CENTER
+        )
+        enabled = overlay_on and center_mode
+        for w in (
+            getattr(self, 'lbl_overlay_center', None),
+            getattr(self, 'spin_overlay_center', None),
+            getattr(self, 'chk_overlay_auto_unblack', None),
+        ):
+            if w is not None:
+                w.setEnabled(enabled)
+
+    def _on_overlay_center_changed(self, _idx):
+        self._persist_settings(overlay_center_secs=self._overlay_center_secs())
+        self._sync_book_name_overlay_settings()
+        self._schedule_lyric_preview()
+
+    def _on_overlay_auto_unblack_toggled(self, checked):
+        checked = bool(checked)
+        self._persist_settings(overlay_auto_unblack=checked)
+        if hasattr(self._remote.state, 'set_overlay_auto_unblack'):
+            self._remote.state.set_overlay_auto_unblack(checked)
+
+    def _on_overlay_countdown_finished(self):
+        self._schedule_lyric_preview()
+        self._tick_overlay_countdown()
+        if not self._settings.get('overlay_auto_unblack'):
+            return
+        pair = getattr(self, '_lyric_pair', None)
+        if pair is not None and pair.session.blacked:
+            pair.session.set_blacked(False)
+
+    def _start_overlay_countdown_tick(self):
+        timer = getattr(self, '_overlay_count_timer', None)
+        if timer is None:
+            return
+        timer.start()
+        self._tick_overlay_countdown()
+
+    def _tick_overlay_countdown(self):
+        pair = getattr(self, '_lyric_pair', None)
+        ends = BookNameOverlay.ends_at_unix()
+        text = ''
+        if ends > 0:
+            left = int(ends - time.time() + 0.999)
+            if left > 0:
+                text = f'轉移 {left} 秒'
+                if self._settings.get('overlay_auto_unblack') and pair is not None and pair.session.blacked:
+                    text += ' · 完咗取消全黑'
+        if pair is not None:
+            pair.set_countdown(text)
+        timer = getattr(self, '_overlay_count_timer', None)
+        if not text and timer is not None:
+            timer.stop()
+
+    def _schedule_lyric_preview(self):
+        timer = getattr(self, '_preview_sync_timer', None)
+        if timer is not None:
+            timer.start()
+
+    def _sync_lyric_preview(self):
+        pair = getattr(self, '_lyric_pair', None)
+        remote = getattr(self, '_remote', None)
+        if pair is None or remote is None:
+            return
+        state = getattr(remote, 'state', None)
+        # Local lyric windows update via session signals; remote push only when watched.
+        if state is not None and hasattr(state, 'has_preview_subscribers'):
+            try:
+                if not state.has_preview_subscribers():
+                    return
+            except Exception:
+                pass
+        stage_w, stage_h = 1920, 1080
+        hymn_open = bool(getattr(pair.session, 'hymn', None))
+        fullscreen = False
+        try:
+            display = getattr(pair, 'display', None)
+            canvas = getattr(display, 'canvas', None) if display is not None else None
+            if canvas is not None and canvas.width() >= 40 and canvas.height() >= 40:
+                stage_w = canvas.width()
+                stage_h = canvas.height()
+            fullscreen = bool(hymn_open and pair.is_display_fullscreen())
+        except Exception:
+            fullscreen = False
+        snap = pair.session.preview_snapshot(
+            stage_w, stage_h, display_open=hymn_open, fullscreen=fullscreen,
+        )
+        snap['overlay_ends_at'] = round(BookNameOverlay.ends_at_unix(), 3)
+        remote.state.set_lyric_preview(snap)
+
+    def _apply_lyric_settings(self):
+        s = self._settings
+        if getattr(self, '_lyric_pair', None) is None:
+            return
+        self._lyric_pair.session.set_colors(
+            s.get('lyric_bg_color', DEFAULT_LYRIC_BG),
+            s.get('lyric_text_color', DEFAULT_LYRIC_TEXT),
+        )
+        self._lyric_pair.session.set_bg_image(s.get('lyric_bg_image') or '')
+        self._lyric_pair.session.set_align(s.get('lyric_align', DEFAULT_LYRIC_ALIGN))
+        self._lyric_pair.session.set_letter_spacing(
+            s.get('lyric_letter_spacing', DEFAULT_LETTER_SPACING)
+        )
+        self._lyric_pair.session.set_line_height(
+            s.get('lyric_line_height', DEFAULT_LINE_HEIGHT)
+        )
+        self._lyric_pair.session.set_margins(s.get('lyric_margins', DEFAULT_LYRIC_MARGINS))
+        self._lyric_pair.session.set_font_family(
+            s.get('lyric_font_family', DEFAULT_LYRIC_FONT_FAMILY)
+        )
+        self._lyric_pair.session.set_preferred_font_pt(s.get('lyric_font_pt', DEFAULT_LYRIC_FONT_PT))
+        # Keep preview staging style in sync with saved defaults
+        prev = getattr(self._lyric_pair, 'preview_session', None)
+        if prev is not None:
+            prev.set_colors(
+                s.get('lyric_bg_color', DEFAULT_LYRIC_BG),
+                s.get('lyric_text_color', DEFAULT_LYRIC_TEXT),
+            )
+            prev.set_bg_image(s.get('lyric_bg_image') or '')
+            prev.set_align(s.get('lyric_align', DEFAULT_LYRIC_ALIGN))
+            prev.set_letter_spacing(s.get('lyric_letter_spacing', DEFAULT_LETTER_SPACING))
+            prev.set_line_height(s.get('lyric_line_height', DEFAULT_LINE_HEIGHT))
+            prev.set_margins(s.get('lyric_margins', DEFAULT_LYRIC_MARGINS))
+            prev.set_font_family(s.get('lyric_font_family', DEFAULT_LYRIC_FONT_FAMILY))
+            prev.set_preferred_font_pt(s.get('lyric_font_pt', DEFAULT_LYRIC_FONT_PT))
+        self._lyric_pair.set_placement(
+            s.get('lyric_control_placement', PLACEMENT_WINDOW),
+            getattr(self, 'lyric_dock', None),
+        )
+        self._lyric_pair.set_preview_mode(bool(s.get('lyric_preview_mode', False)))
+        if hasattr(self, 'chk_lyric_preview_mode'):
+            self.chk_lyric_preview_mode.blockSignals(True)
+            self.chk_lyric_preview_mode.setChecked(bool(s.get('lyric_preview_mode', False)))
+            self.chk_lyric_preview_mode.blockSignals(False)
 
     def _update_overlay_color_previews(self):
         if hasattr(self, 'lbl_overlay_bg_preview'):
@@ -4212,7 +5054,9 @@ class MainWindow(QMainWindow, EnhancementMixin):
             ref._corner_duration,
             ref._mode,
             self._settings,
+            center_secs=self._overlay_center_secs(),
         )
+        self._start_overlay_countdown_tick()
 
     def _on_overlay_appearance_changed(self, _value=''):
         values = self._overlay_appearance_values()
@@ -4238,35 +5082,52 @@ class MainWindow(QMainWindow, EnhancementMixin):
 
     def _on_open_overlay_toggled(self, checked):
         self._sync_open_overlay_checkboxes(checked)
-        for w in (self.lbl_overlay_secs, self.combo_overlay_duration,
+        for w in (self.lbl_overlay_secs, getattr(self, 'overlay_duration_row', None),
+                  getattr(self, 'spin_overlay_duration', None),
+                  getattr(self, 'chk_overlay_always', None),
                   self.lbl_overlay_pos, self.combo_overlay_pos):
-            w.setEnabled(checked)
+            if w is not None:
+                w.setEnabled(checked)
+        if (
+            checked
+            and hasattr(self, 'chk_overlay_always')
+            and self.chk_overlay_always.isChecked()
+            and hasattr(self, 'spin_overlay_duration')
+        ):
+            self.spin_overlay_duration.setEnabled(False)
         for w in self._overlay_appearance_widgets():
             w.setEnabled(checked)
+        self._sync_overlay_center_enabled()
         if not checked:
             BookNameOverlay.hide_overlay()
+            self._schedule_lyric_preview()
         self._persist_settings(open_overlay=checked)
 
     def _on_open_overlay_hdr_toggled(self, checked):
         self._on_open_overlay_toggled(checked)
 
-    def _on_overlay_duration_changed(self, _idx):
+    def _on_overlay_always_toggled(self, checked):
+        if hasattr(self, 'spin_overlay_duration'):
+            self.spin_overlay_duration.setEnabled(not checked)
+        self._on_overlay_duration_changed()
+
+    def _on_overlay_duration_changed(self, _val=None):
         self._persist_settings(
-            overlay_duration=self.combo_overlay_duration.currentData()
+            overlay_duration=self._overlay_duration_value()
         )
+        self._sync_book_name_overlay_settings()
+        self._schedule_lyric_preview()
 
     def _on_overlay_mode_changed(self, _idx):
         self._persist_settings(
             overlay_mode=self.combo_overlay_pos.currentData()
         )
+        self._sync_overlay_center_enabled()
         self._sync_book_name_overlay_settings()
 
     def _on_display_duplicate_toggled(self, checked):
         self._sync_display_duplicate_checkboxes(checked)
         self._persist_settings(display_duplicate=checked)
-
-    def _on_display_duplicate_hdr_toggled(self, checked):
-        self._on_display_duplicate_toggled(checked)
 
     def _on_display_switch_mode_changed(self, _index=-1):
         mode = self.combo_display_switch_mode.currentData()
@@ -4295,6 +5156,8 @@ class MainWindow(QMainWindow, EnhancementMixin):
 
     def _hide_overlay_on_esc(self):
         BookNameOverlay.hide_overlay()
+        self._schedule_lyric_preview()
+        self._tick_overlay_countdown()
 
     def _on_projection_ready(self, generation: int):
         if not self._open_flow.should_switch_display(generation):
@@ -5014,6 +5877,31 @@ class MainWindow(QMainWindow, EnhancementMixin):
             self._remote.state.set_hymn_num_mode(s.get('hymn_num_mode', HYMN_NUM_MODE_CONTAINS))
         if hasattr(self._remote.state, 'set_click_to_open'):
             self._remote.state.set_click_to_open(s.get('click_to_open', False))
+        if hasattr(self._remote.state, 'set_overlay_auto_unblack'):
+            self._remote.state.set_overlay_auto_unblack(s.get('overlay_auto_unblack', False))
+        if hasattr(self, 'chk_overlay_auto_unblack'):
+            self.chk_overlay_auto_unblack.blockSignals(True)
+            self.chk_overlay_auto_unblack.setChecked(s.get('overlay_auto_unblack', False))
+            self.chk_overlay_auto_unblack.blockSignals(False)
+        if hasattr(self, 'spin_overlay_center'):
+            self.spin_overlay_center.blockSignals(True)
+            self.spin_overlay_center.setValue(
+                _normalize_center_secs(s.get('overlay_center_secs', CENTER_OVERLAY_SECS))
+            )
+            self.spin_overlay_center.blockSignals(False)
+        if hasattr(self, 'spin_overlay_duration'):
+            dur = _normalize_overlay_duration(s.get('overlay_duration'))
+            always = dur == OVERLAY_DURATION_ALWAYS
+            if hasattr(self, 'chk_overlay_always'):
+                self.chk_overlay_always.blockSignals(True)
+                self.chk_overlay_always.setChecked(always)
+                self.chk_overlay_always.blockSignals(False)
+            self.spin_overlay_duration.blockSignals(True)
+            self.spin_overlay_duration.setValue(
+                DEFAULT_OVERLAY_SECS if always else dur
+            )
+            self.spin_overlay_duration.setEnabled(not always)
+            self.spin_overlay_duration.blockSignals(False)
         if hasattr(self, 'combo_hymn_num_mode'):
             idx = self.combo_hymn_num_mode.findData(
                 s.get('hymn_num_mode', HYMN_NUM_MODE_CONTAINS)
@@ -5051,6 +5939,77 @@ class MainWindow(QMainWindow, EnhancementMixin):
                 _normalize_hex_color(text_color, DEFAULT_OVERLAY_TEXT_COLOR) if text_color else ''
             )
             self.inp_overlay_text_color.blockSignals(False)
+        if hasattr(self, 'inp_lyric_bg_color'):
+            self.inp_lyric_bg_color.blockSignals(True)
+            self.inp_lyric_bg_color.setText(
+                _normalize_hex_color(s.get('lyric_bg_color'), DEFAULT_LYRIC_BG)
+            )
+            self.inp_lyric_bg_color.blockSignals(False)
+        if hasattr(self, 'inp_lyric_text_color'):
+            self.inp_lyric_text_color.blockSignals(True)
+            self.inp_lyric_text_color.setText(
+                _normalize_hex_color(s.get('lyric_text_color'), DEFAULT_LYRIC_TEXT)
+            )
+            self.inp_lyric_text_color.blockSignals(False)
+        if hasattr(self, 'combo_lyric_placement'):
+            idx = self.combo_lyric_placement.findData(
+                s.get('lyric_control_placement', PLACEMENT_WINDOW)
+            )
+            self.combo_lyric_placement.blockSignals(True)
+            self.combo_lyric_placement.setCurrentIndex(idx if idx >= 0 else 0)
+            self.combo_lyric_placement.blockSignals(False)
+        if hasattr(self, 'combo_lyric_align'):
+            idx = self.combo_lyric_align.findData(s.get('lyric_align', DEFAULT_LYRIC_ALIGN))
+            self.combo_lyric_align.blockSignals(True)
+            self.combo_lyric_align.setCurrentIndex(idx if idx >= 0 else 0)
+            self.combo_lyric_align.blockSignals(False)
+        if hasattr(self, 'slider_lyric_spacing'):
+            spacing = normalize_letter_spacing(s.get('lyric_letter_spacing'))
+            self.slider_lyric_spacing.blockSignals(True)
+            self.slider_lyric_spacing.setValue(spacing)
+            self.slider_lyric_spacing.blockSignals(False)
+            if hasattr(self, 'lbl_lyric_spacing_val'):
+                self.lbl_lyric_spacing_val.setText(f'{spacing}%')
+        if hasattr(self, 'slider_lyric_line_height'):
+            line_height = normalize_line_height(s.get('lyric_line_height'))
+            self.slider_lyric_line_height.blockSignals(True)
+            self.slider_lyric_line_height.setValue(line_height)
+            self.slider_lyric_line_height.blockSignals(False)
+            if hasattr(self, 'lbl_lyric_line_height_val'):
+                self.lbl_lyric_line_height_val.setText(f'{line_height}%')
+        if hasattr(self, 'spin_lyric_margins'):
+            margins = normalize_lyric_margins(s.get('lyric_margins'))
+            for side, spin in self.spin_lyric_margins.items():
+                spin.blockSignals(True)
+                spin.setValue(margins[side])
+                spin.blockSignals(False)
+        if hasattr(self, 'combo_lyric_font_family'):
+            family = normalize_lyric_font_family(s.get('lyric_font_family'))
+            self.combo_lyric_font_family.blockSignals(True)
+            self.combo_lyric_font_family.setCurrentFont(QFont(family))
+            self.combo_lyric_font_family.blockSignals(False)
+        if hasattr(self, 'chk_lyric_font_auto') and hasattr(self, 'spin_lyric_font'):
+            font_pt = normalize_lyric_font_pt(s.get('lyric_font_pt'))
+            self.chk_lyric_font_auto.blockSignals(True)
+            self.spin_lyric_font.blockSignals(True)
+            self.chk_lyric_font_auto.setChecked(font_pt <= 0)
+            self.spin_lyric_font.setValue(font_pt if font_pt > 0 else 48)
+            self.spin_lyric_font.setEnabled(font_pt > 0)
+            self.chk_lyric_font_auto.blockSignals(False)
+            self.spin_lyric_font.blockSignals(False)
+        if hasattr(self, 'chk_lyric_start_blacked'):
+            self.chk_lyric_start_blacked.blockSignals(True)
+            self.chk_lyric_start_blacked.setChecked(bool(s.get('lyric_start_blacked', True)))
+            self.chk_lyric_start_blacked.blockSignals(False)
+        if hasattr(self, 'lbl_lyric_bg_preview'):
+            self._update_qr_color_preview(
+                self.lbl_lyric_bg_preview, s.get('lyric_bg_color'), DEFAULT_LYRIC_BG,
+            )
+            self._update_qr_color_preview(
+                self.lbl_lyric_text_preview, s.get('lyric_text_color'), DEFAULT_LYRIC_TEXT,
+            )
+        self._apply_lyric_settings()
+        self._sync_lyric_bg_image_label()
         self._update_overlay_color_previews()
         if s['remote_api_enabled']:
             self.chk_remote_api.setChecked(True)
@@ -5060,11 +6019,11 @@ class MainWindow(QMainWindow, EnhancementMixin):
                 self._remote.state.set_accepting(True)
         for chk, key in (
             (self.chk_show_preview, 'show_preview'),
+            (self.chk_lyric_start_blacked, 'lyric_start_blacked'),
             (self.chk_auto_rescan, 'auto_rescan'),
             (self.chk_startup_tray, 'startup_tray'),
             (self.chk_minimize_tray, 'minimize_to_tray'),
             (self.chk_viewer_show_debug, 'viewer_show_debug'),
-            (self.chk_show_qr_hdr, 'show_qr_code'),
             (self.chk_show_qr_lan, 'show_qr_lan'),
             (self.chk_show_qr_fixed, 'show_qr_fixed'),
             (self.chk_show_qr_quick, 'show_qr_quick'),
@@ -5300,27 +6259,75 @@ class MainWindow(QMainWindow, EnhancementMixin):
         self._update_qr_code(sync_desktop=False)
 
     def _browse_hymn_folder(self):
-        start = self.inp_hymn_folder.text().strip() or self.hymn_folder
-        if not os.path.isdir(start):
-            start = os.path.dirname(start) if os.path.dirname(start) else default_hymn_folder()
-        path = QFileDialog.getExistingDirectory(self, "選擇詩歌資料夾", start)
+        start = self.inp_hymn_folder.text().strip() or self.hymns_json_path
+        if os.path.isfile(start):
+            start_dir = os.path.dirname(start)
+        elif os.path.isdir(start):
+            start_dir = start
+        else:
+            start_dir = os.path.dirname(default_hymns_json_path())
+        path, _ = QFileDialog.getOpenFileName(
+            self, "選擇 hymns.json", start_dir, "JSON (*.json);;All files (*.*)",
+        )
         if path:
             self.inp_hymn_folder.setText(path)
 
-    def _apply_hymn_folder(self):
-        path = self.inp_hymn_folder.text().strip() or default_hymn_folder()
-        path = os.path.abspath(path)
-        if path == os.path.abspath(self.hymn_folder):
-            self._show_toast('資料夾路徑未變更', 'warn')
+    def _open_hymn_editor(self, hymn_id='', volume_id=''):
+        from hymn_features.hymn_editor import HymnCatalogEditorDialog
+        path = resolve_hymns_json_path(
+            (self.inp_hymn_folder.text().strip() if hasattr(self, 'inp_hymn_folder') else '')
+            or getattr(self, 'hymns_json_path', '')
+            or self.hymn_folder
+        )
+        dlg = HymnCatalogEditorDialog(
+            path,
+            parent=self,
+            select_hymn_id=hymn_id or '',
+            select_volume_id=volume_id or '',
+            theme=getattr(self, 'theme_name', 'dark'),
+            font_size=getattr(self, 'font_size', 14),
+        )
+        dlg.exec()
+        if not dlg.did_save:
             return
-        self.hymn_folder = path
+        self.hymns_json_path = dlg.json_path
+        self.hymn_folder = os.path.dirname(dlg.json_path)
+        if hasattr(self, 'inp_hymn_folder'):
+            self.inp_hymn_folder.setText(dlg.json_path)
+        self._persist_settings(hymn_folder=dlg.json_path)
+        self._scan_all()
+        self._refresh_open_hymn_after_edit()
+        self._show_toast(f'已更新詩歌庫 · {dlg.saved_count} 首', 'ok')
+
+    def _refresh_open_hymn_after_edit(self):
+        pair = getattr(self, '_lyric_pair', None)
+        session = getattr(pair, 'session', None) if pair else None
+        hymn = getattr(session, 'hymn', None) if session else None
+        if not pair or not hymn:
+            return
+        book, found = find_hymn_in_books(self.books, hymn_id=hymn.get('id') or '')
+        if not found:
+            return
+        try:
+            pair.open_hymn(hymn_payload(book, found), keep_blacked=True)
+        except Exception as exc:
+            print(f'[WARN] refresh open hymn: {exc}')
+
+    def _apply_hymn_folder(self):
+        path = self.inp_hymn_folder.text().strip() or default_hymns_json_path()
+        path = resolve_hymns_json_path(path)
+        if path == os.path.abspath(self.hymns_json_path):
+            self._show_toast('資料路徑未變更', 'warn')
+            return
+        self.hymns_json_path = path
+        self.hymn_folder = os.path.dirname(path)
         self._persist_settings(hymn_folder=path)
         self._stop_index_worker()
         self._stop_search_worker()
         self.content_index = None
         self.current_book = None
         self._scan_all()
-        self._show_toast(f'已切換資料夾：{os.path.basename(path) or path}', 'ok')
+        self._show_toast(f'已載入：{os.path.basename(path) or path}', 'ok')
 
     def _refresh_settings_layout(self):
         for w in (self.grp_data, self.grp_appearance, self.grp_open,
@@ -5430,6 +6437,23 @@ class MainWindow(QMainWindow, EnhancementMixin):
         # Global stylesheet
         self.setStyleSheet(build_app_style(self.theme_name, fs))
 
+        # QFontComboBox popup uses a custom delegate that ignores dark item colors
+        if hasattr(self, 'combo_lyric_font_family'):
+            view = self.combo_lyric_font_family.view()
+            if view is not None:
+                vpal = QPalette(view.palette())
+                vpal.setColor(QPalette.ColorRole.Base, QColor('#ffffff'))
+                vpal.setColor(QPalette.ColorRole.AlternateBase, QColor('#f4f5fb'))
+                vpal.setColor(QPalette.ColorRole.Text, QColor('#1a1e40'))
+                vpal.setColor(QPalette.ColorRole.WindowText, QColor('#1a1e40'))
+                vpal.setColor(QPalette.ColorRole.HighlightedText, QColor('#ffffff'))
+                vpal.setColor(QPalette.ColorRole.Highlight, QColor(t['accent']))
+                view.setPalette(vpal)
+                view.setStyleSheet(
+                    f"background: #ffffff; color: #1a1e40; outline: none; "
+                    f"selection-background-color: {t['accent']}; selection-color: #ffffff;"
+                )
+
         # ── Header ──────────────────────────────────────────────
         self.header_frame.setStyleSheet(
             f"background: {t['panel']}; border-bottom: 1px solid {t['border']};"
@@ -5449,8 +6473,6 @@ class MainWindow(QMainWindow, EnhancementMixin):
         )
         self.chk_click_to_open_hdr.setStyleSheet(hdr_chk_style)
         self.chk_open_overlay_hdr.setStyleSheet(hdr_chk_style)
-        self.chk_display_duplicate_hdr.setStyleSheet(hdr_chk_style)
-        self.chk_show_qr_hdr.setStyleSheet(hdr_chk_style)
 
         # ── Footer ───────────────────────────────────────────────
         footer_style = (
@@ -5463,6 +6485,10 @@ class MainWindow(QMainWindow, EnhancementMixin):
         for lbl in (self.footer_status_lbl, self.footer_last_lbl, self.footer_index_lbl,
                     self.footer_pending_lbl, self.footer_remote_lbl):
             lbl.setStyleSheet(footer_lbl)
+        if hasattr(self, 'chk_lyric_preview_mode'):
+            self.chk_lyric_preview_mode.setStyleSheet(
+                f"color: {t['text2']}; font-size: {max(10, fs - 2)}px; background: transparent;"
+            )
 
         # ── Sidebar ──────────────────────────────────────────────
         self.sidebar_frame.setStyleSheet(
@@ -5518,7 +6544,7 @@ class MainWindow(QMainWindow, EnhancementMixin):
                 border-radius: 14px; padding: 4px 12px;
                 font-size: {max(10, fs - 2)}px; font-weight: 600;
                 border: 1.5px solid {t['in_bd']};
-                color: {t['text2']}; background: transparent;
+                color: {t['text']}; background: {t['panel2']};
             }}
             QPushButton:checked {{
                 background: {t['accent']}; border-color: {t['accent']}; color: {t['a_text']};
@@ -5713,38 +6739,32 @@ class MainWindow(QMainWindow, EnhancementMixin):
 
         index_btn_style = f"""
             QPushButton {{
-                background: {t['panel2']}; color: {t['text']};
-                border: 1.5px solid {t['in_bd']}; border-radius: 8px;
+                background: #e8ebff; color: #1a1e40;
+                border: 1.5px solid #c5c9ee; border-radius: 8px;
                 padding: 4px 14px; font-size: {fs - 2}px; font-weight: 600;
             }}
-            QPushButton:hover {{ border-color: {t['accent_h']}; color: {t['accent_h']}; }}
-            QPushButton:disabled {{ color: {t['muted']}; border-color: {t['border']}; }}
+            QPushButton:hover {{ background: #ffffff; border-color: {t['accent_h']}; color: #1a1e40; }}
+            QPushButton:disabled {{ background: {t['panel2']}; color: {t['muted']}; border-color: {t['border']}; }}
         """
         self.btn_build_index.setStyleSheet(index_btn_style)
         self.btn_refresh_index.setStyleSheet(index_btn_style)
         self.btn_browse_hymn_folder.setStyleSheet(index_btn_style)
         self.btn_apply_hymn_folder.setStyleSheet(action_style)
+        if hasattr(self, 'btn_edit_hymns'):
+            self.btn_edit_hymns.setStyleSheet(index_btn_style)
         self.btn_export_settings.setStyleSheet(index_btn_style)
         self.btn_import_settings.setStyleSheet(index_btn_style)
-        if hasattr(self, 'btn_check_update'):
-            self.btn_check_update.setStyleSheet(index_btn_style)
-        if hasattr(self, 'btn_open_download'):
-            self.btn_open_download.setStyleSheet(action_style)
-        if hasattr(self, 'lbl_update_status'):
-            self.lbl_update_status.setStyleSheet(
-                f"font-size: {fs - 1}px; color: {t['text2']}; background: transparent;"
-            )
         if hasattr(self, 'about_ver_lbl'):
             self.about_ver_lbl.setStyleSheet(
                 f"font-size: {fs + 1}px; font-weight: 600; color: {t['text']}; background: transparent;"
             )
         compact_btn_style = f"""
             QPushButton {{
-                background: {t['panel2']}; color: {t['text2']};
-                border: 1px solid {t['in_bd']}; border-radius: 6px;
+                background: #e8ebff; color: #1a1e40;
+                border: 1px solid #c5c9ee; border-radius: 6px;
                 font-size: {max(10, fs - 3)}px; font-weight: 600; padding: 0;
             }}
-            QPushButton:hover {{ border-color: {t['accent_h']}; color: {t['text']}; }}
+            QPushButton:hover {{ background: #ffffff; border-color: {t['accent_h']}; color: #1a1e40; }}
         """
         for btn in (self.btn_sess_prev, self.btn_sess_next,
                     self.btn_sched_prev, self.btn_sched_next,
@@ -5804,9 +6824,12 @@ class MainWindow(QMainWindow, EnhancementMixin):
             self.chk_show_qr_lan, self.chk_show_qr_fixed, self.chk_show_qr_quick,
             self.chk_viewer_show_debug,
             self.chk_show_preview,
+            getattr(self, 'chk_overlay_always', None),
+            getattr(self, 'chk_lyric_start_blacked', None),
             self.chk_auto_rescan, self.chk_startup_tray, self.chk_minimize_tray,
         ):
-            chk.setStyleSheet(checkbox_style)
+            if chk is not None:
+                chk.setStyleSheet(checkbox_style)
         for lbl in (self.lbl_remote_policy, self.lbl_remote_port,
                     self.lbl_remote_token, self.lbl_remote_url, self.lbl_viewer_url,
                     self.lbl_quick_url, getattr(self, 'lbl_quick_admin_url', None),
@@ -5879,8 +6902,14 @@ class MainWindow(QMainWindow, EnhancementMixin):
 
         # Settings labels
         for lbl in (self.lbl_hymn_folder, self.lbl_theme, self.lbl_font, self.lbl_hymn_num_mode,
-                    self.lbl_overlay_secs, self.lbl_overlay_pos, self.fs_lbl,
+                    self.lbl_overlay_secs, self.lbl_overlay_pos, self.lbl_overlay_center, self.fs_lbl,
                     self.lbl_overlay_bg, self.lbl_overlay_text_color,
+                    self.lbl_lyric_bg, getattr(self, 'lbl_lyric_bg_image', None),
+                    self.lbl_lyric_text, self.lbl_lyric_align,
+                    self.lbl_lyric_spacing, self.lbl_lyric_line_height,
+                    self.lbl_lyric_margin, getattr(self, 'lbl_lyric_font_family', None),
+                    self.lbl_lyric_font, self.lbl_lyric_best,
+                    self.lbl_lyric_placement,
                     self.lbl_remote_policy, self.lbl_remote_port, self.lbl_remote_token, self.lbl_remote_url,
                     self.lbl_viewer_url, self.lbl_local_url, self.lbl_quick_url,
                     getattr(self, 'lbl_quick_admin_url', None),
@@ -5917,6 +6946,9 @@ class MainWindow(QMainWindow, EnhancementMixin):
             f"border-top: 1px solid {t['border']};"
         )
 
+        if getattr(self, '_lyric_pair', None) is not None:
+            self._lyric_pair.set_theme(self.theme_name)
+
         # Dropdown
         self.dropdown.set_theme(self.theme_name, self.font_size)
         if hasattr(self, 'sched_entry_dropdown'):
@@ -5927,14 +6959,17 @@ class MainWindow(QMainWindow, EnhancementMixin):
 
     def _scan_all(self):
         t = THEMES[self.theme_name]
-        self.books = scan_books(self.hymn_folder)
+        self.hymns_json_path = resolve_hymns_json_path(
+            getattr(self, 'hymns_json_path', '') or self.hymn_folder
+        )
+        self.books = scan_books(self.hymns_json_path)
 
         if not self.books:
             self.book_list.clear()
-            item = QListWidgetItem("  ⚠  找不到資料夾")
+            item = QListWidgetItem("  ⚠  找不到詩歌資料")
             item.setForeground(QColor(t['err']))
             self.book_list.addItem(item)
-            self._set_status('err', f"找不到：{os.path.basename(self.hymn_folder)}")
+            self._set_status('err', f"找不到：{os.path.basename(self.hymns_json_path)}")
             return
 
         self._rebuild_book_list()
@@ -5955,7 +6990,14 @@ class MainWindow(QMainWindow, EnhancementMixin):
         self._load_content_index()
 
     def _load_content_index(self):
-        self.content_index = load_content_index(self.hymn_folder)
+        folder = self.hymn_folder
+        if os.path.isfile(folder):
+            folder = os.path.dirname(folder)
+        if not os.path.isdir(folder):
+            self.content_index = None
+            self._update_index_status_label()
+            return
+        self.content_index = load_content_index(folder)
         self._update_index_status_label()
 
     def _update_index_status_label(self):
@@ -6055,7 +7097,7 @@ class MainWindow(QMainWindow, EnhancementMixin):
             self.sel_info.setText(f"  ▸  排程 · {book['name']}")
             return
         if self.search_mode in ('global', 'keyword'):
-            self._set_search_mode('book')
+            self._set_search_mode('standard')
         self.current_book = book
         self.inp_book.blockSignals(True)
         self.inp_book.setText(book['name'])
@@ -6097,12 +7139,18 @@ class MainWindow(QMainWindow, EnhancementMixin):
         if q:
             targets = resolve_targets(book, q, num_mode=self._hymn_num_mode())
             if not targets:
-                ni = QListWidgetItem("  ⚠  沒有符合條件的檔案或書籤")
+                ni = QListWidgetItem("  ⚠  沒有符合條件的詩歌")
                 ni.setForeground(QColor(t['muted']))
                 self.file_list.addItem(ni)
             else:
                 for payload in targets:
-                    if payload.get('kind') == 'file':
+                    if payload.get('kind') == 'hymn':
+                        item = QListWidgetItem(
+                            f"  {payload.get('name') or payload.get('title') or ''}"
+                        )
+                        item.setData(Qt.ItemDataRole.UserRole, payload)
+                        self.file_list.addItem(item)
+                    elif payload.get('kind') == 'file':
                         path = payload['path']
                         ext = os.path.splitext(path)[1].lower()
                         tag = ext[1:].upper() if ext.startswith('.') else ext.upper()
@@ -6129,33 +7177,25 @@ class MainWindow(QMainWindow, EnhancementMixin):
             return
 
         count = 0
-        for fi in book.get('files', []):
-            ext = fi['ext']
-            is_pdf = ext == '.pdf'
-            tag = ext[1:].upper() if ext.startswith('.') else ext.upper()
-            item = QListWidgetItem(f"  [{tag}]  {fi['name']}")
-            item.setData(Qt.ItemDataRole.UserRole, {'kind': 'file', 'path': fi['path']})
-            self.file_list.addItem(item)
-            count += 1
-
-            if is_pdf and book.get('bookmark') and book.get('toc'):
-                toc = book['toc']
-                if any(lvl == 2 for lvl, _, _ in toc):
-                    toc = [(lvl, title, page) for lvl, title, page in toc if lvl == 2]
-                if toc:
-                    add_section_hdr("    書籤")
-                    for lvl, title, page in toc:
-                        indent = "      " if lvl == 1 else "          "
-                        bi = QListWidgetItem(f"{indent}↳  {title}  ·  P.{page}")
-                        bi.setData(Qt.ItemDataRole.UserRole, {
-                            'kind': 'bookmark', 'title': title,
-                            'page': page, 'pdf_path': fi['path'],
-                        })
-                        self.file_list.addItem(bi)
-                        count += 1
+        hymns = book.get('hymns') or []
+        if hymns:
+            for hymn in hymns:
+                payload = hymn_payload(book, hymn)
+                item = QListWidgetItem(f"  {payload['name']}")
+                item.setData(Qt.ItemDataRole.UserRole, payload)
+                self.file_list.addItem(item)
+                count += 1
+        else:
+            for fi in book.get('files', []):
+                ext = fi['ext']
+                tag = ext[1:].upper() if ext.startswith('.') else ext.upper()
+                item = QListWidgetItem(f"  [{tag}]  {fi['name']}")
+                item.setData(Qt.ItemDataRole.UserRole, {'kind': 'file', 'path': fi['path']})
+                self.file_list.addItem(item)
+                count += 1
 
         if count == 0:
-            ni = QListWidgetItem("  ⚠  沒有符合條件的檔案或書籤")
+            ni = QListWidgetItem("  ⚠  沒有符合條件的詩歌")
             ni.setForeground(QColor(t['muted']))
             self.file_list.addItem(ni)
 
@@ -6186,27 +7226,23 @@ class MainWindow(QMainWindow, EnhancementMixin):
 
         by_book = {}
         for book in self.books:
-            pdf_path = book.get('pdf')
             matches = []
-
-            if book.get('bookmark') and book.get('toc'):
-                for lvl, title, page in book['toc']:
-                    score = fuzzy_match_score(q, title)
-                    if score > 0:
-                        matches.append({
-                            'kind': 'bookmark', 'title': title, 'page': page,
-                            'lvl': lvl, 'pdf_path': pdf_path, 'score': score,
-                        })
-
-            for fi in book.get('files', []):
-                score = fuzzy_match_score(q, fi['name'])
+            for hymn in book.get('hymns') or []:
+                payload = hymn_payload(book, hymn)
+                score = max(
+                    fuzzy_match_score(q, payload.get('name', '')) or 0,
+                    fuzzy_match_score(q, payload.get('title', '')) or 0,
+                    fuzzy_match_score(q, payload.get('code', '')) or 0,
+                )
+                if q in (payload.get('name') or '').lower() or q in (payload.get('title') or '').lower():
+                    score = max(score, 80)
+                if q.isdigit() and (
+                    q.lstrip('0') == (hymn.get('number') or '').lstrip('0')
+                    or q in (hymn.get('code') or '').lower()
+                ):
+                    score = max(score, 100)
                 if score > 0:
-                    ext = fi['ext']
-                    tag = ext[1:].upper() if ext.startswith('.') else ext.upper()
-                    matches.append({
-                        'kind': 'file', 'path': fi['path'], 'name': fi['name'],
-                        'tag': tag, 'score': score,
-                    })
+                    matches.append({**payload, 'score': score})
 
             if matches:
                 matches.sort(key=lambda m: m.get('score', 0), reverse=True)
@@ -6225,18 +7261,8 @@ class MainWindow(QMainWindow, EnhancementMixin):
             matches = by_book[book_name]
             add_section_hdr(f"📖  {book_name}  ({len(matches)} 項)")
             for m in matches:
-                if m['kind'] == 'bookmark':
-                    indent = "      " if m['lvl'] == 1 else "          "
-                    bi = QListWidgetItem(f"{indent}↳  {m['title']}  ·  P.{m['page']}")
-                    bi.setData(Qt.ItemDataRole.UserRole, {
-                        'kind': 'bookmark', 'title': m['title'],
-                        'page': m['page'], 'pdf_path': m['pdf_path'],
-                    })
-                else:
-                    bi = QListWidgetItem(f"      [{m['tag']}]  {m['name']}")
-                    bi.setData(Qt.ItemDataRole.UserRole, {
-                        'kind': 'file', 'path': m['path'],
-                    })
+                bi = QListWidgetItem(f"      {m.get('name') or m.get('title') or ''}")
+                bi.setData(Qt.ItemDataRole.UserRole, {k: v for k, v in m.items() if k != 'score'})
                 self.file_list.addItem(bi)
                 count += 1
 
@@ -6267,24 +7293,8 @@ class MainWindow(QMainWindow, EnhancementMixin):
             return
 
         self._stop_search_worker()
-        t = THEMES[self.theme_name]
-        using_index = bool(self.content_index)
-        if using_index:
-            results = search_content_index(self.content_index, query)
-            self._on_keyword_results(results)
-            return
-
-        self.file_list.clear()
-        ni = QListWidgetItem("  ⏳  正在搜索 PDF / Word 內容，請稍候…")
-        ni.setForeground(QColor(t['muted']))
-        self.file_list.addItem(ni)
-        self.file_count_lbl.setText("搜索中")
-        self._set_status('warn', '內容搜索中…（建議建立索引以加快速度）')
-
-        self._search_worker = ContentSearchWorker(query, index=None, books=self.books)
-        self._search_worker.progress.connect(self._on_search_progress)
-        self._search_worker.finished.connect(self._on_keyword_results)
-        self._search_worker.start()
+        results = search_hymn_lyrics(self.books, query)
+        self._on_keyword_results(results)
 
     def _on_search_progress(self, msg):
         self._set_status('warn', f'搜索中：{msg}')
@@ -6292,10 +7302,7 @@ class MainWindow(QMainWindow, EnhancementMixin):
     def _show_keyword_placeholder(self):
         self.file_list.clear()
         t = THEMES[self.theme_name]
-        if self.content_index:
-            hint = "  🔍  輸入關鍵字搜索（已載入索引，可勾選即時搜索）"
-        else:
-            hint = "  🔍  輸入關鍵字後按搜索（建議先按「建立索引」）"
+        hint = "  🔍  輸入關鍵字搜索歌詞（可勾選即時搜索）"
         ni = QListWidgetItem(hint)
         ni.setForeground(QColor(t['muted']))
         self.file_list.addItem(ni)
@@ -6323,7 +7330,7 @@ class MainWindow(QMainWindow, EnhancementMixin):
             return
 
         if not results:
-            ni = QListWidgetItem(f"  ⚠  在 PDF / Word 內容中找不到「{query}」")
+            ni = QListWidgetItem(f"  ⚠  在歌詞中找不到「{query}」")
             ni.setForeground(QColor(t['muted']))
             self.file_list.addItem(ni)
             self.file_count_lbl.setText("0 項")
@@ -6331,36 +7338,21 @@ class MainWindow(QMainWindow, EnhancementMixin):
             self._update_search_action_buttons()
             return
 
-        by_book = {}
-        for entry in results:
-            by_book.setdefault(entry['book'], []).append(entry)
-
         count = 0
-        for book_name in sorted(by_book.keys()):
-            entries = by_book[book_name]
-            book_hits = sum(len(e['hits']) for e in entries)
-            add_section_hdr(f"📖  {book_name}  ({book_hits} 處)")
-            for entry in entries:
-                ext = entry['ext']
-                tag = ext[1:].upper() if ext.startswith('.') else ext.upper()
-                add_section_hdr(f"    [{tag}]  {entry['file']}")
-                is_pdf = ext == '.pdf'
-                for hit in entry['hits']:
-                    loc = f"P.{hit['page']}" if is_pdf else f"§{hit['page']}"
-                    snip = hit.get('snippet', '')
-                    label = f"          ↳  {loc}  ·  {snip}" if snip else f"          ↳  {loc}"
-                    bi = QListWidgetItem(label)
-                    payload = {
-                        'kind': 'content_pdf' if is_pdf else 'content_word',
-                        'path': entry['path'],
-                        'page': hit['page'],
-                        'snippet': snip,
-                    }
-                    bi.setData(Qt.ItemDataRole.UserRole, payload)
-                    self.file_list.addItem(bi)
-                    count += 1
+        for entry in results:
+            hits = entry.get('hits') or []
+            add_section_hdr(f"📖  {entry['book']}  ({len(hits)} 首)")
+            for hit in hits:
+                snip = hit.get('snippet', '')
+                label = f"      {hit.get('name') or hit.get('title') or ''}"
+                if snip:
+                    label += f"  ·  {snip}"
+                bi = QListWidgetItem(label)
+                bi.setData(Qt.ItemDataRole.UserRole, hit)
+                self.file_list.addItem(bi)
+                count += 1
 
-        self.file_count_lbl.setText(f"{count} 處 · {len(by_book)} 本")
+        self.file_count_lbl.setText(f"{count} 處 · {len(results)} 本")
         self._set_status('ok', f'搜索完成 · {count} 處匹配')
         self._update_search_action_buttons()
 
@@ -6385,80 +7377,37 @@ class MainWindow(QMainWindow, EnhancementMixin):
         BlackScreenOverlay.hide()
         kind = payload.get('kind')
         opened = False
-        if kind == 'file':
-            path = payload.get('path')
-            if path and os.path.exists(path):
-                try:
-                    ext = os.path.splitext(path)[1].lower()
-                    if ext in WORD_EXTS:
-                        self._open_docx_with_flow(
-                            path, os.path.basename(path), show_overlay=show_overlay,
-                        )
-                    elif ext == '.pdf':
-                        self._open_pdf_with_flow(
-                            path, os.path.basename(path), show_overlay=show_overlay,
-                        )
-                    elif sys.platform == 'win32':
-                        os.startfile(path)
-                    elif sys.platform == 'darwin':
-                        subprocess.Popen(['open', path])
-                    else:
-                        subprocess.Popen(['xdg-open', path])
-                    if show_toast:
-                        self._show_toast(f"✅  正在開啟：{os.path.basename(path)}")
-                    opened = True
-                except Exception as e:
-                    if show_toast:
-                        self._show_toast(f"❌  無法開啟：{e}", 'err')
-        elif kind == 'bookmark':
+        hymn_payload_data = payload if kind == 'hymn' and payload.get('lyrics') else payload_from_legacy(self.books, payload)
+        if hymn_payload_data:
             try:
-                self._open_pdf_with_flow(
-                    payload['pdf_path'],
-                    f"{payload['title']}  ·  P.{payload['page']}",
-                    page=payload['page'],
-                    show_overlay=show_overlay,
-                )
-                if show_toast:
-                    self._show_toast(
-                        f"✅  開啟 P.{payload['page']}：{payload['title'][:30]}"
+                self._last_opened_path = 'lyric'
+                preview_mode = bool(self._settings.get('lyric_preview_mode', False))
+                if show_overlay and not preview_mode:
+                    self._show_open_hymn_popup(
+                        hymn_payload_data.get('book', ''),
+                        hymn_payload_data.get('name') or hymn_payload_data.get('title', ''),
                     )
-                opened = True
-            except Exception as e:
-                if show_toast:
-                    self._show_toast(f"❌  無法開啟書籤：{e}", 'err')
-        elif kind == 'content_pdf':
-            try:
-                sub = f"P.{payload['page']}"
-                snip = (payload.get('snippet') or '').strip()
-                if snip:
-                    sub += f"  {snip[:40]}"
-                self._open_pdf_with_flow(
-                    payload['path'], sub, page=payload['page'], show_overlay=show_overlay,
+                self._lyric_pair.open_hymn(
+                    hymn_payload_data,
+                    start_blacked=self._settings.get('lyric_start_blacked', True),
+                    preview=preview_mode,
                 )
+                self._schedule_lyric_preview()
+                QTimer.singleShot(80, self._sync_lyric_preview)
+                QTimer.singleShot(220, self._sync_lyric_preview)
                 if show_toast:
-                    self._show_toast(f"✅  開啟 P.{payload['page']}")
+                    label = hymn_payload_data.get('name') or hymn_payload_data.get('title') or ''
+                    if preview_mode:
+                        self._show_toast(f'👁  預覽：{label}（未出街）')
+                    else:
+                        self._show_toast(f"✅  開啟：{label}")
                 opened = True
+                payload = hymn_payload_data
             except Exception as e:
                 if show_toast:
-                    self._show_toast(f"❌  無法開啟：{e}", 'err')
-        elif kind == 'content_word':
-            path = payload.get('path')
-            if path and os.path.exists(path):
-                try:
-                    sub = os.path.splitext(os.path.basename(path))[0]
-                    page = payload.get('page')
-                    snip = (payload.get('snippet') or '').strip()
-                    if page:
-                        sub = f"P.{page}  {sub}"
-                    if snip:
-                        sub += f"  ·  {snip[:35]}"
-                    self._open_docx_with_flow(path, sub, show_overlay=show_overlay)
-                    if show_toast:
-                        self._show_toast(f"✅  正在開啟：{os.path.basename(path)}")
-                    opened = True
-                except Exception as e:
-                    if show_toast:
-                        self._show_toast(f"❌  無法開啟：{e}", 'err')
+                    self._show_toast(f"❌  無法開啟詩歌：{e}", 'err')
+        elif show_toast:
+            self._show_toast('找不到對應歌詞，已不再開啟 Word / PDF', 'warn')
         if opened and record:
             self._record_open(payload=payload)
 
@@ -6492,14 +7441,6 @@ class MainWindow(QMainWindow, EnhancementMixin):
         info = f"已選：{book['name']}"
         if book['hymn_count']:
             info += f"  ·  {book['hymn_count']} 首"
-        if book['bookmark']:
-            info += "  ·  PDF + 書籤"
-        elif book['docx'] and book['pdf']:
-            info += "  ·  DOCX + PDF"
-        elif book['docx']:
-            info += "  ·  DOCX"
-        elif book['pdf']:
-            info += "  ·  PDF"
         self.sel_info.setText(f"  ▸  {info}")
 
     # ─────────────────────────────────────────────────────────────
@@ -6729,6 +7670,7 @@ class MainWindow(QMainWindow, EnhancementMixin):
             self.sched_entry_dropdown.hide()
 
     def _set_search_mode(self, mode):
+        mode = LEGACY_SEARCH_MODES.get(mode, mode)
         if getattr(self, 'senior_mode', False) and mode != 'standard':
             mode = 'standard'
         if mode not in SEARCH_MODES:
@@ -6747,7 +7689,7 @@ class MainWindow(QMainWindow, EnhancementMixin):
         self.schedule_row.setVisible(mode == 'schedule')
         self.global_row.setVisible(mode == 'global')
         self.keyword_row.setVisible(mode == 'keyword')
-        self.keyword_index_row.setVisible(mode == 'keyword')
+        self.keyword_index_row.setVisible(False)
         self.dropdown.hide()
         if hasattr(self, 'sched_entry_dropdown'):
             self.sched_entry_dropdown.hide()
@@ -6783,14 +7725,12 @@ class MainWindow(QMainWindow, EnhancementMixin):
             self._refresh_schedule_list()
         elif mode == 'global':
             self.file_hdr.setText("全局搜索結果")
-            self.hint_lbl.setText("輸入歌名，會在所有書冊的 PDF 書籤及檔名中搜索")
+            self.hint_lbl.setText("輸入歌名或編號，會在所有書冊中搜索")
             self.sel_info.setText("  ▸  全局模式 — 跨書冊搜索")
             self._show_global_results(self.inp_global.text())
         else:
             self.file_hdr.setText("關鍵字搜索結果")
-            self.hint_lbl.setText(
-                "建立索引後搜索更快；勾選「即時搜索」可邊輸入邊找"
-            )
+            self.hint_lbl.setText("輸入關鍵字搜索歌詞；可勾選「即時搜索」邊輸入邊找")
             self.sel_info.setText("  ▸  關鍵字模式 — 全文搜索")
             self._update_index_status_label()
             self._show_keyword_placeholder()
@@ -6894,111 +7834,6 @@ class MainWindow(QMainWindow, EnhancementMixin):
         self._toast_timer.start(3500)
 
     # ─────────────────────────────────────────────────────────────
-    #  UPDATE — 檢查更新／前往下載（唔自動安裝）
-    # ─────────────────────────────────────────────────────────────
-    def _update_download_url(self):
-        return (
-            str(self._settings.get('update_download_url') or DEFAULT_UPDATE_DOWNLOAD_URL).strip()
-            or DEFAULT_UPDATE_DOWNLOAD_URL
-        )
-
-    def _update_check_url(self):
-        return (
-            str(self._settings.get('update_check_url') or DEFAULT_UPDATE_CHECK_URL).strip()
-            or DEFAULT_UPDATE_CHECK_URL
-        )
-
-    def _open_url_in_browser(self, url: str) -> bool:
-        url = (url or '').strip()
-        if not url:
-            return False
-        return QDesktopServices.openUrl(QUrl(url))
-
-    def _on_open_download_page(self):
-        url = self._update_download_url()
-        if self._open_url_in_browser(url):
-            self._show_toast('已開啟下載頁', 'ok')
-            if hasattr(self, 'lbl_update_status'):
-                self.lbl_update_status.setText(f'已開啟：{url}')
-        else:
-            self._show_toast('無法開啟下載頁', 'err')
-
-    def _on_check_update(self):
-        worker = getattr(self, '_update_check_worker', None)
-        if worker is not None and worker.isRunning():
-            self._show_toast('正在檢查更新…', 'warn')
-            return
-        check_url = self._update_check_url()
-        if hasattr(self, 'lbl_update_status'):
-            self.lbl_update_status.setText('檢查中…')
-        if hasattr(self, 'btn_check_update'):
-            self.btn_check_update.setEnabled(False)
-        self._show_toast('正在檢查更新…', 'warn')
-        worker = UpdateCheckWorker(check_url, APP_VERSION, parent=self)
-        worker.finished_ok.connect(self._on_update_check_ok)
-        worker.finished_err.connect(self._on_update_check_err)
-        worker.finished.connect(self._on_update_check_finished)
-        self._update_check_worker = worker
-        worker.start()
-
-    def _on_update_check_finished(self):
-        if hasattr(self, 'btn_check_update'):
-            self.btn_check_update.setEnabled(True)
-        self._update_check_worker = None
-
-    def _on_update_check_err(self, msg: str):
-        text = msg or '檢查更新失敗'
-        if hasattr(self, 'lbl_update_status'):
-            self.lbl_update_status.setText(text + ' — 可按「前往下載」手動查看')
-        self._show_toast(text, 'err')
-        box = QMessageBox(self)
-        box.setIcon(QMessageBox.Icon.Warning)
-        box.setWindowTitle('檢查更新')
-        box.setText(text)
-        box.setInformativeText('要開啟下載頁嗎？')
-        box.setStandardButtons(
-            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
-        )
-        box.setDefaultButton(QMessageBox.StandardButton.Yes)
-        if box.exec() == QMessageBox.StandardButton.Yes:
-            self._on_open_download_page()
-
-    def _on_update_check_ok(self, info: dict):
-        remote = int(info.get('remote_version') or 0)
-        current = int(info.get('current') or APP_VERSION)
-        notes = str(info.get('notes') or '').strip()
-        build_date = str(info.get('build_date') or '').strip()
-        download = str(info.get('url') or '').strip() or self._update_download_url()
-        if info.get('has_update'):
-            detail = f'目前 v{current} → 最新 v{remote}'
-            if build_date:
-                detail += f'（{build_date}）'
-            if notes:
-                detail += f'\n{notes}'
-            if hasattr(self, 'lbl_update_status'):
-                self.lbl_update_status.setText(f'有新版本 v{remote} — {notes or "請前往下載"}')
-            self._show_toast(f'有新版本 v{remote}', 'warn')
-            box = QMessageBox(self)
-            box.setIcon(QMessageBox.Icon.Information)
-            box.setWindowTitle('發現新版本')
-            box.setText(f'有新版本 v{remote}')
-            box.setInformativeText(detail + '\n\n要開啟下載頁嗎？')
-            box.setStandardButtons(
-                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
-            )
-            box.setDefaultButton(QMessageBox.StandardButton.Yes)
-            if box.exec() == QMessageBox.StandardButton.Yes:
-                if self._open_url_in_browser(download):
-                    self._show_toast('已開啟下載頁', 'ok')
-        else:
-            msg = f'已是最新版本 v{current}'
-            if remote:
-                msg = f'已是最新（遠端 v{remote}）'
-            if hasattr(self, 'lbl_update_status'):
-                self.lbl_update_status.setText(msg)
-            self._show_toast(msg, 'ok')
-
-    # ─────────────────────────────────────────────────────────────
     #  REMOTE — Mobile API 遙控開檔
     # ─────────────────────────────────────────────────────────────
     def _remote_local_base_url(self):
@@ -7032,7 +7867,8 @@ class MainWindow(QMainWindow, EnhancementMixin):
         """內網會眾入口（同 WiFi）。"""
         if not getattr(self._remote, 'running', False):
             return ''
-        return self._remote_local_base_url() or ''
+        base = self._remote_local_base_url()
+        return tunnel_viewer_url(base) if base else ''
 
     def _remote_lan_admin_url(self):
         """內網操作員遙控頁（/admin）。"""
@@ -7535,103 +8371,6 @@ class MainWindow(QMainWindow, EnhancementMixin):
         self._remote.state.set_viewer_show_debug(checked)
         self._persist_settings(viewer_show_debug=checked)
 
-    def _refresh_gdrive_map_status(self):
-        lbl = getattr(self, 'gdrive_map_status_lbl', None)
-        if lbl is None:
-            return
-        try:
-            info = get_index_info()
-        except Exception as exc:
-            lbl.setText(f'無法讀取 index：{exc}')
-            return
-        src = '外置設定' if info.get('external') else '內嵌（唯讀 fallback）'
-        built = info.get('built_at') or '—'
-        lbl.setText(
-            f"來源：{src}\n路徑：{info.get('path')}\n"
-            f"筆數：{info.get('file_count', 0)}  ·  built_at：{built}"
-        )
-
-    def _on_gdrive_folder_ids_changed(self):
-        self._persist_settings(
-            gdrive_folder_id=self.inp_gdrive_folder.text().strip() or GDRIVE_DEFAULT_FOLDER_ID,
-            gdrive_s1_folder_id=self.inp_gdrive_s1.text().strip() or GDRIVE_SPLIT_BOOK_FOLDERS[0][1],
-            gdrive_s2_folder_id=self.inp_gdrive_s2.text().strip() or GDRIVE_SPLIT_BOOK_FOLDERS[1][1],
-        )
-
-    def _on_gdrive_rebuild_clicked(self):
-        from hymn_features.gdrive_map_dialog import GdriveRebuildWorker
-        if getattr(self, '_gdrive_rebuild_worker', None) and self._gdrive_rebuild_worker.isRunning():
-            self._show_toast('正在重建 mapping…', 'warn')
-            return
-        self._on_gdrive_folder_ids_changed()
-        self.btn_gdrive_rebuild.setEnabled(False)
-        self.gdrive_map_status_lbl.setText('正在從 Google Drive 列出檔案…')
-        worker = GdriveRebuildWorker(
-            self._settings['gdrive_folder_id'],
-            self._settings['gdrive_s1_folder_id'],
-            self._settings['gdrive_s2_folder_id'],
-            self,
-        )
-        self._gdrive_rebuild_worker = worker
-        worker.progress.connect(lambda m: self.gdrive_map_status_lbl.setText(m))
-        worker.finished_ok.connect(self._on_gdrive_rebuild_ok)
-        worker.finished_err.connect(self._on_gdrive_rebuild_err)
-        worker.start()
-
-    def _on_gdrive_rebuild_ok(self, payload):
-        from hymn_remote.gdrive_hymn_map import external_index_path, save_index_payload, invalidate_index_cache
-        try:
-            path = save_index_payload(payload, external_index_path())
-            invalidate_index_cache()
-            self._show_toast(f'Drive mapping 已重建（{payload.get("file_count", 0)} 筆）', 'ok')
-            self.gdrive_map_status_lbl.setText(f'已寫入：{path}')
-        except Exception as exc:
-            self._show_toast(f'儲存失敗：{exc}', 'err')
-        self.btn_gdrive_rebuild.setEnabled(True)
-        self._refresh_gdrive_map_status()
-
-    def _on_gdrive_rebuild_err(self, message):
-        self.btn_gdrive_rebuild.setEnabled(True)
-        self._show_toast(f'重建失敗：{message}', 'err')
-        self._refresh_gdrive_map_status()
-
-    def _on_gdrive_edit_clicked(self):
-        from hymn_features.gdrive_map_dialog import GdriveMapEditorDialog
-        dlg = GdriveMapEditorDialog(self)
-        if dlg.exec():
-            self._refresh_gdrive_map_status()
-            self._show_toast('Drive mapping 已更新', 'ok')
-
-    def _on_gdrive_import_clicked(self):
-        from hymn_features.gdrive_map_dialog import import_index_json
-        path, _ = QFileDialog.getOpenFileName(
-            self, '匯入 Drive Mapping JSON', app_dir(), 'JSON (*.json)',
-        )
-        if not path:
-            return
-        try:
-            out = import_index_json(Path(path))
-            self._show_toast('已匯入 Drive mapping', 'ok')
-            self.gdrive_map_status_lbl.setText(f'已匯入 → {out}')
-            self._refresh_gdrive_map_status()
-        except Exception as exc:
-            self._show_toast(f'匯入失敗：{exc}', 'err')
-
-    def _on_gdrive_export_clicked(self):
-        from hymn_features.gdrive_map_dialog import export_index_json
-        path, _ = QFileDialog.getSaveFileName(
-            self, '匯出 Drive Mapping JSON',
-            os.path.join(app_dir(), 'gdrive_hymn_index.json'),
-            'JSON (*.json)',
-        )
-        if not path:
-            return
-        try:
-            export_index_json(Path(path))
-            self._show_toast('已匯出 Drive mapping', 'ok')
-        except Exception as exc:
-            self._show_toast(f'匯出失敗：{exc}', 'err')
-
     def _on_remote_port_changed(self, val):
         self._remote.state.set_port(val)
         self._persist_settings(remote_port=val)
@@ -7642,6 +8381,65 @@ class MainWindow(QMainWindow, EnhancementMixin):
     def _on_remote_open_payload(self, payload):
         self._open_from_payload(payload)
         self._show_toast('📱  Mobile 遙控已開啟', 'ok')
+
+    def _on_remote_prefs(self, payload):
+        if not isinstance(payload, dict):
+            return
+        if 'overlay_auto_unblack' in payload:
+            checked = bool(payload['overlay_auto_unblack'])
+            if hasattr(self, 'chk_overlay_auto_unblack'):
+                self.chk_overlay_auto_unblack.blockSignals(True)
+                self.chk_overlay_auto_unblack.setChecked(checked)
+                self.chk_overlay_auto_unblack.blockSignals(False)
+            self._persist_settings(overlay_auto_unblack=checked)
+
+    def _on_remote_lyric_control(self, payload):
+        pair = getattr(self, '_lyric_pair', None)
+        if pair is None or not isinstance(payload, dict):
+            return
+        action = str(payload.get('action') or '').strip().lower()
+        value = payload.get('value')
+        session = pair.session
+        if action == 'black':
+            if value is None or value == '':
+                session.toggle_blacked()
+            else:
+                session.set_blacked(str(value).strip().lower() in ('1', 'true', 'yes', 'on'))
+        elif action == 'fit':
+            pair.fit_display()
+        elif action == 'restore':
+            self._restore_lyric_best_defaults()
+        elif action == 'save_best':
+            self._save_lyric_best_defaults()
+        elif action == 'fullscreen':
+            pair.toggle_display_fullscreen()
+        elif action == 'align':
+            session.set_align(value)
+            if not session.user_zoomed:
+                pair.fit_display()
+        elif action == 'spacing':
+            session.set_letter_spacing(value)
+            if not session.user_zoomed:
+                pair.fit_display()
+        elif action == 'scroll':
+            try:
+                session.set_scroll_ratio(value)
+            except (TypeError, ValueError):
+                pass
+        elif action == 'nudge':
+            try:
+                session.nudge_scroll(value)
+            except (TypeError, ValueError):
+                pass
+        elif action == 'zoom':
+            try:
+                factor = float(value)
+            except (TypeError, ValueError):
+                factor = ZOOM_STEP
+            if factor <= 0:
+                factor = ZOOM_STEP
+            session.zoom_by(factor, user=True)
+        self._schedule_lyric_preview()
 
     def _on_remote_display_action(self, action):
         action = str(action or '').strip().lower()
@@ -7664,29 +8462,24 @@ class MainWindow(QMainWindow, EnhancementMixin):
         BookNameOverlay.hide_overlay()
         # Must close viewer BEFORE black overlay steals focus
         BlackScreenOverlay.hide()
-
-        def _worker():
+        ok = False
+        try:
+            if getattr(self, '_lyric_pair', None) is not None and self._lyric_pair.is_open():
+                self._lyric_pair.close()
+                self._schedule_lyric_preview()
+                ok = True
+        except Exception as exc:
+            print(f'[WARN] close lyric windows: {exc}')
             ok = False
-            try:
-                ok = close_document_viewer(path=path, title_needle=needle)
-            except Exception as exc:
-                print(f'[WARN] close_document_viewer: {exc}')
-                ok = False
-
-            def _ui():
-                if action == 'black':
-                    BlackScreenOverlay.show()
-                    msg = '📱  已結束並全黑' if ok else '📱  全黑已開（關檔可能失敗）'
-                    self._show_toast(msg, 'warn' if ok else 'err')
-                else:
-                    if ok:
-                        self._show_toast('📱  已結束目前檔案', 'ok')
-                    else:
-                        self._show_toast('📱  關檔失敗：搵唔到 Word/PDF 視窗', 'err')
-
-            self._main_invoke.emit(_ui)
-
-        threading.Thread(target=_worker, daemon=True).start()
+        if action == 'black':
+            BlackScreenOverlay.show()
+            msg = '📱  已結束並全黑' if ok else '📱  全黑已開'
+            self._show_toast(msg, 'warn' if ok else 'err')
+        else:
+            if ok:
+                self._show_toast('📱  已結束目前詩歌', 'ok')
+            else:
+                self._show_toast('📱  未有開啟中的歌詞視窗', 'warn')
 
     def _show_phone_control_wizard(self):
         dlg = PhoneControlWizard(self, theme=self.theme_name, parent=self)
@@ -7715,7 +8508,7 @@ class MainWindow(QMainWindow, EnhancementMixin):
         if not matched:
             return
         book = matched[0]
-        self._set_search_mode('book')
+        self._set_search_mode('standard')
         self.inp_num.blockSignals(True)
         self.inp_num.setText(str(num_ref))
         self.inp_num.blockSignals(False)
@@ -7760,6 +8553,8 @@ class MainWindow(QMainWindow, EnhancementMixin):
             return
         BlackScreenOverlay.hide()
         DesktopQrOverlay.hide()
+        if getattr(self, '_lyric_pair', None) is not None:
+            self._lyric_pair.close()
         self._stop_cloudflare_tunnel()
         self._remote.stop()
         super().closeEvent(event)

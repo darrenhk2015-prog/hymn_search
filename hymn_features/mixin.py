@@ -89,7 +89,10 @@ class EnhancementMixin:
         book = payload.get('book', '')
         if not book and payload.get('path'):
             book = self._book_name_for_path(payload['path'])
-        if kind == 'bookmark':
+        if kind == 'hymn':
+            num = payload.get('code') or payload.get('number') or payload.get('title') or payload.get('name', '')
+            label = summarize_match(payload)
+        elif kind == 'bookmark':
             num = payload.get('title', '')
             label = summarize_match(payload)
         elif kind == 'file':
@@ -111,20 +114,12 @@ class EnhancementMixin:
             'last_opened', 'session_history', 'session_cursor',
         ) if k in self._settings})
         self._update_footer_status()
-        self._sync_viewer_now_playing(book_name, hymn_ref, label, payload=payload)
+        if hasattr(self, '_schedule_lyric_preview'):
+            self._schedule_lyric_preview()
 
     def _sync_viewer_now_playing(self, book_name='', hymn_ref='', label='', payload=None):
-        remote = getattr(self, '_remote', None)
-        if remote is None:
-            return
-        filename = ''
-        if payload and payload.get('kind') == 'file':
-            filename = payload.get('name') or os.path.basename(payload.get('path', ''))
-        from hymn_remote.viewer_hymn_map import resolve_viewer_hymn
-        info = resolve_viewer_hymn(
-            book_name, hymn_ref, label, filename=filename, payload=payload,
-        )
-        remote.state.set_now_viewing(info)
+        if hasattr(self, '_schedule_lyric_preview'):
+            self._schedule_lyric_preview()
 
     def _open_hymn_ref(self, book_ref, num_ref='', record=True):
         matches = resolve_open_request(self.books, book_ref, num_ref)
@@ -145,7 +140,9 @@ class EnhancementMixin:
     def _populate_matches_in_file_list(self, matches):
         self.file_list.clear()
         for payload in matches:
-            if payload.get('kind') == 'file':
+            if payload.get('kind') == 'hymn':
+                item = QListWidgetItem(f"  {payload.get('name') or payload.get('title') or summarize_match(payload)}")
+            elif payload.get('kind') == 'file':
                 path = payload['path']
                 ext = os.path.splitext(path)[1].lower()
                 tag = ext[1:].upper() if ext.startswith('.') else ext.upper()
@@ -279,7 +276,31 @@ class EnhancementMixin:
         pinned = is_book_pinned(self._settings, book['name'])
         pin_action = menu.addAction('取消釘選' if pinned else '釘選此書')
         pin_action.triggered.connect(lambda: self._pin_book_from_menu(book['name'], unpin=pinned))
+        menu.addSeparator()
+        manage = menu.addAction('管理此冊詩歌…')
+        manage.triggered.connect(
+            lambda: self._open_hymn_editor_for_book(book)
+        )
         menu.exec(self.book_list.mapToGlobal(pos))
+
+    def _file_list_context_menu(self, pos):
+        if not hasattr(self, 'file_list'):
+            return
+        menu = QMenu(self)
+        item = self.file_list.itemAt(pos)
+        payload = item.data(Qt.ItemDataRole.UserRole) if item else None
+        if payload and payload.get('kind') == 'hymn' and payload.get('hymn_id'):
+            edit_one = menu.addAction('編輯這首詩歌…')
+            hid = payload.get('hymn_id')
+            edit_one.triggered.connect(lambda: self._open_hymn_editor(hid))
+        manage = menu.addAction('管理詩歌庫…')
+        manage.triggered.connect(lambda: self._open_hymn_editor())
+        menu.exec(self.file_list.mapToGlobal(pos))
+
+    def _open_hymn_editor_for_book(self, book):
+        hymns = (book or {}).get('hymns') or []
+        first_id = hymns[0].get('id', '') if hymns else ''
+        self._open_hymn_editor(first_id, volume_id=(book or {}).get('volume_id') or '')
 
     def _pin_book_from_menu(self, book_name, unpin=False):
         if unpin:
@@ -309,17 +330,10 @@ class EnhancementMixin:
             self.book_list.addItem(i)
 
         def add_book(book, prefix=''):
-            badges = []
-            if book.get('docx'):
-                badges.append('W')
-            if book.get('bookmark'):
-                badges.append('🔖')
-            elif book.get('pdf'):
-                badges.append('P')
             cnt = f" ({book['hymn_count']})" if book.get('hymn_count') else ''
             pin = '📌 ' if is_book_pinned(self._settings, book['name']) else ''
             item = QListWidgetItem(
-                f"  {prefix}{pin}📖  {book['name']}{cnt}  {'  '.join(badges)}"
+                f"  {prefix}{pin}📖  {book['name']}{cnt}"
             )
             item.setData(Qt.ItemDataRole.UserRole, book)
             self.book_list.addItem(item)
@@ -380,10 +394,17 @@ class EnhancementMixin:
     def _setup_folder_watcher(self):
         self._folder_watcher = QFileSystemWatcher(self)
         self._folder_watcher.directoryChanged.connect(self._on_folder_changed)
+        self._folder_watcher.fileChanged.connect(self._on_folder_changed)
         self._rescan_debounce = QTimer(self)
         self._rescan_debounce.setSingleShot(True)
         self._rescan_debounce.timeout.connect(self._auto_rescan_books)
-        if os.path.isdir(self.hymn_folder):
+        json_path = getattr(self, 'hymns_json_path', '') or ''
+        if json_path and os.path.isfile(json_path):
+            self._folder_watcher.addPath(json_path)
+            parent = os.path.dirname(json_path)
+            if os.path.isdir(parent):
+                self._folder_watcher.addPath(parent)
+        elif os.path.isdir(self.hymn_folder):
             self._folder_watcher.addPath(self.hymn_folder)
 
     def _on_folder_changed(self, _path=''):
@@ -406,16 +427,17 @@ class EnhancementMixin:
         dlg.setWindowTitle('快捷鍵')
         lay = QVBoxLayout(dlg)
         lines = [
-            'F1 / F2 / F3 / F4 / F5 — 標準 / 書本 / 全局 / 關鍵字 / 排程模式',
-            'Ctrl+Enter — 聚焦書冊輸入（標準／書本模式）',
+            'F1 / F2 / F3 / F4 — 標準 / 全局 / 關鍵字 / 排程模式',
+            'Ctrl+Enter — 聚焦書冊輸入（標準模式）',
             'Enter — 確認 Mobile 待辦（有待確認時）',
             'Ctrl+← / Ctrl+→ — Session 上一首 / 下一首',
             'Alt+← / Alt+→ — 排程上一首 / 下一首',
-            'Filter / Open — 標準／書本模式過濾或開啟唯一結果',
+            'Filter / Open — 標準模式過濾或開啟唯一結果',
             '🎤 — 廣東話語音輸入詩歌號／歌名（書冊欄有焦點則輸入書冊）',
             '雙擊搜尋結果 — 排程模式加入播放清單',
             '雙擊播放清單 — 開啟該首',
-            'Esc — 取消全黑畫面（手機遙控「結束並全黑」後）',
+            'Esc — 取消全黑畫面；主展示全螢幕時改回視窗',
+            'F11 — 主展示全螢幕 / 視窗化（展示窗或控制窗「展示全螢幕」）',
         ]
         body = QLabel('\n'.join(lines))
         body.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
